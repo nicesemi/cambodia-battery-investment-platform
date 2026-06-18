@@ -1,0 +1,118 @@
+{
+  "nav": {
+    "home": "Home",
+    "invest": "Invest",
+    "trade": "Trade",
+    "dividends": "Dividends",
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "username": "Username",
+    "fullName": "Full Name",
+    "phone": "Phone",
+    "loginBtn": "Login Now",
+    "registerBtn": "Register Now",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "loginSuccess": "Login successful",
+    "registerSuccess": "Registration successful"
+  },
+  "home": {
+    "title": "Cambodia Battery Bank Investment Platform",
+    "subtitle": "Invest in Cambodia battery swapping market, enjoy 70% profit sharing",
+    "totalInvestors": "Total Investors",
+    "totalInvestment": "Total Investment",
+    "totalDividends": "Total Dividends",
+    "avgROI": "Avg Annual ROI",
+    "features": {
+      "title": "Core Advantages",
+      "profitShare": "70% Profit Sharing",
+      "profitShareDesc": "70% of monthly net profit automatically distributed to investors",
+      "tradable": "Tradable Assets",
+      "tradableDesc": "Virtual assets tradable anytime, flexible liquidity",
+      "stable": "Stable Returns",
+      "stableDesc": "Cambodia e-motorcycle market growing rapidly, stable returns",
+      "secure": "Safe & Secure",
+      "secureDesc": "JWT authentication, data encryption, bank-level security"
+    },
+    "market": {
+      "title": "Cambodia Market Overview",
+      "motorcycles": "E-Motorcycles",
+      "dailyDemand": "Daily Swap Demand",
+      "growthRate": "Annual Growth"
+    }
+  },
+  "assets": {
+    "title": "Battery Assets",
+    "purchase": "Purchase",
+    "unitPrice": "Unit Price",
+    "available": "Available",
+    "expectedROI": "Expected ROI",
+    "location": "Location",
+    "units": "Units",
+    "totalCost": "Total Cost",
+    "purchaseSuccess": "Purchase successful",
+    "myAssets": "My Assets",
+    "holdUnits": "Units Held",
+    "avgCost": "Avg Cost",
+    "totalDividends": "Total Dividends"
+  },
+  "trade": {
+    "title": "Asset Trading",
+    "buy": "Buy",
+    "sell": "Sell",
+    "price": "Price",
+    "quantity": "Quantity",
+    "orderBook": "Order Book",
+    "myOrders": "My Orders",
+    "createOrder": "Place Order",
+    "cancel": "Cancel",
+    "pending": "Pending",
+    "filled": "Filled",
+    "cancelled": "Cancelled",
+    "buyOrders": "Buy Orders",
+    "sellOrders": "Sell Orders"
+  },
+  "dividends": {
+    "title": "Dividend Records",
+    "period": "Period",
+    "unitsHeld": "Units Held",
+    "dividendAmount": "Dividend Amount",
+    "total": "Total Dividends",
+    "forecast": "Return Forecast",
+    "monthlyDividend": "Est. Monthly",
+    "yearlyDividend": "Est. Yearly",
+    "paybackPeriod": "Payback Period"
+  },
+  "admin": {
+    "dashboard": "Dashboard",
+    "users": "User Management",
+    "trades": "Trade Records",
+    "configs": "System Config",
+    "totalUsers": "Total Users",
+    "newUsers": "New Users (30d)",
+    "totalVolume": "Total Volume",
+    "recentTrades": "Recent Trades",
+    "recentUsers": "Recent Users"
+  },
+  "common": {
+    "loading": "Loading...",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "success": "Success",
+    "error": "Error",
+    "noData": "No data",
+    "search": "Search",
+    "total": "Total",
+    "items": "items"
+  }
+}
