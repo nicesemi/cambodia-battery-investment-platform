@@ -238,6 +238,345 @@ const updateSystemConfig = async (req, res) => {
   }
 };
 
+// ============ 资产管理 ============
+
+// 获取所有资产（管理视图，含已关闭/维护中的）
+const getAllAssets = async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, asset_code, name, description, battery_type, total_units,
+              available_units, stock, unit_price, unit_price_rmb, expected_roi, location, station_id,
+              status, created_at, updated_at,
+              (total_units - available_units) as sold_units
+       FROM battery_assets
+       ORDER BY created_at DESC`
+    );
+
+    // 获取每个资产的站点分布
+    const assets = await Promise.all(result.rows.map(async (a) => {
+      const sitesResult = await db.query(
+        `SELECT site_id, site_name, COUNT(*) as unit_count,
+                COUNT(CASE WHEN status = 'available' THEN 1 END) as available_count,
+                COUNT(CASE WHEN status = 'sold' THEN 1 END) as sold_count
+         FROM battery_units
+         WHERE battery_asset_id = $1
+         GROUP BY site_id, site_name
+         ORDER BY site_name`,
+        [a.id]
+      );
+      return { ...a, site_distribution: sitesResult.rows };
+    }));
+
+    res.json({ assets });
+  } catch (error) {
+    console.error('Get all assets error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// 创建资产
+const createAsset = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const { asset_code, name, description, battery_type, total_units, unit_price, unit_price_rmb, expected_roi, location, station_id } = req.body;
+
+    if (!asset_code || !name || !total_units || !unit_price || !expected_roi) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Missing required fields: asset_code, name, total_units, unit_price, expected_roi' });
+    }
+
+    const result = await client.query(
+      `INSERT INTO battery_assets (asset_code, name, description, battery_type, total_units, available_units, stock, unit_price, unit_price_rmb, expected_roi, location, station_id, status)
+       VALUES ($1, $2, $3, $4, $5, $5, $5, $6, $7, $8, $9, $10, 'active')
+       RETURNING *`,
+      [asset_code, name, description, battery_type, total_units, unit_price, unit_price_rmb, expected_roi, location, station_id]
+    );
+
+    const newAsset = result.rows[0];
+
+    // 自动生成 battery_units 记录：每块电池一个唯一编号
+    const totalUnits = parseInt(total_units);
+    const unitRecords = [];
+    for (let i = 1; i <= totalUnits; i++) {
+      const unitCode = `${asset_code}-${String(i).padStart(5, '0')}`;
+      unitRecords.push(`('${newAsset.id}', '${unitCode}', '${station_id || ''}', '${location || ''}')`);
+    }
+
+    // 分批插入（每批最多500条）
+    const batchSize = 500;
+    for (let i = 0; i < unitRecords.length; i += batchSize) {
+      const batch = unitRecords.slice(i, i + batchSize).join(', ');
+      await client.query(
+        `INSERT INTO battery_units (battery_asset_id, unit_code, site_id, site_name) VALUES ${batch}`
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      message: `Asset created with ${totalUnits} battery units`,
+      asset: newAsset,
+      units_generated: totalUnits,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Asset code already exists' });
+    }
+    console.error('Create asset error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+// 更新资产
+const updateAsset = async (req, res) => {
+  try {
+    const { assetId } = req.params;
+    const { name, description, battery_type, total_units, unit_price, expected_roi, location, station_id, status } = req.body;
+
+    // 动态构建 SET 子句
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
+    if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description); }
+    if (battery_type !== undefined) { fields.push(`battery_type = $${idx++}`); values.push(battery_type); }
+    if (total_units !== undefined) {
+      // 如果修改 total_units，需要同步调整 available_units 和 stock
+      const current = await db.query('SELECT total_units, available_units, stock FROM battery_assets WHERE id = $1', [assetId]);
+      if (current.rows.length === 0) return res.status(404).json({ error: 'Asset not found' });
+      const diff = total_units - current.rows[0].total_units;
+      const newAvailable = current.rows[0].available_units + diff;
+      const newStock = current.rows[0].stock + diff;
+      fields.push(`total_units = $${idx++}`); values.push(total_units);
+      fields.push(`available_units = $${idx++}`); values.push(Math.max(0, newAvailable));
+      fields.push(`stock = $${idx++}`); values.push(Math.max(0, newStock));
+    }
+    if (unit_price !== undefined) { fields.push(`unit_price = $${idx++}`); values.push(unit_price); }
+    if (expected_roi !== undefined) { fields.push(`expected_roi = $${idx++}`); values.push(expected_roi); }
+    if (location !== undefined) { fields.push(`location = $${idx++}`); values.push(location); }
+    if (station_id !== undefined) { fields.push(`station_id = $${idx++}`); values.push(station_id); }
+    if (status !== undefined) { fields.push(`status = $${idx++}`); values.push(status); }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    values.push(assetId);
+    const result = await db.query(
+      `UPDATE battery_assets SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+    res.json({ message: 'Asset updated', asset: result.rows[0] });
+  } catch (error) {
+    console.error('Update asset error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// 变更资产状态（上线/下架/维护中）
+const updateAssetStatus = async (req, res) => {
+  try {
+    const { assetId } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['active', 'paused', 'closed', 'maintenance'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    const result = await db.query(
+      `UPDATE battery_assets SET status = $1 WHERE id = $2 RETURNING *`,
+      [status, assetId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+    res.json({ message: `Asset status updated to ${status}`, asset: result.rows[0] });
+  } catch (error) {
+    console.error('Update asset status error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// 删除资产（软删除 - 标记为 closed）
+const deleteAsset = async (req, res) => {
+  try {
+    const { assetId } = req.params;
+    const result = await db.query(
+      `UPDATE battery_assets SET status = 'closed' WHERE id = $1 AND status != 'closed' RETURNING *`,
+      [assetId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Asset not found or already closed' });
+    }
+    res.json({ message: 'Asset closed (soft-deleted)', asset: result.rows[0] });
+  } catch (error) {
+    console.error('Delete asset error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ============ 代理商/加盟商审批 ============
+
+// 获取所有代理申请
+const getAgentApplications = async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = `SELECT aa.*, u.username, u.email
+                 FROM agent_applications aa
+                 JOIN users u ON u.id = aa.user_id`;
+    const params = [];
+    if (status) {
+      params.push(status);
+      query += ` WHERE aa.status = $1`;
+    }
+    query += ` ORDER BY aa.created_at DESC`;
+    const result = await db.query(query, params);
+    res.json({ applications: result.rows });
+  } catch (error) {
+    console.error('Get agent applications error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// 审批代理申请
+const reviewAgentApplication = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const { applicationId } = req.params;
+    const { status, review_note } = req.body; // status: 'approved' | 'rejected'
+
+    if (!['approved', 'rejected'].includes(status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'status must be approved or rejected' });
+    }
+
+    const appResult = await client.query(
+      `UPDATE agent_applications
+       SET status = $1, reviewed_by = $2, review_note = $3, updated_at = now()
+       WHERE id = $4
+       RETURNING *`,
+      [status, req.user.id, review_note || null, applicationId]
+    );
+
+    if (appResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const app = appResult.rows[0];
+
+    // 审批通过 → 升级用户角色
+    if (status === 'approved') {
+      const newRole = app.agent_type === 'province_agent' ? 'franchisee' : 'franchisee';
+      await client.query(
+        'UPDATE users SET role = $1 WHERE id = $2',
+        [newRole, app.user_id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.json({ message: `申请已${status === 'approved' ? '通过' : '驳回'}`, application: app });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Review agent application error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+// 获取所有加盟商申请
+const getFranchiseeApplications = async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = `SELECT fa.*, u.username, u.email
+                 FROM franchisee_applications fa
+                 JOIN users u ON u.id = fa.user_id`;
+    const params = [];
+    if (status) {
+      params.push(status);
+      query += ` WHERE fa.status = $1`;
+    }
+    query += ` ORDER BY fa.created_at DESC`;
+    const result = await db.query(query, params);
+    res.json({ applications: result.rows });
+  } catch (error) {
+    console.error('Get franchisee applications error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// 审批加盟商申请
+const reviewFranchiseeApplication = async (req, res) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const { applicationId } = req.params;
+    const { status, review_note } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'status must be approved or rejected' });
+    }
+
+    const appResult = await client.query(
+      `UPDATE franchisee_applications
+       SET status = $1, reviewed_by = $2, review_note = $3, updated_at = now()
+       WHERE id = $4
+       RETURNING *`,
+      [status, req.user.id, review_note || null, applicationId]
+    );
+
+    if (appResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const app = appResult.rows[0];
+
+    // 审批通过 → 创建门店
+    if (status === 'approved') {
+      await client.query(
+        `INSERT INTO franchisee_stores (owner_id, name, city, address, phone, status)
+         VALUES ($1, $2, $3, $4, $5, 'active')
+         ON CONFLICT DO NOTHING`,
+        [app.user_id, app.store_name, app.city, app.address, app.phone]
+      );
+      // 升级用户角色
+      await client.query(
+        'UPDATE users SET role = $1 WHERE id = $2',
+        ['franchisee', app.user_id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.json({ message: `申请已${status === 'approved' ? '通过' : '驳回'}`, application: app });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Review franchisee application error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getAllUsers,
@@ -245,4 +584,15 @@ module.exports = {
   getAllTrades,
   getSystemConfigs,
   updateSystemConfig,
+  // 资产管理
+  getAllAssets,
+  createAsset,
+  updateAsset,
+  updateAssetStatus,
+  deleteAsset,
+  // 代理/加盟商审批
+  getAgentApplications,
+  reviewAgentApplication,
+  getFranchiseeApplications,
+  reviewFranchiseeApplication,
 };

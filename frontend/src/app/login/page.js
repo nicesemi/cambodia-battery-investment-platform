@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
-import { Battery } from 'lucide-react';
+
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -23,7 +23,7 @@ export default function Login() {
       await login(email, password);
       router.push('/');
     } catch (err) {
-      setError(err.response?.data?.error || '登录失败，请重试');
+      setError(err.message || '登录失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -33,9 +33,10 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2">
-            <Battery className="h-10 w-10 text-primary-600" />
-            <span className="text-2xl font-bold text-gray-900">BatteryBank</span>
+          <Link href="/" className="inline-flex flex-col items-center gap-0.5">
+            <img src="/logo.png" alt="1kWh" className="h-10 w-10 object-contain" />
+            <span className="text-lg font-bold text-gray-900 leading-tight">1kWh</span>
+            <span className="text-xs text-gray-400 -mt-1">1kwh.store</span>
           </Link>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">登录账户</h2>
           <p className="mt-2 text-gray-600">欢迎回来，请登录您的账户</p>
@@ -89,11 +90,6 @@ export default function Login() {
             </Link>
           </div>
 
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-500 text-center">
-              测试账号: admin@battery-invest.com / admin123
-            </p>
-          </div>
         </div>
       </div>
     </div>

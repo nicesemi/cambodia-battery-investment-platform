@@ -18,19 +18,36 @@ const getAssets = async (req, res) => {
   }
 };
 
-// 获取用户持有资产
+// 获取用户持有资产（含电池编号、传感器数据、站点信息）
 const getUserAssets = async (req, res) => {
   try {
     const result = await db.query(
       `SELECT ua.id, ua.units, ua.average_cost, ua.total_dividends_received,
-              ba.asset_code, ba.name, ba.unit_price, ba.expected_roi, ba.location
+              ba.asset_code, ba.name, ba.battery_type, ba.unit_price, ba.expected_roi, ba.location,
+              ba.total_units, ba.stock, ba.status as asset_status
        FROM user_assets ua
        JOIN battery_assets ba ON ua.asset_id = ba.id
        WHERE ua.user_id = $1`,
       [req.user.id]
     );
 
-    res.json({ userAssets: result.rows });
+    // 获取每个持有资产的电池单元列表
+    const userAssets = await Promise.all(result.rows.map(async (ua) => {
+      const unitsResult = await db.query(
+        `SELECT ibu.id as holding_id, bu.id as unit_id, bu.unit_code, bu.status as unit_status,
+                bu.site_id, bu.site_name, ibu.purchase_price, ibu.purchased_at,
+                bu.sensor_battery_level, bu.sensor_temperature, bu.sensor_cycle_count,
+                bu.sensor_last_online, bu.sensor_health_status
+         FROM investor_battery_units ibu
+         JOIN battery_units bu ON ibu.battery_unit_id = bu.id
+         WHERE ibu.investor_id = $1 AND ibu.battery_asset_id = $2
+         ORDER BY bu.unit_code`,
+        [req.user.id, ua.id]
+      );
+      return { ...ua, battery_units: unitsResult.rows };
+    }));
+
+    res.json({ userAssets });
   } catch (error) {
     console.error('Get user assets error:', error);
     res.status(500).json({ error: 'Internal server error' });

@@ -9,6 +9,7 @@ const registerSchema = Joi.object({
   password: Joi.string().min(6).required(),
   fullName: Joi.string().allow(''),
   phone: Joi.string().allow(''),
+  role: Joi.string().valid('user', 'investor', 'franchisee').default('investor'),
 });
 
 const loginSchema = Joi.object({
@@ -23,7 +24,7 @@ const register = async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const { email, username, password, fullName, phone } = value;
+    const { email, username, password, fullName, phone, role } = value;
 
     // 检查邮箱是否已存在
     const existingEmail = await db.query(
@@ -49,10 +50,10 @@ const register = async (req, res) => {
 
     // 创建用户
     const result = await db.query(
-      `INSERT INTO users (email, username, password_hash, full_name, phone)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (email, username, password_hash, full_name, phone, role)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, email, username, full_name, role, created_at`,
-      [email, username, passwordHash, fullName || null, phone || null]
+      [email, username, passwordHash, fullName || null, phone || null, role || 'investor']
     );
 
     const user = result.rows[0];

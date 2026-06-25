@@ -23,6 +23,10 @@ export default function Trade() {
       router.push('/login');
       return;
     }
+    if (user.role === 'franchisee') {
+      router.push('/franchisee');
+      return;
+    }
     loadData();
   }, [user]);
 

@@ -1,76 +1,144 @@
-import axios from 'axios';
+const API_URL = '/api';
 
-const API_URL = process.env.API_URL || 'http://localhost:3001/api';
+async function request(url, options = {}) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+  const res = await fetch(`${API_URL}${url}`, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
 
-// 请求拦截器 - 添加JWT token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// 响应拦截器
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  if (!res.ok) {
+    if (res.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      if (typeof window !== 'undefined') window.location.href = '/login';
     }
-    return Promise.reject(error);
+    throw new Error(data.error || data.message || 'Request failed');
   }
-);
+  return data;
+}
 
 // 认证API
 export const authAPI = {
-  register: (data) => api.post('/auth/register', data),
-  login: (data) => api.post('/auth/login', data),
-  getProfile: () => api.get('/auth/profile'),
+  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  login: (data) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  getProfile: () => request('/auth/profile'),
+  getStoreHierarchy: () => request('/auth/store-hierarchy'),
 };
 
 // 资产API
 export const assetAPI = {
-  getAssets: () => api.get('/assets'),
-  getUserAssets: () => api.get('/assets/my'),
-  purchaseAsset: (data) => api.post('/assets/purchase', data),
+  getAssets: () => request('/assets'),
+  getUserAssets: () => request('/assets/my'),
+  purchaseAsset: (data) => request('/assets/purchase', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // 交易API
 export const tradeAPI = {
-  createOrder: (data) => api.post('/trades/orders', data),
-  getMyOrders: (status) => api.get('/trades/orders', { params: { status } }),
-  getOrderBook: (assetId) => api.get(`/trades/orderbook/${assetId}`),
-  cancelOrder: (orderId) => api.delete(`/trades/orders/${orderId}`),
+  createOrder: (data) => request('/trades/orders', { method: 'POST', body: JSON.stringify(data) }),
+  getMyOrders: (status) => request(`/trades/orders${status ? `?status=${status}` : ''}`),
+  getOrderBook: (assetId) => request(`/trades/orderbook/${assetId}`),
+  cancelOrder: (orderId) => request(`/trades/orders/${orderId}`, { method: 'DELETE' }),
 };
 
 // 分红API
 export const dividendAPI = {
-  getMyDividends: (period) => api.get('/dividends/my', { params: { period } }),
-  getMarketForecast: () => api.get('/dividends/forecast'),
-  calculateDividend: (data) => api.post('/dividends/calculate', data),
+  getMyDividends: (period) => request(`/dividends/my${period ? `?period=${period}` : ''}`),
+  getMarketForecast: () => request('/dividends/forecast'),
+  calculateDividend: (data) => request('/dividends/calculate', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // 管理员API
 export const adminAPI = {
-  getDashboard: () => api.get('/admin/dashboard'),
-  getUsers: (page, limit, search) => api.get('/admin/users', { params: { page, limit, search } }),
-  updateUser: (userId, data) => api.put(`/admin/users/${userId}`, data),
-  getTrades: (page, limit) => api.get('/admin/trades', { params: { page, limit } }),
-  getConfigs: () => api.get('/admin/configs'),
-  updateConfig: (configKey, configValue) => api.put(`/admin/configs/${configKey}`, { configValue }),
+  getDashboard: () => request('/admin/dashboard'),
+  getUsers: (page, limit, search) => {
+    const params = new URLSearchParams();
+    if (page) params.set('page', page);
+    if (limit) params.set('limit', limit);
+    if (search) params.set('search', search);
+    return request(`/admin/users?${params}`);
+  },
+  updateUser: (userId, data) => request(`/admin/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getTrades: (page, limit) => {
+    const params = new URLSearchParams();
+    if (page) params.set('page', page);
+    if (limit) params.set('limit', limit);
+    return request(`/admin/trades?${params}`);
+  },
+  getConfigs: () => request('/admin/configs'),
+  updateConfig: (configKey, configValue) => request(`/admin/configs/${configKey}`, { method: 'PUT', body: JSON.stringify({ configValue }) }),
+  getAssets: () => request('/admin/assets'),
+  createAsset: (data) => request('/admin/assets', { method: 'POST', body: JSON.stringify(data) }),
+  updateAsset: (assetId, data) => request(`/admin/assets/${assetId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateAssetStatus: (assetId, status) => request(`/admin/assets/${assetId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  deleteAsset: (assetId) => request(`/admin/assets/${assetId}`, { method: 'DELETE' }),
+  getStores: () => request('/admin/stores'),
+  // 代理/加盟商审批
+  getApplications: () => request('/admin/applications'),
+  reviewApplication: (applicationId, data) => request(`/admin/applications?id=${applicationId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getAgentApplications: (status) => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    return request(`/admin/agent-applications?${params}`);
+  },
+  reviewAgentApplication: (applicationId, data) => request(`/admin/agent-applications?id=${applicationId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  // 已审批代理管理
+  getManagedAgents: (type) => request(`/admin/managed-agents${type ? '?type=' + encodeURIComponent(type) : ''}`),
+  updateManagedAgent: (id, data) => request('/admin/managed-agents', { method: 'PUT', body: JSON.stringify({ id, ...data }) }),
+  deleteManagedAgent: (id) => request(`/admin/managed-agents?id=${id}`, { method: 'DELETE' }),
+  getFranchiseeApplications: (status) => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    return request(`/admin/franchisee-applications?${params}`);
+  },
+  reviewFranchiseeApplication: (applicationId, data) => request(`/admin/franchisee-applications/${applicationId}/review`, { method: 'PUT', body: JSON.stringify(data) }),
+  // 电池类型维护
+  getBatteryTypes: () => request('/admin/battery-types'),
+  createBatteryType: (data) => request('/admin/battery-types', { method: 'POST', body: JSON.stringify(data) }),
+  updateBatteryType: (typeId, data) => request(`/admin/battery-types/${typeId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteBatteryType: (typeId) => request(`/admin/battery-types/${typeId}`, { method: 'DELETE' }),
+  // 已售电池监控
+  getSoldBatteries: (page = 1, limit = 20) => request(`/admin/sold-batteries?page=${page}&limit=${limit}`),
 };
 
-export default api;
+// 加盟商API（更新版）
+export const franchiseeAPI = {
+  getMyStores: () => request('/franchisee/stores'),
+  addStore: (data) => request('/franchisee/stores', { method: 'POST', body: JSON.stringify(data) }),
+  getStoreDetail: (storeId) => request(`/franchisee/stores/${storeId}`),
+  getStorePerformance: (storeId) => request(`/franchisee/stores/${storeId}/performance`),
+  getMyApplications: () => request('/franchisee/applications'),
+  submitApplication: (data) => request('/franchisee/applications', { method: 'POST', body: JSON.stringify(data) }),
+  staffRegisterInvestor: (data) => request('/franchisee/staff-register-investor', { method: 'POST', body: JSON.stringify(data) }),
+  getAgentOptions: (region, city) => request(`/franchisee/agent-options?region=${encodeURIComponent(region)}&city=${encodeURIComponent(city)}`),
+};
+
+// 门店列表API（投资者/加盟商可访问已审批门店）
+export const storesAPI = {
+  getApprovedStores: () => request('/stores/approved'),
+};
+
+// 电池类型公开API（首页动态获取）
+export const batteryTypesAPI = {
+  getList: () => request('/battery-types'),
+};
+
+// 代理申请API
+export const agentAPI = {
+  apply: (data) => request('/agent/apply', { method: 'POST', body: JSON.stringify(data) }),
+  getMyApplications: () => request('/agent/applications'),
+  getApproved: () => request('/agent/approved'),
+  checkStatus: () => request('/agent/status'),
+  getClaimedCities: (region) => request(`/agent/claimed-cities?region=${encodeURIComponent(region)}`),
+  getReviewList: () => request('/agent/review'),
+  reviewApplication: (applicationId, data) => request(`/agent/review?id=${applicationId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getManaged: (type, search) => request(`/agent/managed?type=${type}${search ? '&search=' + encodeURIComponent(search) : ''}`),
+};
+
+// 投资者订单API（门店业绩归属）
+export const orderAPI = {
+  createOrder: (data) => request('/orders', { method: 'POST', body: JSON.stringify(data) }),
+  getMyOrders: () => request('/orders'),
+  getMyBinding: () => request('/orders'),
+};

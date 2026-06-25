@@ -3,37 +3,59 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
-import { Battery, Menu, X, User, LogOut } from 'lucide-react';
+import { Menu, X, User, LogOut } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Navbar() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isFranchisee, isProvinceAgent, canAccessAdmin } = useAuth();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { href: '/', label: '首页', en: 'Home' },
-    { href: '/invest', label: '投资', en: 'Invest' },
-    { href: '/trade', label: '交易', en: 'Trade' },
-    { href: '/dividends', label: '分红', en: 'Dividends' },
+    { href: '/', label: '首页', en: 'Home', all: true },
+    { href: '/invest', label: '投资', en: 'Invest', roles: ['admin', 'operator', 'investor'] },
+    { href: '/trade', label: '交易', en: 'Trade', roles: ['admin', 'operator', 'investor'] },
+    { href: '/dividends', label: '分红', en: 'Dividends', roles: ['admin', 'operator', 'investor'] },
+    { href: '/stores', label: '门店', en: 'Stores', all: true },
   ];
 
-  if (isAdmin()) {
-    navLinks.push({ href: '/admin', label: '管理', en: 'Admin' });
+  // Filter links by role
+  const visibleLinks = navLinks.filter(link => {
+    if (link.all) return true;
+    if (!user) return false;
+    return link.roles.includes(user.role);
+  });
+
+  // Admin link for admin/operator
+  if (canAccessAdmin()) {
+    visibleLinks.push({ href: '/admin', label: '管理', en: 'Admin', roles: ['admin', 'operator'] });
+  }
+
+  // Franchisee link
+  if (isFranchisee()) {
+    visibleLinks.push({ href: '/franchisee', label: '加盟商', en: 'Franchisee', roles: ['franchisee'] });
+  }
+
+  // Agent application link - only for franchisee who is NOT yet an approved agent
+  if (isFranchisee() && !isProvinceAgent() && !user?.agentType) {
+    visibleLinks.push({ href: '/apply-agent', label: '代理申请', en: 'Agent', roles: ['franchisee'] });
   }
 
   return (
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
-          <Link href="/" className="flex items-center space-x-2">
-            <Battery className="h-8 w-8 text-primary-600" />
-            <span className="font-bold text-xl text-gray-900">BatteryBank</span>
+          <Link href="/" className="flex items-center space-x-2.5">
+            <img src="/logo.png" alt="MTX MOTORS" className="h-8 w-8 object-contain" />
+            <div className="inline-flex flex-col items-stretch leading-none">
+              <span className="font-extrabold text-[13px] text-gray-900 tracking-[0.25em] text-center block">MTX MOTORS</span>
+              <span className="text-[13px] text-gray-400 tracking-[0.12em] font-medium text-center block">1kwh.store</span>
+            </div>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
+            {visibleLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -89,7 +111,7 @@ export default function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-100">
             <div className="flex flex-col space-y-3">
-              {navLinks.map((link) => (
+              {visibleLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}

@@ -19,7 +19,7 @@ export default function RootLayout({ children }) {
             </main>
             <footer className="bg-gray-50 border-t border-gray-100 py-8">
               <div className="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
-                <p>© 2024 Cambodia Battery Bank Investment Platform. All rights reserved.</p>
+                <p>© 2025 1kwh.store &amp; MTX Motors. All rights reserved.</p>
               </div>
             </footer>
           </div>

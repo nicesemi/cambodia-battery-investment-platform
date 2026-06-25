@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
-import { Battery } from 'lucide-react';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -13,6 +12,7 @@ export default function Register() {
     password: '',
     fullName: '',
     phone: '',
+    role: 'investor',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,10 +29,17 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await register(formData);
-      router.push('/');
+      await register({
+        email: formData.email,
+        password: formData.password,
+        username: formData.username,
+        full_name: formData.fullName || formData.username,
+        phone: formData.phone,
+        role: formData.role,
+      });
+      router.push(formData.role === 'investor' ? '/invest' : '/');
     } catch (err) {
-      setError(err.response?.data?.error || '注册失败，请重试');
+      setError(err.message || '注册失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -42,9 +49,10 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2">
-            <Battery className="h-10 w-10 text-primary-600" />
-            <span className="text-2xl font-bold text-gray-900">BatteryBank</span>
+          <Link href="/" className="inline-flex flex-col items-center gap-0.5">
+            <img src="/logo.png" alt="1kWh" className="h-10 w-10 object-contain" />
+            <span className="text-lg font-bold text-gray-900 leading-tight">1kWh</span>
+            <span className="text-xs text-gray-400 -mt-1">1kwh.store</span>
           </Link>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">创建账户</h2>
           <p className="mt-2 text-gray-600">加入我们，开始您的投资之旅</p>
@@ -119,6 +127,36 @@ export default function Register() {
                 className="input-field"
                 placeholder="手机号码"
               />
+            </div>
+
+            <div>
+              <label className="label">注册身份 *</label>
+              <div className="grid grid-cols-2 gap-3 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'investor' })}
+                  className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
+                    formData.role === 'investor'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-semibold">投资者</div>
+                  <div className="text-xs mt-1 opacity-70">购买电池资产，获得分红收益</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'franchisee' })}
+                  className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
+                    formData.role === 'franchisee'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-semibold">加盟商</div>
+                  <div className="text-xs mt-1 opacity-70">卖电池的门店和代理</div>
+                </button>
+              </div>
             </div>
 
             <button

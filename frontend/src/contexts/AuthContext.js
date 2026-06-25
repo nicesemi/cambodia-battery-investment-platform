@@ -14,56 +14,101 @@ export function AuthProvider({ children }) {
     const savedUser = localStorage.getItem('user');
     
     if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
-      loadProfile();
+      try {
+        setUser(JSON.parse(savedUser));
+        loadProfile();
+      } catch {
+        setLoading(false);
+      }
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const loadProfile = async () => {
     try {
-      const response = await authAPI.getProfile();
-      setUser(response.data.user);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    } catch (error) {
-      logout();
+      const data = await authAPI.getProfile();
+      if (data.user) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+    } catch {
+      logoutSilent();
+    } finally {
+      setLoading(false);
     }
   };
 
   const login = async (email, password) => {
-    const response = await authAPI.login({ email, password });
-    const { token, user } = response.data;
+    const data = await authAPI.login({ email, password });
+    // API returns { token, user } directly
+    const token = data.token;
+    const userData = data.user;
+    
+    if (!token || !userData) throw new Error('Invalid response from server');
     
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    setUser(user);
-    
-    return response.data;
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+    return data;
   };
 
   const register = async (userData) => {
-    const response = await authAPI.register(userData);
-    const { token, user } = response.data;
+    const data = await authAPI.register(userData);
+    const token = data.token;
+    const user = data.user;
+    
+    if (!token || !user) throw new Error('Invalid response from server');
     
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     setUser(user);
-    
-    return response.data;
+    return data;
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    if (typeof window !== 'undefined') window.location.href = '/';
+  };
+
+  const logoutSilent = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
   };
 
   const isAdmin = () => {
-    return user && (user.role === 'admin' || user.role === 'superadmin');
+    return user && user.role === 'admin';
+  };
+
+  const isOperator = () => {
+    return user && user.role === 'operator';
+  };
+
+  const isInvestor = () => {
+    return user && user.role === 'investor';
+  };
+
+  const isFranchisee = () => {
+    return user && user.role === 'franchisee';
+  };
+
+  const isProvinceAgent = () => {
+    return user && user.role === 'franchisee' && user.agentType === 'province_agent';
+  };
+
+  const isCityFranchisee = () => {
+    return user && user.role === 'franchisee' && user.agentType === 'city_franchisee';
+  };
+
+  const canAccessAdmin = () => {
+    return user && (user.role === 'admin' || user.role === 'operator');
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, loadProfile }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isOperator, isInvestor, isFranchisee, isProvinceAgent, isCityFranchisee, canAccessAdmin, loadProfile }}>
       {children}
     </AuthContext.Provider>
   );

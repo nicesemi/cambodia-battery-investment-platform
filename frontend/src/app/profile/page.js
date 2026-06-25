@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
-import { User, Wallet, TrendingUp, Calendar } from 'lucide-react';
+import { User, Wallet, TrendingUp, Calendar, Store, Building2, ChevronRight } from 'lucide-react';
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState(null);
+  const [hierarchy, setHierarchy] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,7 +24,14 @@ export default function Profile() {
   const loadProfile = async () => {
     try {
       const res = await authAPI.getProfile();
-      setProfile(res.data);
+      setProfile(res);
+      // 投资者加载门店层级关系
+      if (res.user?.role === 'investor') {
+        try {
+          const hierRes = await authAPI.getStoreHierarchy();
+          setHierarchy(hierRes.bindings || []);
+        } catch (e) { /* 层级加载失败不影响主流程 */ }
+      }
     } catch (error) {
       console.error('Load profile error:', error);
     } finally {
@@ -78,6 +86,60 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* 所属门店层级关系（仅投资者可见） */}
+      {hierarchy && hierarchy.length > 0 && (
+        <div className="card mb-6">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-indigo-500" />
+            所属门店层级
+          </h3>
+          {hierarchy.map((binding, idx) => (
+            <div key={idx} className={`${idx > 0 ? 'mt-3 pt-3 border-t border-gray-100' : ''}`}>
+              <div className="flex items-center gap-2 text-sm text-gray-600 flex-wrap">
+                {/* 门店 */}
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 rounded">
+                  <Store className="h-3.5 w-3.5 text-indigo-500" />
+                  {binding.store?.store_code || binding.store?.name}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                {/* 门店名称 */}
+                <span className="font-medium text-gray-800">{binding.store?.name}</span>
+                {binding.franchisee && (
+                  <>
+                    <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                    <span className="text-gray-500">加盟商:</span>
+                    <span className="font-medium text-gray-800">
+                      {binding.franchisee.full_name || binding.franchisee.username}
+                    </span>
+                    <span className="text-xs text-gray-400">{binding.store?.city}</span>
+                  </>
+                )}
+                {binding.city_agent && (
+                  <>
+                    <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                    <span className="text-gray-500">市级代理:</span>
+                    <span className="font-medium text-gray-800">
+                      {binding.city_agent.full_name || binding.city_agent.username}
+                    </span>
+                    <span className="text-xs text-gray-400">{binding.city_agent.city}</span>
+                  </>
+                )}
+                {binding.agent && (
+                  <>
+                    <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                    <span className="text-gray-500">省级代理:</span>
+                    <span className="font-medium text-gray-800">
+                      {binding.agent.full_name || binding.agent.username}
+                    </span>
+                    <span className="text-xs text-gray-400">{binding.agent.city || binding.agent.region}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 资产概览 */}
       <div className="grid md:grid-cols-3 gap-6 mb-6">

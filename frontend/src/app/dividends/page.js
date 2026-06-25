@@ -20,6 +20,10 @@ export default function Dividends() {
       router.push('/login');
       return;
     }
+    if (user.role === 'franchisee') {
+      router.push('/franchisee');
+      return;
+    }
     loadData();
   }, [user]);
 

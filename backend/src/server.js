@@ -11,6 +11,9 @@ const assetRoutes = require('./routes/assetRoutes');
 const tradeRoutes = require('./routes/tradeRoutes');
 const dividendRoutes = require('./routes/dividendRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const franchiseeRoutes = require('./routes/franchiseeRoutes');
+const agentRoutes = require('./routes/agentRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,6 +39,9 @@ app.use('/api/assets', assetRoutes);
 app.use('/api/trades', tradeRoutes);
 app.use('/api/dividends', dividendRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/franchisee', franchiseeRoutes);
+app.use('/api/agent', agentRoutes);
+app.use('/api/investor', orderRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {

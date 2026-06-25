@@ -15,7 +15,7 @@ CREATE TABLE users (
     phone VARCHAR(50),
     country VARCHAR(100) DEFAULT 'China',
     language VARCHAR(10) DEFAULT 'zh',
-    role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin', 'superadmin')),
+    role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin', 'operator', 'investor', 'franchisee')),
     is_verified BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
     kyc_status VARCHAR(20) DEFAULT 'pending' CHECK (kyc_status IN ('pending', 'approved', 'rejected')),
@@ -46,11 +46,13 @@ CREATE TABLE battery_assets (
     battery_type VARCHAR(50) DEFAULT '72V50Ah',
     total_units INTEGER NOT NULL,
     available_units INTEGER NOT NULL,
+    stock INTEGER NOT NULL DEFAULT 0,
     unit_price DECIMAL(12,2) NOT NULL,
+    unit_price_rmb DECIMAL(12,2),
     expected_roi DECIMAL(5,2) NOT NULL, -- 预期年化收益率
     location VARCHAR(100) DEFAULT 'Cambodia',
     station_id VARCHAR(100),
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'closed')),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'closed', 'maintenance')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -67,6 +69,35 @@ CREATE TABLE user_assets (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, asset_id)
+);
+
+-- 电池独立单元表（每块电池唯一编号，支持多站点分布）
+CREATE TABLE battery_units (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    battery_asset_id UUID NOT NULL REFERENCES battery_assets(id) ON DELETE CASCADE,
+    unit_code VARCHAR(50) UNIQUE NOT NULL,
+    site_id VARCHAR(100),
+    site_name VARCHAR(200),
+    status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'sold', 'maintenance', 'reserved')),
+    investor_id UUID REFERENCES users(id),
+    sensor_battery_level DECIMAL(5,2),
+    sensor_temperature DECIMAL(5,2),
+    sensor_cycle_count INTEGER DEFAULT 0,
+    sensor_last_online TIMESTAMP WITH TIME ZONE,
+    sensor_health_status VARCHAR(20) DEFAULT 'normal' CHECK (sensor_health_status IN ('normal', 'warning', 'critical')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 投资者持有电池单元关联表
+CREATE TABLE investor_battery_units (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    investor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    battery_unit_id UUID NOT NULL REFERENCES battery_units(id) ON DELETE CASCADE,
+    battery_asset_id UUID NOT NULL REFERENCES battery_assets(id) ON DELETE CASCADE,
+    purchase_price DECIMAL(12,2),
+    purchased_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(investor_id, battery_unit_id)
 );
 
 -- 交易订单表
@@ -192,6 +223,12 @@ CREATE TABLE operation_logs (
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_user_assets_user_id ON user_assets(user_id);
+CREATE INDEX idx_battery_units_asset_id ON battery_units(battery_asset_id);
+CREATE INDEX idx_battery_units_site_id ON battery_units(site_id);
+CREATE INDEX idx_battery_units_investor ON battery_units(investor_id);
+CREATE INDEX idx_battery_units_status ON battery_units(status);
+CREATE INDEX idx_investor_battery_units_investor ON investor_battery_units(investor_id);
+CREATE INDEX idx_investor_battery_units_unit ON investor_battery_units(battery_unit_id);
 CREATE INDEX idx_trade_orders_user_id ON trade_orders(user_id);
 CREATE INDEX idx_trade_orders_status ON trade_orders(status);
 CREATE INDEX idx_dividend_records_user_id ON dividend_records(user_id);
@@ -213,6 +250,7 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECU
 CREATE TRIGGER update_user_wallets_updated_at BEFORE UPDATE ON user_wallets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_battery_assets_updated_at BEFORE UPDATE ON battery_assets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_assets_updated_at BEFORE UPDATE ON user_assets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_battery_units_updated_at BEFORE UPDATE ON battery_units FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_system_configs_updated_at BEFORE UPDATE ON system_configs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- 插入初始系统配置
@@ -233,4 +271,4 @@ INSERT INTO battery_assets (asset_code, name, description, battery_type, total_u
 
 -- 创建管理员用户 (密码: admin123, 需要在应用中使用bcrypt加密)
 INSERT INTO users (email, username, password_hash, full_name, role, is_verified, is_active) VALUES
-('admin@battery-invest.com', 'admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '系统管理员', 'superadmin', true, true);
+('admin@battery-invest.com', 'admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '系统管理员', 'admin', true, true);
