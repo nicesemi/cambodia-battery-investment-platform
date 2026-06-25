@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
-import { User, Wallet, TrendingUp, Calendar, Store, Building2, ChevronRight } from 'lucide-react';
+import { User, Wallet, TrendingUp, Calendar, Store, Building2, ChevronRight, X } from 'lucide-react';
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -12,6 +12,10 @@ export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [hierarchy, setHierarchy] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showRecharge, setShowRecharge] = useState(false);
+  const [rechargeAmount, setRechargeAmount] = useState('');
+  const [recharging, setRecharging] = useState(false);
+  const [rechargeMsg, setRechargeMsg] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -36,6 +40,27 @@ export default function Profile() {
       console.error('Load profile error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRecharge = async () => {
+    const amt = parseFloat(rechargeAmount);
+    if (!amt || amt <= 0) {
+      setRechargeMsg('请输入有效金额');
+      return;
+    }
+    setRecharging(true);
+    setRechargeMsg('');
+    try {
+      const res = await authAPI.rechargeWallet(amt);
+      setRechargeMsg(`充值成功！当前余额: $${Number(res.balance).toFixed(2)}`);
+      setRechargeAmount('');
+      // Refresh profile
+      loadProfile();
+    } catch (e) {
+      setRechargeMsg(e.message || '充值失败');
+    } finally {
+      setRecharging(false);
     }
   };
 
@@ -181,7 +206,7 @@ export default function Profile() {
       <div className="card">
         <h3 className="font-semibold mb-4">账户操作</h3>
         <div className="grid md:grid-cols-3 gap-4">
-          <button className="btn-secondary">充值</button>
+          <button className="btn-secondary" onClick={() => { setShowRecharge(true); setRechargeMsg(''); }}>充值</button>
           <button className="btn-secondary">提现</button>
           <button
             onClick={() => {
@@ -194,6 +219,52 @@ export default function Profile() {
           </button>
         </div>
       </div>
+
+      {/* 充值弹窗 */}
+      {showRecharge && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">钱包充值</h3>
+              <button onClick={() => setShowRecharge(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm text-gray-600 mb-1">充值金额 (USD)</label>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={rechargeAmount}
+                onChange={(e) => setRechargeAmount(e.target.value)}
+                placeholder="请输入充值金额"
+                className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+            {rechargeMsg && (
+              <div className={`mb-4 p-2 rounded text-sm ${rechargeMsg.includes('成功') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                {rechargeMsg}
+              </div>
+            )}
+            <div className="flex space-x-3">
+              <button
+                onClick={handleRecharge}
+                disabled={recharging}
+                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+              >
+                {recharging ? '处理中...' : '确认充值'}
+              </button>
+              <button
+                onClick={() => setShowRecharge(false)}
+                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

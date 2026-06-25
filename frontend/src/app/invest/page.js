@@ -158,7 +158,7 @@ export default function Invest() {
                     <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t text-sm">
                       <div><div className="text-gray-400">单价</div><div className="font-bold text-gray-900">${asset.unit_price}</div>{asset.unit_price_rmb != null && <div className="text-xs text-gray-400">¥{asset.unit_price_rmb}</div>}</div>
                       {asset.monthly_rent != null && <div><div className="text-gray-400">月租金</div><div className="font-bold text-gray-900">¥{asset.monthly_rent}{' '}<span className="text-xs text-gray-400">/月</span></div></div>}
-                      <div><div className="text-gray-400">预期年化</div><div className="font-bold text-green-600 flex items-center"><TrendingUp className="h-3 w-3 mr-1" />{asset.expected_roi}%</div></div>
+                      <div><div className="text-gray-400">预期年化</div><div className="font-bold text-green-600 flex items-center"><TrendingUp className="h-3 w-3 mr-1" />{asset.annualized_return != null ? asset.annualized_return : asset.expected_roi}%</div></div>
                       <div><div className="text-gray-400">可购</div><div className="font-bold text-gray-900">{asset.available_units} 份</div></div>
                       <div><div className="text-gray-400">总量</div><div className="font-bold text-gray-500">{asset.total_units} 份</div></div>
                     </div>

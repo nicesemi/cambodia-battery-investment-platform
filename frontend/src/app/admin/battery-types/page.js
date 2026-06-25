@@ -9,6 +9,7 @@ import { Battery, Plus, Edit, Trash2, Loader2, ArrowLeft, Zap, AlertCircle, Uplo
 const DEFAULT_FORM = {
   name: '', voltage: '', capacity: '', chemistry: '', description: '',
   scenario: '', dimensions: '', net_weight: '', power_kwh: '', unit_price: '',
+  monthly_rent: '', annualized_return: '',
   image_url: '', thumbnail_url: '', is_active: true, sort_order: 0
 };
 
@@ -54,6 +55,7 @@ export default function BatteryTypesPage() {
       chemistry: t.chemistry || '', description: t.description || '',
       scenario: t.scenario || '', dimensions: t.dimensions || '',
       net_weight: t.net_weight || '', power_kwh: t.power_kwh || '', unit_price: t.unit_price || '',
+      monthly_rent: t.monthly_rent != null ? String(t.monthly_rent) : '', annualized_return: t.annualized_return != null ? String(t.annualized_return) : '',
       image_url: t.image_url || '', thumbnail_url: t.thumbnail_url || '',
       is_active: t.is_active !== undefined ? t.is_active : true, sort_order: t.sort_order || 0
     });
@@ -264,6 +266,16 @@ export default function BatteryTypesPage() {
                     <label className="block text-xs font-medium text-gray-600 mb-1">出厂单价</label>
                     <input type="text" value={form.unit_price} onChange={e => setForm({ ...form, unit_price: e.target.value })}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 ¥4280" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">月租 (¥/月)</label>
+                    <input type="text" value={form.monthly_rent} onChange={e => setForm({ ...form, monthly_rent: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 85" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">年化收益率 (%)</label>
+                    <input type="text" value={form.annualized_return} onChange={e => setForm({ ...form, annualized_return: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 8.5" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">排序</label>

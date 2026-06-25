@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const { name, voltage, capacity, chemistry, description, is_active, sort_order } = body
     if (!name) return badRequest('电池类型名称不能为空')
 
-    const { image_url, scenario, dimensions, net_weight, power_kwh, unit_price } = body
+    const { image_url, scenario, dimensions, net_weight, power_kwh, unit_price, monthly_rent, annualized_return } = body
 
     const { data: type, error } = await supabase.from('battery_types').insert({
       name: name.trim(),
@@ -42,6 +42,8 @@ export async function POST(request: Request) {
       net_weight: net_weight || null,
       power_kwh: power_kwh || null,
       unit_price: unit_price || null,
+      monthly_rent: monthly_rent != null ? parseFloat(monthly_rent) : null,
+      annualized_return: annualized_return != null ? parseFloat(annualized_return) : null,
       is_active: is_active !== undefined ? is_active : true,
       sort_order: sort_order || 0
     }).select('*').single()

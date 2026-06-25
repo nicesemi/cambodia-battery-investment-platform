@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { adminAPI, batteryTypesAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
-import { Users, TrendingUp, DollarSign, BarChart3, Settings, Battery, Store, ClipboardList, Check, X, Eye, Shield, MapPin, Plus, Edit, Trash2, Loader2, Zap, BadgeCheck, Percent } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, BarChart3, Settings, Battery, Store, ClipboardList, Check, X, Eye, Shield, MapPin, Plus, Edit, Trash2, Loader2, Zap, BadgeCheck, Percent, Cpu } from 'lucide-react';
 
 export default function Admin() {
   const { user, canAccessAdmin } = useAuth();

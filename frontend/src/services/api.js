@@ -25,6 +25,7 @@ export const authAPI = {
   login: (data) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   getProfile: () => request('/auth/profile'),
   getStoreHierarchy: () => request('/auth/store-hierarchy'),
+  rechargeWallet: (amount) => request('/wallet/recharge', { method: 'POST', body: JSON.stringify({ amount }) }),
 };
 
 // 资产API
@@ -40,6 +41,8 @@ export const tradeAPI = {
   getMyOrders: (status) => request(`/trades/orders${status ? `?status=${status}` : ''}`),
   getOrderBook: (assetId) => request(`/trades/orderbook/${assetId}`),
   cancelOrder: (orderId) => request(`/trades/orders/${orderId}`, { method: 'DELETE' }),
+  previewBuyback: (unitId) => request(`/trades/sell-to-platform?unitId=${unitId}`),
+  sellToPlatform: (unitIds) => request('/trades/sell-to-platform', { method: 'POST', body: JSON.stringify({ unitIds }) }),
 };
 
 // 分红API

@@ -6,6 +6,14 @@ import { Battery, Zap, Globe, Shield, TrendingUp, Users, MapPin, Phone, ArrowRig
 import { isLoggedIn } from '@/lib/api';
 import { storesAPI, batteryTypesAPI } from '@/services/api';
 
+// ─── 门店坐标硬编码 ──────────────────────────────────
+const STORE_COORDS = {
+  'STORE-00001': { lat: 31.03, lng: 121.23 },
+  'STORE-00002': { lat: 32.06, lng: 118.79 },
+  'STORE-00003': { lat: 28.23, lng: 112.94 },
+  'STORE-00004': { lat: 28.20, lng: 113.08 },
+};
+
 // ─── 高德地图加载（单例） ──────────────────────────────
 let _amapLoading = false;
 let _amapResolvers = [];
@@ -78,11 +86,11 @@ function useFranchiseStores() {
           region: s.country || s.city || '',
           address: s.address || '',
           phone: s.phone || '',
-          lng: s.lng || s.longitude || 0,
-          lat: s.lat || s.latitude || 0,
+          lng: s.lng || s.longitude || (STORE_COORDS[s.store_code]?.lng) || 0,
+          lat: s.lat || s.latitude || (STORE_COORDS[s.store_code]?.lat) || 0,
           soldBattery: s.type || '—',
-          soldCount: s.total_batteries || s.count || 0,
-          revenue: s.total_batteries ? `¥${(s.total_batteries * 1.8).toFixed(0)}万` : '¥0',
+          soldCount: s.battery_count || s.total_batteries || s.count || 0,
+          revenue: (s.battery_count || s.total_batteries) ? `¥${((s.battery_count || s.total_batteries) * 1.8).toFixed(0)}万` : '¥0',
           status: s.status || '运营中',
           img: (s.images && s.images.length > 0) ? s.images[0] : null,
         }));
