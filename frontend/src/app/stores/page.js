@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { MapPin, Phone, Store, Battery, Globe, DollarSign, ShoppingBag, Camera, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { storesAPI } from '../../services/api';
-import { formatUSD, formatCNY, usdToCny } from '../../lib/currency';
+import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 import { useTranslation } from 'react-i18next';
 
 // ─── 门店坐标硬编码 ──────────────────────────────────
@@ -13,8 +13,7 @@ const STORE_COORDS = {
   'STORE-00001': { lat: 31.03, lng: 121.23 },
   'STORE-00002': { lat: 32.06, lng: 118.79 },
   'STORE-00003': { lat: 28.23, lng: 112.94 },
-  'STORE-00004': { lat: 28.20, lng: 113.08 },
-};
+  'STORE-00004': { lat: 28.20, lng: 113.08 }};
 
 // ─── 高德地图加载器 ──────────────────────────────────
 function useAmap() {
@@ -34,7 +33,12 @@ function useAmap() {
 }
 
 export default function StoresPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+
+  // 拉取实时汇率
+  useEffect(() => { fetchRates(); }, []);
+
 
   // ─── 数据映射（组件内部，可访问 t）─────────────────
   function mapStore(s) {
@@ -53,15 +57,12 @@ export default function StoresPage() {
       soldBattery: orderCount ? `${orderCount} ${t('stores.orderUnit')}` : (s.battery_count ? `${s.battery_count} ${t('stores.groupUnit')}` : '—'),
       soldCount: orderCount || (s.battery_count || s.total_batteries || 0),
       revenue: totalSales,
-      revenueDisplay: totalSales ? formatUSD(totalSales) : '$0',
-      revenueSecondary: totalSales ? `≈ ${formatCNY(usdToCny(totalSales))}` : '≈ ¥0',
-      status: s.status || 'operating',
+      revenueDisplay: totalSales ? formatCurrency(totalSales, i18n.language) : formatCurrency(0, i18n.language),      status: s.status || 'operating',
       img: (s.images && s.images.length > 0) ? s.images[0] : (s.photo_url || null),
       images: s.images || [],
       photo_url: s.photo_url || null,
       storeCode: s.store_code || '',
-      totalSales,
-    };
+      totalSales};
   }
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -98,16 +99,14 @@ export default function StoresPage() {
     const map = new AMap.Map(containerRef.current, {
       center: [113.5, 30],
       zoom: 5,
-      mapStyle: 'amap://styles/light',
-    });
+      mapStyle: 'amap://styles/light'});
     mapRef.current = map;
     stores.forEach((s) => {
       if (!s.lng || !s.lat) return;
       const marker = new AMap.Marker({
         position: [s.lng, s.lat],
         content: `<div style="width:36px;height:36px;background:#1a1a1a;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">${s.soldCount}</div>`,
-        offset: new AMap.Pixel(-18, -18),
-      });
+        offset: new AMap.Pixel(-18, -18)});
       marker.on('click', () => {
         map.setZoomAndCenter(15, [s.lng, s.lat]);
         setSelectedStore(s);
@@ -156,7 +155,7 @@ export default function StoresPage() {
             return [
               { icon: Store, label: t('stores.totalStores'), value: `${stores.length}` },
               { icon: ShoppingBag, label: t('stores.totalSales'), value: `${totalOrders}` },
-              { icon: DollarSign, label: t('stores.totalRevenue'), value: formatUSD(totalRevenue), secondary: `≈ ${formatCNY(usdToCny(totalRevenue))}` },
+              { icon: DollarSign, label: t('stores.totalRevenue'), value: formatCurrency(totalRevenue, i18n.language) },
               { icon: Globe, label: t('stores.coverage'), value: t('stores.global') },
             ].map((s, i) => (
               <div key={i} className="bg-gray-50 rounded-2xl p-5 text-center">

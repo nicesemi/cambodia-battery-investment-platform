@@ -8,6 +8,7 @@ import {
   User, Store, Building2, ChevronRight, Mail, ShieldCheck,
   FileText, Upload, CheckCircle, Clock, AlertCircle, XCircle
 } from 'lucide-react';
+import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 import { useTranslation } from 'react-i18next';
 
 // ============ Helpers ============
@@ -37,8 +38,7 @@ const STATUS_MAP = {
   kyc_submitted: { label: 'profile.certStatus.kycSubmitted', color: 'bg-orange-100 text-orange-700' },
   kyc_approved: { label: 'profile.certStatus.kycApproved', color: 'bg-green-100 text-green-700' },
   kyc_rejected: { label: 'profile.certStatus.kycRejected', color: 'bg-red-100 text-red-700' },
-  business_verified: { label: 'profile.certStatus.businessVerified', color: 'bg-green-100 text-green-700' },
-};
+  business_verified: { label: 'profile.certStatus.businessVerified', color: 'bg-green-100 text-green-700' }};
 
 function StatusBadge({ status }) {
   const { t } = useTranslation();
@@ -66,22 +66,19 @@ function StepIndicator({ status, role }) {
     {
       key: 'email', label: t('profile.step.emailVerify'),
       done: ['email_verified', 'kyc_submitted', 'kyc_approved', 'kyc_rejected', 'business_verified'].includes(status),
-      active: status === 'unverified',
-    },
+      active: status === 'unverified'},
     ...(isInvestor ? [{
       key: 'kyc', label: t('profile.step.kycInvestor'), desc: t('profile.step.uploadIdCardDesc'),
       done: ['kyc_approved'].includes(status),
       pending: status === 'kyc_submitted',
       failed: status === 'kyc_rejected',
-      active: status === 'email_verified',
-    }] : []),
+      active: status === 'email_verified'}] : []),
     ...(isFranchisee ? [{
       key: 'kyc', label: t('profile.step.businessFranchisee'), desc: t('profile.step.uploadLicenseDesc'),
       done: ['kyc_approved'].includes(status),
       pending: status === 'kyc_submitted',
       failed: status === 'kyc_rejected',
-      active: status === 'email_verified',
-    }] : []),
+      active: status === 'email_verified'}] : []),
   ];
 
   return (
@@ -188,8 +185,7 @@ function EmailVerification({ profile, onRefresh, onAuthRefresh }) {
     try {
       await apiFetch('/api/auth/verify-code', {
         method: 'POST',
-        body: JSON.stringify({ code: fullCode }),
-      });
+        body: JSON.stringify({ code: fullCode })});
       setSuccess(t('profile.email.verifySuccess'));
       setCode(['', '', '', '', '', '']);
       // 等待 profile 刷新完成，确保t('profile.certificationStatus') UI 同步更新
@@ -382,8 +378,7 @@ function DocumentUpload({ profile, onRefresh }) {
     try {
       await apiFetch('/api/auth/upload-doc', {
         method: 'POST',
-        body: formData,
-      });
+        body: formData});
       onRefresh();
     } catch (e) {
       alert(e.message);
@@ -512,6 +507,7 @@ export default function Profile() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
+  useEffect(() => { fetchRates(); }, []);
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -530,8 +526,7 @@ export default function Profile() {
         phone: u?.phone || '',
         country: u?.country || 'China',
         language: u?.language || 'zh',
-        username: u?.username || '',
-      });
+        username: u?.username || ''});
       if (u?.role === 'investor') {
         try {
           const hierRes = await authAPI.getStoreHierarchy();
@@ -560,8 +555,7 @@ export default function Profile() {
     try {
       await apiFetch('/api/auth/profile', {
         method: 'PUT',
-        body: JSON.stringify(form),
-      });
+        body: JSON.stringify(form)});
       setFormSuccess(t('profile.validation.profileUpdated'));
       loadProfile();
     } catch (e) {
@@ -592,8 +586,7 @@ export default function Profile() {
     try {
       const res = await apiFetch('/api/auth/update-email', {
         method: 'PUT',
-        body: JSON.stringify({ email }),
-      });
+        body: JSON.stringify({ email })});
       setEmailSuccess(res.message || t('profile.validation.emailUpdated'));
       setIsEditingEmail(false);
       loadProfile();
@@ -626,8 +619,7 @@ export default function Profile() {
     try {
       const res = await apiFetch('/api/auth/change-password', {
         method: 'POST',
-        body: JSON.stringify({ oldPassword, newPassword }),
-      });
+        body: JSON.stringify({ oldPassword, newPassword })});
       setPasswordSuccess(res.message || t('profile.validation.passwordUpdated'));
       setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
       setTimeout(() => setShowPasswordModal(false), 1500);

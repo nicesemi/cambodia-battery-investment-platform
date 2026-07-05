@@ -7,7 +7,7 @@ import { agentAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
 import { Award, Shield, TrendingUp, DollarSign, Building2, Users, Globe, MapPin, Phone, Mail, Send, Loader2, BadgeCheck, Clock, XCircle, AlertTriangle, Lock } from 'lucide-react';
 import { getCities, getRegionCities } from '../../data/region-cities';
-import { formatUSD, formatCNY, usdToCny } from '../../lib/currency';
+import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 
 const getRegions = (t) => [
   { code: 'cn', name: t('applyAgent.region.cn') },
@@ -39,8 +39,7 @@ const getAgentTypes = (t) => [
     area: t('applyAgent.typeProvinceBenefit4'),
     color: 'from-blue-600 to-blue-800',
     desc: t('applyAgent.typeProvinceDesc'),
-    benefits: [t('applyAgent.typeProvinceBenefit1'), t('applyAgent.typeProvinceBenefit2'), t('applyAgent.typeProvinceBenefit3'), t('applyAgent.typeProvinceBenefit4'), t('applyAgent.typeProvinceBenefit5')],
-  },
+    benefits: [t('applyAgent.typeProvinceBenefit1'), t('applyAgent.typeProvinceBenefit2'), t('applyAgent.typeProvinceBenefit3'), t('applyAgent.typeProvinceBenefit4'), t('applyAgent.typeProvinceBenefit5')]},
   {
     key: 'city_franchisee',
     label: t('applyAgent.typeCity'),
@@ -52,12 +51,15 @@ const getAgentTypes = (t) => [
     area: t('applyAgent.typeCityBenefit4'),
     color: 'from-blue-500 to-blue-700',
     desc: t('applyAgent.typeCityDesc'),
-    benefits: [t('applyAgent.typeCityBenefit1'), t('applyAgent.typeCityBenefit2'), t('applyAgent.typeCityBenefit3'), t('applyAgent.typeCityBenefit4'), t('applyAgent.typeCityBenefit5')],
-  },
+    benefits: [t('applyAgent.typeCityBenefit1'), t('applyAgent.typeCityBenefit2'), t('applyAgent.typeCityBenefit3'), t('applyAgent.typeCityBenefit4'), t('applyAgent.typeCityBenefit5')]},
 ];
 
 export default function ApplyAgent() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // 拉取实时汇率
+  useEffect(() => { fetchRates(); }, []);
+
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -142,8 +144,7 @@ export default function ApplyAgent() {
     try {
       const payload = {
         agent_type: agentType,
-        ...form,
-      };
+        ...form};
       if (agentType === 'city_franchisee') {
         payload.parent_agent_id = parentAgentId;
       }
@@ -227,12 +228,12 @@ export default function ApplyAgent() {
                 </div>
                 <p className="text-sm text-gray-600 mb-3">{type.desc}</p>
                 <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.franchiseFee')}</span><div className="font-semibold text-xs">{formatUSD(type.feeUsd)} <span className="text-gray-400 font-normal">{formatCNY(usdToCny(type.feeUsd))}</span></div></div>
-                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.deposit')}</span><div className="font-semibold text-xs">{formatUSD(type.depositUsd)} <span className="text-gray-400 font-normal">{formatCNY(usdToCny(type.depositUsd))}</span></div></div>
-                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.monthlyTarget')}</span><div className="font-semibold text-xs">{formatUSD(type.performanceTargetUsd)} <span className="text-gray-400 font-normal">{formatCNY(usdToCny(type.performanceTargetUsd))}</span></div></div>
+                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.franchiseFee')}</span><div className="font-semibold text-xs">{formatCurrency(type.feeUsd, i18n.language)} </div></div>
+                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.deposit')}</span><div className="font-semibold text-xs">{formatCurrency(type.depositUsd, i18n.language)} </div></div>
+                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.monthlyTarget')}</span><div className="font-semibold text-xs">{formatCurrency(type.performanceTargetUsd, i18n.language)} </div></div>
                   <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.commission')}</span><div className="font-semibold text-green-600">{type.commission}</div></div>
                 </div>
-                <p className="text-xs text-gray-400">{t('applyAgent.totalInitial')}: <span className="font-bold text-gray-700">{formatCNY(usdToCny(type.feeUsd) + usdToCny(type.depositUsd))}</span></p>
+                <p className="text-xs text-gray-400">{t('applyAgent.totalInitial')}: <span className="font-bold text-gray-700">{formatCurrency(type.feeUsd + type.depositUsd, i18n.language)}</span></p>
                 <div className="mt-2 space-y-1">
                   {type.benefits.map((b, i) => (
                     <div key={i} className="flex items-start gap-1.5 text-xs text-gray-600">

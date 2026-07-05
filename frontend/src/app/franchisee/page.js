@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import {
   Store, Battery, MapPin, Zap, Shield, TrendingUp, Send, Plus, QrCode, ClipboardList, BarChart3, Calculator, MessageCircle, Star, Globe, Users, DollarSign, Wallet, Phone, Mail, ChevronRight, X, Loader2, Search, Home, Building2, BadgeCheck, AlertTriangle, Clock, Award, Target, Lightbulb, UserPlus, Eye, ArrowLeft, CheckCircle, Edit2, Image, Upload, Lock
 } from 'lucide-react';
-import { USD_TO_CNY_RATE, dualCurrency, formatUSD, formatCNY, usdToCny } from '../../lib/currency';
+import { formatCurrency, fetchRates } from '../../lib/currency';
 import { getCities, getRegionCities } from '../../data/region-cities';
 
 /* ========== 常量定义 ========== */
@@ -74,8 +74,7 @@ const getAgentTypes = (t) => [
     area: t('franchisee.agentType.provinceArea'),
     color: 'from-blue-600 to-blue-800',
     desc: t('franchisee.agentType.provinceDesc'),
-    benefits: [t('franchisee.agentType.provinceBenefit1'), t('franchisee.agentType.provinceBenefit2'), t('franchisee.agentType.provinceBenefit3'), t('franchisee.agentType.provinceBenefit4'), t('franchisee.agentType.provinceBenefit5')],
-  },
+    benefits: [t('franchisee.agentType.provinceBenefit1'), t('franchisee.agentType.provinceBenefit2'), t('franchisee.agentType.provinceBenefit3'), t('franchisee.agentType.provinceBenefit4'), t('franchisee.agentType.provinceBenefit5')]},
   {
     key: 'city_franchisee',
     label: t('franchisee.agentType.city'),
@@ -87,8 +86,7 @@ const getAgentTypes = (t) => [
     area: t('franchisee.agentType.cityArea'),
     color: 'from-blue-500 to-blue-700',
     desc: t('franchisee.agentType.cityDesc'),
-    benefits: [t('franchisee.agentType.cityBenefit1'), t('franchisee.agentType.cityBenefit2'), t('franchisee.agentType.cityBenefit3'), t('franchisee.agentType.cityBenefit4'), t('franchisee.agentType.cityBenefit5')],
-  },
+    benefits: [t('franchisee.agentType.cityBenefit1'), t('franchisee.agentType.cityBenefit2'), t('franchisee.agentType.cityBenefit3'), t('franchisee.agentType.cityBenefit4'), t('franchisee.agentType.cityBenefit5')]},
 ];
 
 const PROVINCES = [
@@ -119,8 +117,7 @@ const REGION_KEY_MAP = {
   mo: 'franchisee.applyStore.regionMo',
   bd: 'franchisee.applyStore.regionBd',
   kh: 'franchisee.applyStore.regionKh',
-  other: 'franchisee.applyStore.regionOther',
-};
+  other: 'franchisee.applyStore.regionOther'};
 
 const CITY_KEY_MAP = {
   '北京': 'franchisee.applyStore.cityBeijing',
@@ -156,8 +153,7 @@ const CITY_KEY_MAP = {
   '马德望': 'franchisee.applyStore.cityBattambang',
   '贡布': 'franchisee.applyStore.cityKampot',
   '磅湛': 'franchisee.applyStore.cityKampongCham',
-  '其它': 'franchisee.applyStore.cityOther',
-};
+  '其它': 'franchisee.applyStore.cityOther'};
 
 const TOP_CASES = []; // 改为从API动态加载
 
@@ -172,14 +168,17 @@ const CHAT_QA = {
   '退出机制': null,
   '代理层级': null,
   '投资回报': null,
-  default: '感谢您的咨询!如需了解加盟费用、收益分享、开店条件、区域保护等,请输入具体关键词。也可拨打加盟热线:400-1KWH-888 或发邮件至 franchise@1kwh.store。',
-};
+  default: '感谢您的咨询!如需了解加盟费用、收益分享、开店条件、区域保护等,请输入具体关键词。也可拨打加盟热线:400-1KWH-888 或发邮件至 franchise@1kwh.store。'};
 
 /* ========== 主组件 ========== */
 
 export default function Franchisee() {
   const { user, isProvinceAgent } = useAuth();
   const { t, i18n } = useTranslation();
+
+  // 拉取实时汇率
+  useEffect(() => { fetchRates(); }, []);
+
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [stores, setStores] = useState([]);
@@ -342,8 +341,7 @@ export default function Franchisee() {
               energy: bt.power_kwh || '',
               weight: bt.net_weight || '',
               unit_price: price,
-              monthly_rent: rent,
-            };
+              monthly_rent: rent};
           });
           setBatteryTypes(mapped);
         }
@@ -580,8 +578,7 @@ export default function Franchisee() {
         totalBalance: Math.max(0, totalBalance),
         withdrawableBalance: Math.max(0, withdrawableBalance),
         preTargetWithdrawable: Math.max(0, preTargetWithdrawable),
-        postTargetWithdrawable: Math.max(0, postTargetWithdrawable),
-      });
+        postTargetWithdrawable: Math.max(0, postTargetWithdrawable)});
     } catch (err) { console.error(err); }
     finally { setWalletLoading(false); }
   };
@@ -719,8 +716,7 @@ export default function Franchisee() {
         ownStoreCount: ownStores.length,
         franchisedStoreCount: franchisedStores.length,
         managedStoreCount,
-        managedFranchiseeCount,
-      });
+        managedFranchiseeCount});
     } catch (err) { console.error(err); }
     finally { setInfoCardsLoading(false); }
   };
@@ -732,8 +728,7 @@ export default function Franchisee() {
       bank_name: prev.bank_name || '',
       bank_account: prev.bank_account || '',
       bank_holder: prev.bank_holder || '',
-      business_license_url: prev.business_license_url || withdrawForm.business_license_url || withdrawModalForm.business_license_url || '',
-    }));
+      business_license_url: prev.business_license_url || withdrawForm.business_license_url || withdrawModalForm.business_license_url || ''}));
     setShowDepositRefundModal(true);
   };
 
@@ -754,9 +749,7 @@ export default function Franchisee() {
           bank_name: depositRefundForm.bank_name,
           bank_account: depositRefundForm.bank_account,
           bank_holder: depositRefundForm.bank_holder,
-          business_license_url: depositRefundForm.business_license_url,
-        }),
-      });
+          business_license_url: depositRefundForm.business_license_url})});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('franchisee.alert.submitFailed'));
       alert('退保证金申请已提交，等待 admin 审批');
@@ -794,8 +787,7 @@ export default function Franchisee() {
       const res = await fetch('/api/withdrawals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ type: 'commission_withdraw', ...withdrawModalForm }),
-      });
+        body: JSON.stringify({ type: 'commission_withdraw', ...withdrawModalForm })});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('franchisee.alert.submitFailed'));
       alert('提现申请已提交，等待 admin 审批');
@@ -839,8 +831,7 @@ export default function Franchisee() {
           bank_holder: withdrawForm.bank_holder,
           business_license_url: withdrawForm.business_license_url,
           invoice_info_url: withdrawForm.invoice_info_url,
-          vat_invoice_url: withdrawForm.vat_invoice_url,
-        })
+          vat_invoice_url: withdrawForm.vat_invoice_url})
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('franchisee.alert.submitFailed'));
@@ -879,8 +870,7 @@ export default function Franchisee() {
           address: editStoreForm.address,
           phone: editStoreForm.phone,
           photo_url: editStoreForm.photo_url,
-          images: editStoreForm.images,
-        })
+          images: editStoreForm.images})
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('franchisee.alert.updateFailed'));
@@ -905,8 +895,7 @@ export default function Franchisee() {
         const res = await fetch('/api/upload/photo', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-          body: formData,
-        });
+          body: formData});
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || t('franchisee.alert.uploadFailed'));
         urls.push(data.url);
@@ -1044,8 +1033,7 @@ export default function Franchisee() {
     try {
       const data = await franchiseeAPI.staffRegisterInvestor({
         ...staffForm,
-        store_id: selectedStoreId,
-      });
+        store_id: selectedStoreId});
       setStaffResult({ success: true, msg: `投资者 ${data.investor?.username || staffForm.username} 注册成功！已绑定门店 编码: ${storeDetail?.store_code || data.store_code || selectedStoreId}` });
       setStaffForm({ username: '', email: '', password: '', phone: '' });
       // 刷新门店详情
@@ -1086,8 +1074,7 @@ export default function Franchisee() {
       setApplyForm(prev => ({
         ...prev,
         province_agent_id: data.has_province_agent ? prev.province_agent_id : '',
-        city_agent_id: data.has_city_agent ? prev.city_agent_id : '',
-      }));
+        city_agent_id: data.has_city_agent ? prev.city_agent_id : ''}));
     } catch (e) { console.error(e); }
     finally { setAgentOptionsLoading(false); }
   }, [showApplyForm]);
@@ -1160,8 +1147,7 @@ export default function Franchisee() {
         ...applyForm,
         city: cityValue,
         parent_agent_id: parent_agent_id || undefined,
-        agent_type: agent_type || undefined,
-      };
+        agent_type: agent_type || undefined};
       await franchiseeAPI.submitApplication(payload);
       alert('申请已提交!平台将在3个工作日内审核。');
       setShowApplyForm(false);
@@ -1215,8 +1201,7 @@ export default function Franchisee() {
       details, totalInvestment, totalMonthlyRent, franchiseeMonthly, franchiseeAnnual, investorMonthly,
       investorAnnual, investorPaybackMonths, investorAnnualReturn, selfCommissionRate, selfRentalRate,
       downstreamCommissionRate, downstreamRentalRate, downstreamAnnualSales, selfCommissionAmount,
-      selfRentalAmount, downstreamCommissionAnnual, downstreamRentalMonthly, hqRate,
-    };
+      selfRentalAmount, downstreamCommissionAnnual, downstreamRentalMonthly, hqRate};
   };
 
   /* ===== AI 对话 ===== */
@@ -1232,8 +1217,7 @@ export default function Franchisee() {
       const res = await fetch('/api/advisor/franchisee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [{ role: 'user', content: q }] }),
-      });
+        body: JSON.stringify({ messages: [{ role: 'user', content: q }] })});
 
       if (!res.ok) throw new Error(res.statusText);
 
@@ -1409,7 +1393,7 @@ export default function Franchisee() {
                     </div>
                     <div className="bg-white/80 rounded-lg p-3">
                       <p className="text-xs text-gray-500 mb-0.5">{t('franchisee.overview.monthlySummary')}</p>
-                      <p className="font-semibold text-green-600 text-lg">${perfMonthly.toLocaleString()}<span className="text-xs text-gray-400 ml-2">≈ ¥{(perfMonthly * 7.25).toLocaleString()}</span></p>
+                      <p className="font-semibold text-green-600 text-lg">{formatCurrency(perfMonthly, i18n.language)}<span className="text-xs text-gray-400 ml-2"></span></p>
                     </div>
                   </div>
                 </div>
@@ -1438,7 +1422,7 @@ export default function Franchisee() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-white/80 rounded-lg p-3">
                       <p className="text-xs text-gray-500 mb-0.5">{t('franchisee.overview.monthlyPerformanceSelfAndFranchisee')}</p>
-                      <p className="font-semibold text-green-600 text-lg">${perfMonthly.toLocaleString()}<span className="text-xs text-gray-400 ml-2">≈ ¥{(perfMonthly * 7.25).toLocaleString()}</span></p>
+                      <p className="font-semibold text-green-600 text-lg">{formatCurrency(perfMonthly, i18n.language)}<span className="text-xs text-gray-400 ml-2"></span></p>
                     </div>
                     <div className="bg-white/80 rounded-lg p-3">
                       <p className="text-xs text-gray-500 mb-0.5">{t('franchisee.overview.selfStores')}</p>
@@ -1477,7 +1461,7 @@ export default function Franchisee() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-white/80 rounded-lg p-3">
                       <p className="text-xs text-gray-500 mb-0.5">{t('franchisee.overview.monthlyPerformanceSelfAndProvince')}</p>
-                      <p className="font-semibold text-green-600 text-lg">${perfMonthly.toLocaleString()}</p>
+                      <p className="font-semibold text-green-600 text-lg">{formatCurrency(perfMonthly, i18n.language)}</p>
                     </div>
                     <div className="bg-white/80 rounded-lg p-3">
                       <p className="text-xs text-gray-500 mb-0.5">{t("franchisee.overview.selfStores")}</p>
@@ -1531,7 +1515,7 @@ export default function Franchisee() {
                           <div className="text-xs text-gray-500 mt-1">{t('franchisee.overview.boundInvestors')}</div>
                         </div>
                         <div className="bg-gray-50 rounded-lg p-4 text-center">
-                          <div className="text-2xl font-bold text-orange-600">${(storeDetail.monthly_total || 0).toLocaleString()}<div className="text-xs text-gray-400">≈ ¥{((storeDetail.monthly_total || 0) * 7.25).toLocaleString()}</div></div>
+                          <div className="text-2xl font-bold text-orange-600">{formatCurrency(storeDetail.monthly_total || 0, i18n.language)}</div>
                           <div className="text-xs text-gray-500 mt-1">{t('franchisee.overview.monthlyPerformance')}</div>
                         </div>
                       </div>
@@ -1645,8 +1629,8 @@ export default function Franchisee() {
                                   <div className="grid grid-cols-2 gap-3 text-sm">
                                     <div><span className="text-gray-400">{t('franchisee.store.activeBatteries')}:</span> <span className="font-semibold">{s.total_batteries || 0}</span></div>
                                     <div><span className="text-gray-400">{t('franchisee.revenue.rentalSplit')}:</span> <span className="font-semibold">{(s.revenue_share || 0.3) * 100}%</span></div>
-                                    <div><span className="text-gray-400">{t('franchisee.overview.monthlyPerformance')}:</span> <span className="font-semibold text-green-600">${(s.monthly_sales || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}<div className="text-xs text-gray-400 font-normal">≈ ¥{((s.monthly_sales || 0) * 7.25).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div></span></div>
-                                    <div><span className="text-gray-400">{t('franchisee.overview.totalPerformance')}:</span> <span className="font-semibold text-blue-600">${(s.total_sales || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}<div className="text-xs text-gray-400 font-normal">≈ ¥{((s.total_sales || 0) * 7.25).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div></span></div>
+                                    <div><span className="text-gray-400">{t('franchisee.overview.monthlyPerformance')}:</span> <span className="font-semibold text-green-600">{formatCurrency(s.monthly_sales || 0, i18n.language)}</span></div>
+                                    <div><span className="text-gray-400">{t('franchisee.overview.totalPerformance')}:</span> <span className="font-semibold text-blue-600">{formatCurrency(s.total_sales || 0, i18n.language)}</span></div>
                                   </div>
                                   <div onClick={() => openStoreDetail(s.id)} className="mt-3 text-xs text-blue-600 flex items-center gap-1 cursor-pointer">
                                     <Eye className="h-3 w-3" /> {t('franchisee.button.viewDetails')}
@@ -1696,8 +1680,8 @@ export default function Franchisee() {
                                   <div className="grid grid-cols-2 gap-3 text-sm">
                                     <div><span className="text-gray-400">{t('franchisee.calculator.battery')}:</span> <span className="font-semibold">{s.total_batteries || 0}</span></div>
                                     <div><span className="text-gray-400">{t('franchisee.calculator.split')}:</span> <span className="font-semibold">{(s.revenue_share || 0.3) * 100}%</span></div>
-                                    <div><span className="text-gray-400">{t('franchisee.calculator.monthlyTarget')}:</span> <span className="font-semibold text-green-600">${(s.monthly_sales || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}<div className="text-xs text-gray-400 font-normal">≈ ¥{((s.monthly_sales || 0) * 7.25).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div></span></div>
-                                    <div><span className="text-gray-400">{t('franchisee.calculator.cumulativeTarget')}:</span> <span className="font-semibold text-blue-600">${(s.total_sales || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}<div className="text-xs text-gray-400 font-normal">≈ ¥{((s.total_sales || 0) * 7.25).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div></span></div>
+                                    <div><span className="text-gray-400">{t('franchisee.calculator.monthlyTarget')}:</span> <span className="font-semibold text-green-600">{formatCurrency(s.monthly_sales || 0, i18n.language)}</span></div>
+                                    <div><span className="text-gray-400">{t('franchisee.calculator.cumulativeTarget')}:</span> <span className="font-semibold text-blue-600">{formatCurrency(s.total_sales || 0, i18n.language)}</span></div>
                                   </div>
                                   <div onClick={() => openStoreDetail(s.id)} className="mt-3 text-xs text-blue-600 flex items-center gap-1 cursor-pointer">
                                     <Eye className="h-3 w-3" /> {t('franchisee.store.viewDetail')}
@@ -1727,7 +1711,7 @@ export default function Franchisee() {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${o.order_type === '投资者绑定' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                           {o.order_type || t('franchisee.store.orderDefault')}
                         </span>
-                      </td><td className="p-3">{o.asset?.name || o.asset_name || o.battery_type || '-'}</td><td className="p-3">{o.store?.name || o.store_name || '-'}</td><td className="p-3 text-right">{o.units || 1}</td><td className="p-3 text-right font-medium">${(o.purchase_amount || o.total_amount || o.amount || 0).toLocaleString()}<div className="text-xs text-gray-400">≈ ¥{((o.purchase_amount || o.total_amount || o.amount || 0) * 7.25).toLocaleString()}</div></td><td className="p-3 text-right text-gray-600">${(o._monthlyRent || 0).toLocaleString()}<div className="text-xs text-gray-400">≈ ¥{((o._monthlyRent || 0) * 7.25).toLocaleString()}</div></td><td className="p-3 text-right font-medium text-green-600">${(o.store_commission || 0).toLocaleString()}<div className="text-xs text-gray-400">≈ ¥{((o.store_commission || 0) * 7.25).toLocaleString()}</div></td><td className="p-3 text-right font-medium text-blue-600">${(o.revenue_share || 0).toLocaleString()}<div className="text-xs text-gray-400">≈ ¥{((o.revenue_share || 0) * 7.25).toLocaleString()}</div></td><td className="p-3 text-right text-gray-400">{formatDate(o.created_at, i18n.language)}</td></tr>
+                      </td><td className="p-3">{o.asset?.name || o.asset_name || o.battery_type || '-'}</td><td className="p-3">{o.store?.name || o.store_name || '-'}</td><td className="p-3 text-right">{o.units || 1}</td><td className="p-3 text-right font-medium">{formatCurrency(o.purchase_amount || o.total_amount || o.amount || 0, i18n.language)}</td><td className="p-3 text-right text-gray-600">{formatCurrency(o._monthlyRent || 0, i18n.language)}</td><td className="p-3 text-right font-medium text-green-600">{formatCurrency(o.store_commission || 0, i18n.language)}</td><td className="p-3 text-right font-medium text-blue-600">{formatCurrency(o.revenue_share || 0, i18n.language)}</td><td className="p-3 text-right text-gray-400">{formatDate(o.created_at, i18n.language)}</td></tr>
                     ))}</tbody></table>
                 </div>
               )}
@@ -1907,9 +1891,9 @@ export default function Franchisee() {
                     {getFranchiseLevels(t).map((l, i) => (
                       <tr key={i} className={`border-b ${i === 0 ? 'bg-blue-50/50' : i === 1 ? 'bg-gray-50/50' : ''}`}>
                         <td className="p-3 font-bold">{l.level}<span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{l.badge}</span></td>
-                        <td className="p-3 text-right font-semibold text-blue-700">{formatUSD(l.fee)}<div className="text-xs text-gray-400">{dualCurrency(l.fee).secondary}</div></td>
-                        <td className="p-3 text-right">{formatUSD(l.deposit)}<div className="text-xs text-gray-400">{dualCurrency(l.deposit).secondary}</div></td>
-                        <td className="p-3 text-right">${l.performanceTarget.toLocaleString()}<div className="text-xs text-gray-400">≈ ¥{(l.performanceTarget * 7.25).toLocaleString()}</div></td>
+                        <td className="p-3 text-right font-semibold text-blue-700">{formatCurrency(l.fee, i18n.language)}</td>
+                        <td className="p-3 text-right">{formatCurrency(l.deposit, i18n.language)}</td>
+                        <td className="p-3 text-right">{formatCurrency(l.performanceTarget, i18n.language)}</td>
                         <td className="p-3 text-right font-semibold text-green-600">{l.commission}</td>
                         <td className="p-3 text-right font-semibold text-blue-600">{l.revShare}</td>
                         <td className="p-3">{l.area}</td>
@@ -1975,7 +1959,12 @@ export default function Franchisee() {
                   <div key={i} className="bg-white rounded-xl border p-4 text-center hover:shadow-md transition">
                     <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-bold mx-auto mb-2">{o.num}</div>
                     <h4 className="font-bold text-sm mb-1">{o.title}</h4>
-                    <p className="text-xs text-gray-500">{o.desc}</p>
+                    <p className="text-xs text-gray-500">
+                      {i === 2
+                        ? <>{t('franchisee.obligation.targetDescPrefix')}: {formatCurrency(getFranchiseLevels(t)[0].performanceTarget, i18n.language)} / {formatCurrency(getFranchiseLevels(t)[1].performanceTarget, i18n.language)} / {formatCurrency(getFranchiseLevels(t)[2].performanceTarget, i18n.language)}</>
+                        : o.desc
+                      }
+                    </p>
                   </div>
                 ))}
               </div>
@@ -2018,7 +2007,7 @@ export default function Franchisee() {
                     <div className="grid grid-cols-2 gap-1 text-xs border-t pt-3">
                       <div><span className="text-gray-400">{t("franchisee.product.voltage")}:</span> {p.voltage}</div>
                       <div><span className="text-gray-400">{t("franchisee.product.energy")}:</span> {p.energy}</div>
-                      <div><span className="text-gray-400">{t("franchisee.product.price")}:</span> {formatUSD(p.price)}</div><div className="text-xs text-gray-400">{dualCurrency(p.price).secondary}</div>
+                      <div><span className="text-gray-400">{t("franchisee.product.price")}:</span> {formatCurrency(p.price, i18n.language)}</div>
                       <div><span className="text-gray-400">{t("franchisee.product.weight")}:</span> {p.weight}</div>
                     </div>
                   </div>
@@ -2069,7 +2058,7 @@ export default function Franchisee() {
                       <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatUSD(battery.price)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatUSD(battery.monthlyRent) : formatUSD(Math.round(battery.price * 0.05))}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatCurrency(battery.monthlyRent, i18n.language) : formatCurrency(Math.round(battery.price * 0.05), i18n.language)}</div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button onClick={() => setCalcBatteryCounts(prev => ({ ...prev, [battery.id]: Math.max(0, (Number(prev[battery.id]) || 0) - 1) }))} className="w-7 h-7 rounded-md border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm">−</button>
@@ -2083,7 +2072,7 @@ export default function Franchisee() {
                       <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatUSD(battery.price)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatUSD(battery.monthlyRent) : formatUSD(Math.round(battery.price * 0.05))}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatCurrency(battery.monthlyRent, i18n.language) : formatCurrency(Math.round(battery.price * 0.05), i18n.language)}</div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button onClick={() => setCalcBatteryCounts(prev => ({ ...prev, [battery.id]: Math.max(0, (Number(prev[battery.id]) || 0) - 1) }))} className="w-7 h-7 rounded-md border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm">−</button>
@@ -2097,7 +2086,7 @@ export default function Franchisee() {
                       <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatUSD(battery.price)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatUSD(battery.monthlyRent) : formatUSD(Math.round(battery.price * 0.05))}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatCurrency(battery.monthlyRent, i18n.language) : formatCurrency(Math.round(battery.price * 0.05), i18n.language)}</div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button onClick={() => setCalcBatteryCounts(prev => ({ ...prev, [battery.id]: Math.max(0, (Number(prev[battery.id]) || 0) - 1) }))} className="w-7 h-7 rounded-md border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm">−</button>
@@ -2111,7 +2100,7 @@ export default function Franchisee() {
                       <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatUSD(battery.price)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatUSD(battery.monthlyRent) : formatUSD(Math.round(battery.price * 0.05))}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatCurrency(battery.monthlyRent, i18n.language) : formatCurrency(Math.round(battery.price * 0.05), i18n.language)}</div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button onClick={() => setCalcBatteryCounts(prev => ({ ...prev, [battery.id]: Math.max(0, (Number(prev[battery.id]) || 0) - 1) }))} className="w-7 h-7 rounded-md border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm">−</button>
@@ -2140,17 +2129,17 @@ export default function Franchisee() {
                     <>
                       <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-xl p-6">
                         <p className="text-blue-200 text-sm mb-1">{t('franchisee.calculator.monthlyTotal')}</p>
-                        <div className="text-4xl font-bold">{formatUSD(r.franchiseeMonthly)}</div>
+                        <div className="text-4xl font-bold">{formatCurrency(r.franchiseeMonthly, i18n.language)}</div>
                         <p className="text-blue-200 text-sm mt-2">{t('franchisee.calculator.selfSalesLabel')}{t('franchisee.earnings.commission')}{t('franchisee.calculator.oneTimeParen')} + {t('franchisee.calculator.selfRentalTitle')}{(r.selfRentalRate * 100).toFixed(0)}%{r.downstreamCommissionRate > 0 ? ` + ${t('franchisee.calculator.downstreamCommissionTitle')}${(r.downstreamCommissionRate * 100).toFixed(0)}%+${t('franchisee.earnings.share')}${(r.downstreamRentalRate * 100).toFixed(0)}%` : ''}</p>
                       </div>
                       <div className="bg-white rounded-xl border p-6 space-y-4">
                         <h3 className="font-bold">{t('franchisee.calculator.detail')}</h3>
                         <div className="text-xs text-gray-500 space-y-1 mb-3">
                           <p className="font-semibold text-gray-700 text-sm mb-2">{t('franchisee.calculator.deployList')}</p>
-                          {r.details.map(d => (<div key={d.id} className="flex justify-between"><span>{d.name} × {d.count}</span><span className="text-gray-700">{formatUSD(d.invest)}</span></div>))}
+                          {r.details.map(d => (<div key={d.id} className="flex justify-between"><span>{d.name} × {d.count}</span><span className="text-gray-700">{formatCurrency(d.invest, i18n.language)}</span></div>))}
                         </div>
                         <hr className="border-gray-100" />
-                        {[{ label: t('franchisee.calculator.totalInvestment'), value: formatUSD(r.totalInvestment), bold: true }, { label: t('franchisee.calculator.totalMonthlyRent'), value: formatUSD(r.totalMonthlyRent) }].map((item, i) => (
+                        {[{ label: t('franchisee.calculator.totalInvestment'), value: formatCurrency(r.totalInvestment, i18n.language), bold: true }, { label: t('franchisee.calculator.totalMonthlyRent'), value: formatCurrency(r.totalMonthlyRent, i18n.language) }].map((item, i) => (
                           <div key={i} className={`flex justify-between text-sm ${item.bold ? 'font-bold text-base border-t pt-3 mt-1 border-gray-100' : ''}`}>
                             <span className="text-gray-600">{item.label}</span><span className="text-gray-900">{item.value}</span>
                           </div>
@@ -2158,18 +2147,18 @@ export default function Franchisee() {
                         <hr className="border-gray-100" />
                         <p className="text-xs text-gray-500 font-semibold mb-1">{t('franchisee.calculator.revenueBreakdown')}</p>
                         {[
-                          { label: `${t('franchisee.calculator.selfRentalTemplate', { rate: (r.selfRentalRate * 100).toFixed(0) })}`, value: formatUSD(r.selfRentalAmount || 0), color: 'text-blue-600 font-medium' },
+                          { label: `${t('franchisee.calculator.selfRentalTemplate', { rate: (r.selfRentalRate * 100).toFixed(0) })}`, value: formatCurrency(r.selfRentalAmount || 0, i18n.language), color: 'text-blue-600 font-medium' },
                           ...(r.downstreamRentalRate > 0 ? [
-                            { label: `${t('franchisee.calculator.downstreamShareTemplate', { rate: (r.downstreamRentalRate * 100).toFixed(0) })}`, value: formatUSD(r.downstreamRentalMonthly || 0), color: 'text-indigo-600 font-medium' },
+                            { label: `${t('franchisee.calculator.downstreamShareTemplate', { rate: (r.downstreamRentalRate * 100).toFixed(0) })}`, value: formatCurrency(r.downstreamRentalMonthly || 0, i18n.language), color: 'text-indigo-600 font-medium' },
                           ] : []),
-                          { label: t('franchisee.calculator.yourMonthlyRevenue'), value: formatUSD(r.franchiseeMonthly), color: 'text-blue-600 font-bold' },
+                          { label: t('franchisee.calculator.yourMonthlyRevenue'), value: formatCurrency(r.franchiseeMonthly, i18n.language), color: 'text-blue-600 font-bold' },
                           { label: '---', value: '', color: 'text-gray-300' },
-                          { label: `${t('franchisee.calculator.selfCommissionTemplate', { rate: (r.selfCommissionRate * 100).toFixed(0) })}`, value: formatUSD(r.selfCommissionAmount || 0), color: 'text-orange-600 font-medium' },
+                          { label: `${t('franchisee.calculator.selfCommissionTemplate', { rate: (r.selfCommissionRate * 100).toFixed(0) })}`, value: formatCurrency(r.selfCommissionAmount || 0, i18n.language), color: 'text-orange-600 font-medium' },
                           ...(r.downstreamCommissionRate > 0 ? [
-                            { label: `下级${t('franchisee.earnings.commission')}抽成 (${(r.downstreamCommissionRate * 100).toFixed(0)}%,一次性)`, value: formatUSD(r.downstreamCommissionAnnual || 0), color: 'text-purple-600 font-medium' },
+                            { label: `下级${t('franchisee.earnings.commission')}抽成 (${(r.downstreamCommissionRate * 100).toFixed(0)}%,一次性)`, value: formatCurrency(r.downstreamCommissionAnnual || 0, i18n.language), color: 'text-purple-600 font-medium' },
                           ] : []),
                           { label: '---', value: '', color: 'text-gray-300' },
-                          { label: t('franchisee.calculator.investorMonthly'), value: formatUSD(r.investorMonthly), color: 'text-green-600' },
+                          { label: t('franchisee.calculator.investorMonthly'), value: formatCurrency(r.investorMonthly, i18n.language), color: 'text-green-600' },
                         ].map((item, i) => (
                           <div key={i} className="flex justify-between text-sm"><span className="text-gray-600">{item.label}</span><span className={item.color}>{item.value}</span></div>
                         ))}
@@ -2177,7 +2166,7 @@ export default function Franchisee() {
                       <div className="grid grid-cols-3 gap-3">
                         <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-bold text-blue-600">{r.investorAnnualReturn}%</div><div className="text-xs text-gray-500 mt-1">{t('franchisee.calculator.investorAnnualReturn')}</div></div>
                         <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-bold text-green-600">{isFinite(r.investorPaybackMonths) ? (r.investorPaybackMonths < 12 ? `${r.investorPaybackMonths.toFixed(1)}${t('franchisee.calculator.monthUnit')}` : `${(r.investorPaybackMonths / 12).toFixed(1)}${t('franchisee.calculator.yearUnit')}`) : '—'}</div><div className="text-xs text-gray-500 mt-1">{t('franchisee.calculator.investorPaybackPeriod')}</div></div>
-                        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-bold text-purple-600">{formatUSD(r.franchiseeAnnual)}</div><div className="text-xs text-gray-500 mt-1">{t('franchisee.calculator.yourAnnual')}</div></div>
+                        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-bold text-purple-600">{formatCurrency(r.franchiseeAnnual, i18n.language)}</div><div className="text-xs text-gray-500 mt-1">{t('franchisee.calculator.yourAnnual')}</div></div>
                       </div>
                     </>
                   );
@@ -2242,7 +2231,7 @@ export default function Franchisee() {
                 {/* 总收入概览 */}
                 <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-xl p-6">
                   <div className="text-blue-200 text-sm">{t('franchisee.earnings.totalLabel')}</div>
-                  <div className="text-4xl font-bold mt-1">${(earningsData.grand_total || 0).toLocaleString()}<div className="text-base font-normal text-blue-200 mt-1">≈ ¥{((earningsData.grand_total || 0) * 7.25).toLocaleString()}</div></div>
+                  <div className="text-4xl font-bold mt-1">{formatCurrency(earningsData.grand_total || 0, i18n.language)}</div>
                 </div>
 
                 {/* {t('franchisee.earnings.ownStoreTitle')} */}
@@ -2253,15 +2242,15 @@ export default function Franchisee() {
                   </h3>
                   <div className="grid grid-cols-3 gap-4 mb-4">
                     <div className="bg-green-50 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-green-700">${((earningsData.self_earnings?.purchase_commission || 0)).toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-green-700">{formatCurrency(earningsData.self_earnings?.purchase_commission || 0, i18n.language)}</div>
                       <div className="text-xs text-green-600 mt-1">{t('franchisee.earnings.purchaseCommission')}</div>
                     </div>
                     <div className="bg-blue-50 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-blue-700">${((earningsData.self_earnings?.rental_share || 0)).toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-blue-700">{formatCurrency(earningsData.self_earnings?.rental_share || 0, i18n.language)}</div>
                       <div className="text-xs text-blue-600 mt-1">{t('franchisee.earnings.rentalShare')}</div>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-gray-700">${((earningsData.self_earnings?.total || 0)).toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-gray-700">{formatCurrency(earningsData.self_earnings?.total || 0, i18n.language)}</div>
                       <div className="text-xs text-gray-500 mt-1">{t('franchisee.earnings.subtotal')}</div>
                     </div>
                   </div>
@@ -2278,8 +2267,8 @@ export default function Franchisee() {
                               )}
                             </div>
                             <div className="flex gap-4 text-right">
-                              <span className="text-green-600">{t('franchisee.earnings.commission')} ${(s.purchase_commission || 0).toLocaleString()}</span>
-                              <span className="text-blue-600">{t('franchisee.earnings.share')} ${(s.rental_share || 0).toLocaleString()}</span>
+                              <span className="text-green-600">{t('franchisee.earnings.commission')} {formatCurrency(s.purchase_commission || 0, i18n.language)}</span>
+                              <span className="text-blue-600">{t('franchisee.earnings.share')} {formatCurrency(s.rental_share || 0, i18n.language)}</span>
                             </div>
                           </div>
                         ))}
@@ -2299,15 +2288,15 @@ export default function Franchisee() {
                     </h3>
                     <div className="grid grid-cols-3 gap-4 mb-4">
                       <div className="bg-purple-50 rounded-lg p-4">
-                        <div className="text-2xl font-bold text-purple-700">${((earningsData.city_earnings?.purchase_commission || 0)).toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-purple-700">{formatCurrency(earningsData.city_earnings?.purchase_commission || 0, i18n.language)}</div>
                         <div className="text-xs text-purple-600 mt-1">{t('franchisee.earnings.purchaseCommissionRate', { rate: agentType === 'province_agent' ? '2%' : '3%' })}</div>
                       </div>
                       <div className="bg-indigo-50 rounded-lg p-4">
-                        <div className="text-2xl font-bold text-indigo-700">${((earningsData.city_earnings?.rental_share || 0)).toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-indigo-700">{formatCurrency(earningsData.city_earnings?.rental_share || 0, i18n.language)}</div>
                         <div className="text-xs text-indigo-600 mt-1">{t('franchisee.earnings.rentalShareRate', { rate: agentType === 'province_agent' ? '2%' : '3%' })}</div>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-4">
-                        <div className="text-2xl font-bold text-gray-700">${((earningsData.city_earnings?.total || 0)).toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-gray-700">{formatCurrency(earningsData.city_earnings?.total || 0, i18n.language)}</div>
                         <div className="text-xs text-gray-500 mt-1">{t('franchisee.earnings.subtotal')}</div>
                       </div>
                     </div>
@@ -2331,10 +2320,10 @@ export default function Franchisee() {
                               {earningsData.city_earnings.details.map((d, i) => (
                                 <tr key={i} className="border-b border-gray-100">
                                   <td className="py-2 pr-2 font-medium text-gray-800">{d.investor_email || d.store_name}</td>
-                                  <td className="py-2 pr-2 text-right">${(d.purchase_amount || 0).toLocaleString()}</td>
-                                  <td className="py-2 pr-2 text-right text-purple-600">${(d.commission || 0).toLocaleString()}</td>
-                                  <td className="py-2 pr-2 text-right">${(d.monthly_rent || 0).toLocaleString()}</td>
-                                  <td className="py-2 pr-2 text-right text-indigo-600">${(d.rent_share || 0).toLocaleString()}</td>
+                                  <td className="py-2 pr-2 text-right">{formatCurrency(d.purchase_amount || 0, i18n.language)}</td>
+                                  <td className="py-2 pr-2 text-right text-purple-600">{formatCurrency(d.commission || 0, i18n.language)}</td>
+                                  <td className="py-2 pr-2 text-right">{formatCurrency(d.monthly_rent || 0, i18n.language)}</td>
+                                  <td className="py-2 pr-2 text-right text-indigo-600">{formatCurrency(d.rent_share || 0, i18n.language)}</td>
                                   <td className="py-2 pr-2 text-xs text-gray-400">{d.rent_start_date ? t('franchisee.earnings.rentStartTemplate', { date: d.rent_start_date }) : '—'}</td>
                                 </tr>
                               ))}
@@ -2396,11 +2385,11 @@ export default function Franchisee() {
                   <div className="bg-white rounded-xl border overflow-hidden p-5">
                     <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-xl p-5">
                       <div className="text-blue-200 text-sm mb-1">{t('franchisee.wallet.balanceLabel')}</div>
-                      <div className="text-3xl font-bold">${(walletData.totalBalance || 0).toLocaleString()}</div>
-                      <div className="text-blue-200 text-xs mt-1">≈ ¥{((walletData.totalBalance || 0) * 7.25).toLocaleString()}</div>
+                      <div className="text-3xl font-bold">{formatCurrency(walletData.totalBalance || 0, i18n.language)}</div>
+                      
                       <div className="text-blue-200 text-xs mt-2">{t('franchisee.wallet.balanceBreakdown')}</div>
                       <div className="mt-3 bg-blue-500/30 rounded-lg px-3 py-2 text-xs">
-                        {t('franchisee.wallet.balanceBreakdownDetail', { deposit: (walletData.depositAmount || 0).toLocaleString(), earnings: (walletData.cumulativeEarnings || 0).toLocaleString() })}
+                        {t('franchisee.wallet.balanceBreakdownDetail', { deposit: formatCurrency(walletData.depositAmount || 0, i18n.language), earnings: formatCurrency(walletData.cumulativeEarnings || 0, i18n.language) })}
                       </div>
                     </div>
                   </div>
@@ -2409,14 +2398,14 @@ export default function Franchisee() {
                     {walletData.cumulativePerformance >= walletData.performanceTarget && walletData.performanceTarget > 0 ? (
                       <div className="bg-gradient-to-br from-green-600 to-green-800 text-white rounded-xl p-5">
                         <div className="text-green-200 text-sm mb-1">{t('franchisee.wallet.withdrawableLabel')}</div>
-                        <div className="text-3xl font-bold">${(walletData.postTargetWithdrawable || 0).toLocaleString()}</div><div className="text-green-200 text-xs mt-1">≈ ¥{((walletData.postTargetWithdrawable || 0) * 7.25).toLocaleString()}</div>
+                        <div className="text-3xl font-bold">{formatCurrency(walletData.postTargetWithdrawable || 0, i18n.language)}</div>
                         <div className="text-green-200 text-xs mt-2">{t('franchisee.wallet.balanceBreakdown')}</div>
                         <div className="mt-3 bg-green-500/30 rounded-lg px-3 py-2 text-xs">{t('franchisee.wallet.targetMetHint')}</div>
                       </div>
                     ) : (
                       <div className="bg-gradient-to-br from-yellow-600 to-yellow-800 text-white rounded-xl p-5">
                         <div className="text-yellow-200 text-sm mb-1">{t('franchisee.wallet.withdrawableLabel')}</div>
-                        <div className="text-3xl font-bold">${(walletData.preTargetWithdrawable || 0).toLocaleString()}</div><div className="text-yellow-200 text-xs mt-1">≈ ¥{((walletData.preTargetWithdrawable || 0) * 7.25).toLocaleString()}</div>
+                        <div className="text-3xl font-bold">{formatCurrency(walletData.preTargetWithdrawable || 0, i18n.language)}</div>
                         <div className="text-yellow-200 text-xs mt-2">{t('franchisee.wallet.withdrawableBreakdown')}</div>
                         <div className="mt-3 bg-yellow-500/30 rounded-lg px-3 py-2 text-xs">{t('franchisee.wallet.targetNotMetHint')}</div>
                       </div>
@@ -2447,11 +2436,11 @@ export default function Franchisee() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl border p-5">
                     <div className="text-sm text-gray-500 mb-1">{t('franchisee.wallet.myFranchiseFee')}</div>
-                    <div className="text-2xl font-bold text-gray-900">${(walletData.franchiseFee || 0).toLocaleString()}</div><div className="text-xs text-gray-400 mt-0.5">≈ ¥{((walletData.franchiseFee || 0) * 7.25).toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-gray-900">{formatCurrency(walletData.franchiseFee || 0, i18n.language)}</div>
                   </div>
                   <div className="bg-white rounded-xl border p-5">
                     <div className="text-sm text-gray-500 mb-1">{t('franchisee.wallet.myDeposit')}</div>
-                    <div className="text-2xl font-bold text-blue-700">${(walletData.depositAmount || 0).toLocaleString()}</div><div className="text-xs text-gray-400 mt-0.5">≈ ¥{((walletData.depositAmount || 0) * 7.25).toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-blue-700">{formatCurrency(walletData.depositAmount || 0, i18n.language)}</div>
                   </div>
                 </div>
 
@@ -2462,15 +2451,15 @@ export default function Franchisee() {
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div className="bg-blue-50 rounded-lg p-4">
-                      <div className="text-lg font-bold text-blue-700">${(walletData.monthlyRevenue || 0).toLocaleString()}</div><div className="text-xs text-blue-500 mt-0.5">≈ ¥{((walletData.monthlyRevenue || 0) * 7.25).toLocaleString()}</div>
+                      <div className="text-lg font-bold text-blue-700">{formatCurrency(walletData.monthlyRevenue || 0, i18n.language)}</div>
                       <div className="text-xs text-blue-600 mt-1">{t('franchisee.wallet.cumulativePerformance')}（{t('franchisee.wallet.monthlyPerformance')}）</div>
                     </div>
                     <div className="bg-purple-50 rounded-lg p-4">
-                      <div className="text-lg font-bold text-purple-700">${(walletData.cumulativePerformance || 0).toLocaleString()}</div><div className="text-xs text-purple-500 mt-0.5">≈ ¥{((walletData.cumulativePerformance || 0) * 7.25).toLocaleString()}</div>
+                      <div className="text-lg font-bold text-purple-700">{formatCurrency(walletData.cumulativePerformance || 0, i18n.language)}</div>
                       <div className="text-xs text-purple-600 mt-1">{t('franchisee.wallet.cumulativePerformance')}</div>
                     </div>
                     <div className="bg-orange-50 rounded-lg p-4">
-                      <div className="text-lg font-bold text-orange-700">${(walletData.performanceTarget || 0).toLocaleString()}</div><div className="text-xs text-orange-500 mt-0.5">≈ ¥{((walletData.performanceTarget || 0) * 7.25).toLocaleString()}</div>
+                      <div className="text-lg font-bold text-orange-700">{formatCurrency(walletData.performanceTarget || 0, i18n.language)}</div>
                       <div className="text-xs text-orange-600 mt-1">{t('franchisee.wallet.performanceTarget')}</div>
                     </div>
                     <div className={`rounded-lg p-4 ${walletData.cumulativePerformance >= walletData.performanceTarget && walletData.performanceTarget > 0 ? 'bg-green-50' : 'bg-gray-50'}`}>
@@ -2508,7 +2497,7 @@ export default function Franchisee() {
                         <div key={w.id || i} className="p-4 flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-gray-900">${(Number(w.amount) || 0).toLocaleString()}</span><span className="text-xs text-gray-400 ml-2">≈ ¥{((Number(w.amount) || 0) * 7.25).toLocaleString()}</span>
+                              <span className="font-semibold text-gray-900">{formatCurrency(Number(w.amount) || 0, i18n.language)}</span><span className="text-xs text-gray-400 ml-2"></span>
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                 w.status === 'approved' ? 'bg-green-100 text-green-700' :
                                 w.status === 'rejected' ? 'bg-red-100 text-red-700' :
@@ -2776,15 +2765,15 @@ export default function Franchisee() {
                       <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                         <div className="bg-gray-50 rounded p-2">
                           <span className="text-gray-400">{t('franchisee.applyAgent.franchiseFee')}</span>
-                          <div className="font-semibold">{formatUSD(type.feeUsd)} <span className="text-gray-400 font-normal">≈ {formatCNY(usdToCny(type.feeUsd))}</span></div>
+                          <div className="font-semibold">{formatCurrency(type.feeUsd, i18n.language)} </div>
                         </div>
                         <div className="bg-gray-50 rounded p-2">
                           <span className="text-gray-400">{t('franchisee.applyAgent.deposit')}</span>
-                          <div className="font-semibold">{formatUSD(type.depositUsd)} <span className="text-gray-400 font-normal">≈ {formatCNY(usdToCny(type.depositUsd))}</span></div>
+                          <div className="font-semibold">{formatCurrency(type.depositUsd, i18n.language)} </div>
                         </div>
                         <div className="bg-gray-50 rounded p-2">
                           <span className="text-gray-400">{t('franchisee.applyAgent.performanceTarget')}</span>
-                          <div className="font-semibold">{formatUSD(type.performanceTargetUsd)} <span className="text-gray-400 font-normal">≈ {formatCNY(usdToCny(type.performanceTargetUsd))}</span></div>
+                          <div className="font-semibold">{formatCurrency(type.performanceTargetUsd, i18n.language)} </div>
                         </div>
                         <div className="bg-gray-50 rounded p-2">
                           <span className="text-gray-400">{t('franchisee.applyAgent.revShare')}</span>
@@ -2792,7 +2781,7 @@ export default function Franchisee() {
                         </div>
                       </div>
                       <p className="text-xs text-gray-400">
-                        {t('franchisee.applyAgent.initialInvestment')}: <span className="font-bold text-gray-700">{formatUSD(type.feeUsd + type.depositUsd)} <span className="font-normal">≈ {formatCNY(usdToCny(type.feeUsd + type.depositUsd))}</span></span>
+                        {t('franchisee.applyAgent.initialInvestment')}: <span className="font-bold text-gray-700">{formatCurrency(type.feeUsd + type.depositUsd, i18n.language)} </span>
                       </p>
                       <div className="mt-2 space-y-1">
                         {type.benefits.map((b, i) => (
@@ -3402,7 +3391,7 @@ export default function Franchisee() {
               <button onClick={() => setShowDepositRefundModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <p className="text-xs text-gray-400 mb-4">
-              {t('franchisee.modal.depositRefundAmount')}：<span className="font-semibold text-blue-600">${(walletData.depositAmount || 0).toLocaleString()} ≈ ¥{((walletData.depositAmount || 0) * 7.25).toLocaleString()}</span>，提交后由 admin 审批
+              {t('franchisee.modal.depositRefundAmount')}：<span className="font-semibold text-blue-600">{formatCurrency(walletData.depositAmount || 0, i18n.language)}</span>，提交后由 admin 审批
             </p>
             <form onSubmit={handleDepositRefundSubmit} className="space-y-3">
               <div>

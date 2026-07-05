@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { assetAPI, orderAPI, dividendAPI } from '../../services/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MapPin, TrendingUp, Battery, ShoppingCart, DollarSign, Calendar, BarChart3, Clock, Zap, Wallet, ArrowUpCircle, ArrowDownCircle, Send, CreditCard, Banknote, Loader2, Gift, AlertTriangle, Calculator, Network, MapPinned, RefreshCw } from 'lucide-react';
-import { USD_TO_CNY_RATE, dualCurrency, formatUSD, formatCNY, usdToCny } from '../../lib/currency';
+import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 import { formatDate } from '../../lib/date-format';
 import { useTranslation } from 'react-i18next';
 
@@ -110,6 +110,9 @@ export default function Invest() {
     loadAmap().then(() => { if (!cancelled) setInvestMapReady(true); }).catch(() => {});
     return () => { cancelled = true; };
   }, [loadAmap]);
+
+  // 拉取实时汇率
+  useEffect(() => { fetchRates(); }, []);
 
   // ─── 可投资运营电池 ─────────────
   const [operationalBatteries, setOperationalBatteries] = useState([]);
@@ -592,8 +595,8 @@ export default function Invest() {
           {storeRef && <div className="mt-3 bg-white/20 backdrop-blur rounded-lg px-4 py-2 inline-block text-sm">{t('invest.header.storeRefBadge')}</div>}
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-white/10 backdrop-blur rounded-xl p-4"><div className="text-3xl font-bold">${totalInvested.toFixed(0)}</div><div className="text-blue-100 text-sm">{t('invest.header.totalInvest')}</div></div>
-            <div className="bg-white/10 backdrop-blur rounded-xl p-4"><div className="text-3xl font-bold">${dividendsTotal.toFixed(0)}</div><div className="text-blue-100 text-sm">{t('invest.header.totalDividends')}</div></div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4"><div className="text-3xl font-bold">{formatCurrency(totalInvested, i18n.language)}</div><div className="text-blue-100 text-sm">{t('invest.header.totalInvest')}</div></div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4"><div className="text-3xl font-bold">{formatCurrency(dividendsTotal, i18n.language)}</div><div className="text-blue-100 text-sm">{t('invest.header.totalDividends')}</div></div>
             <div className="bg-white/10 backdrop-blur rounded-xl p-4"><div className="text-3xl font-bold">{activeCount}</div><div className="text-blue-100 text-sm">{t('invest.header.activeAssets')}</div></div>
             <div className="bg-white/10 backdrop-blur rounded-xl p-4"><div className="text-3xl font-bold">{orders.length}</div><div className="text-blue-100 text-sm">{t('invest.header.orderCount')}</div></div>
           </div>
@@ -646,8 +649,8 @@ export default function Invest() {
                     </p>
                     <p className="text-sm text-gray-600 mt-3 line-clamp-2">{asset.description}</p>
                     <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t text-sm">
-                      <div><div className="text-gray-400">{t('invest.browse.unitPrice')}</div><div className="font-bold text-gray-900">{formatUSD(asset.unit_price)}</div><div className="text-xs text-gray-400">{dualCurrency(asset.unit_price).secondary}</div></div>
-                      {asset.monthly_rent != null && <div><div className="text-gray-400">{t('invest.browse.monthlyRent')}</div><div className="font-bold text-gray-900">{formatUSD(asset.monthly_rent)}{' '}<span className="text-xs text-gray-400">{t('invest.calculator.perMonth')}</span></div><div className="text-xs text-gray-400">{dualCurrency(asset.monthly_rent).secondary}</div></div>}
+                      <div><div className="text-gray-400">{t('invest.browse.unitPrice')}</div><div className="font-bold text-gray-900">{formatCurrency(asset.unit_price, i18n.language)}</div></div>
+                      {asset.monthly_rent != null && <div><div className="text-gray-400">{t('invest.browse.monthlyRent')}</div><div className="font-bold text-gray-900">{formatCurrency(asset.monthly_rent, i18n.language)}{' '}<span className="text-xs text-gray-400">{t('invest.calculator.perMonth')}</span></div></div>}
                       <div><div className="text-gray-400">{t('invest.browse.annualReturn')}</div><div className="font-bold text-green-600 flex items-center"><TrendingUp className="h-3 w-3 mr-1" />{asset.annualized_return != null ? asset.annualized_return : asset.expected_roi}%</div></div>
                       <div><div className="text-gray-400">{t('invest.browse.available')}</div><div className="font-bold text-gray-900">{asset.available_units}{t('invest.browse.units')}</div></div>
                       <div><div className="text-gray-400">{t('invest.browse.total')}</div><div className="font-bold text-gray-500">{asset.total_units}{t('invest.browse.units')}</div></div>
@@ -701,7 +704,7 @@ export default function Invest() {
                         </div>
                         <div className="bg-gray-50 rounded-lg p-3 text-center">
                           <div className="text-xs text-gray-400">{t('invest.investAmount')}</div>
-                          <div className="font-bold text-lg">${((ua.units || 0) * (ua.average_cost || ua.unit_price || 0)).toFixed(0)}</div><div className="text-xs text-gray-400">≈ ¥{(((ua.units || 0) * (ua.average_cost || ua.unit_price || 0)) * 7.25).toFixed(0)}</div>
+                          <div className="font-bold text-lg">{formatCurrency((ua.units || 0) * (ua.average_cost || ua.unit_price || 0), i18n.language)}</div>
                         </div>
                         <div className="bg-gray-50 rounded-lg p-3 text-center">
                           <div className="text-xs text-gray-400">{t('invest.portfolio.stockTotal')}</div>
@@ -870,7 +873,7 @@ export default function Invest() {
                     <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatUSD(battery.price)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatUSD(battery.monthlyRent)}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatCurrency(battery.monthlyRent, i18n.language)}</div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button onClick={() => setCalcBatteryCounts(prev => ({ ...prev, [battery.id]: Math.max(0, (Number(prev[battery.id]) || 0) - 1) }))} className="w-7 h-7 rounded-md border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm">−</button>
@@ -884,7 +887,7 @@ export default function Invest() {
                     <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatUSD(battery.price)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatUSD(battery.monthlyRent)}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatCurrency(battery.monthlyRent, i18n.language)}</div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button onClick={() => setCalcBatteryCounts(prev => ({ ...prev, [battery.id]: Math.max(0, (Number(prev[battery.id]) || 0) - 1) }))} className="w-7 h-7 rounded-md border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm">−</button>
@@ -898,7 +901,7 @@ export default function Invest() {
                     <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatUSD(battery.price)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatUSD(battery.monthlyRent)}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatCurrency(battery.monthlyRent, i18n.language)}</div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button onClick={() => setCalcBatteryCounts(prev => ({ ...prev, [battery.id]: Math.max(0, (Number(prev[battery.id]) || 0) - 1) }))} className="w-7 h-7 rounded-md border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm">−</button>
@@ -912,7 +915,7 @@ export default function Invest() {
                     <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatUSD(battery.price)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatUSD(battery.monthlyRent)}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatCurrency(battery.monthlyRent, i18n.language)}</div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button onClick={() => setCalcBatteryCounts(prev => ({ ...prev, [battery.id]: Math.max(0, (Number(prev[battery.id]) || 0) - 1) }))} className="w-7 h-7 rounded-md border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm">−</button>
@@ -940,17 +943,17 @@ export default function Invest() {
                     <>
                       <div className="bg-gradient-to-br from-green-600 to-emerald-800 text-white rounded-xl p-6">
                         <p className="text-green-100 text-sm mb-1">{t('invest.calculator.investIncome')}</p>
-                        <div className="text-4xl font-bold">{formatUSD(r.investorMonthly)}<span className="text-lg font-normal text-green-200 ml-2">{t('invest.calculator.perMonth')}</span></div>
+                        <div className="text-4xl font-bold">{formatCurrency(r.investorMonthly, i18n.language)}<span className="text-lg font-normal text-green-200 ml-2">{t('invest.calculator.perMonth')}</span></div>
                         <p className="text-green-100 text-sm mt-2">{t('invest.calculator.investorShare', { pct: (r.investorRate * 100).toFixed(0) })}</p>
                       </div>
                       <div className="bg-white rounded-xl border p-6 space-y-4">
                         <h3 className="font-bold">{t('invest.calculator.details')}</h3>
                         <div className="text-xs text-gray-500 space-y-1 mb-3">
                           <p className="font-semibold text-gray-700 text-sm mb-2">{t('invest.calculator.deployList')}</p>
-                          {r.details.map(d => (<div key={d.id} className="flex justify-between"><span>{d.name} × {d.count}</span><span className="text-gray-700">{formatUSD(d.invest)}</span></div>))}
+                          {r.details.map(d => (<div key={d.id} className="flex justify-between"><span>{d.name} × {d.count}</span><span className="text-gray-700">{formatCurrency(d.invest, i18n.language)}</span></div>))}
                         </div>
                         <hr className="border-gray-100" />
-                        {[{ label: t('invest.calculator.totalInvestment'), value: formatUSD(r.totalInvestment), bold: true }, { label: t('invest.calculator.totalMonthlyRent'), value: formatUSD(r.totalMonthlyRent) }].map((item, i) => (
+                        {[{ label: t('invest.calculator.totalInvestment'), value: formatCurrency(r.totalInvestment, i18n.language), bold: true }, { label: t('invest.calculator.totalMonthlyRent'), value: formatCurrency(r.totalMonthlyRent, i18n.language) }].map((item, i) => (
                           <div key={i} className={`flex justify-between text-sm ${item.bold ? 'font-bold text-base border-t pt-3 mt-1 border-gray-100' : ''}`}>
                             <span className="text-gray-600">{item.label}</span><span className="text-gray-900">{item.value}</span>
                           </div>
@@ -958,7 +961,7 @@ export default function Invest() {
                         <hr className="border-gray-100" />
                         <p className="text-xs text-gray-500 font-semibold mb-1">{t('invest.calculator.investorDetails')}</p>
                         {[
-                          { label: t('invest.calculator.investorMonthlyEarnings', { pct: (r.investorRate * 100).toFixed(0) }), value: formatUSD(r.investorMonthly), color: 'text-green-600 font-bold' },
+                          { label: t('invest.calculator.investorMonthlyEarnings', { pct: (r.investorRate * 100).toFixed(0) }), value: formatCurrency(r.investorMonthly, i18n.language), color: 'text-green-600 font-bold' },
                         ].map((item, i) => (
                           <div key={i} className="flex justify-between text-sm"><span className="text-gray-600">{item.label}</span><span className={item.color}>{item.value}</span></div>
                         ))}
@@ -1003,7 +1006,7 @@ export default function Invest() {
                               </div>
                               <span className="text-xs text-gray-500">{unit.asset_name}</span>
                             </div>
-                            <div className="mt-1 text-xs text-gray-500">{t('trade.purchasePrice')}: ${Number(unit.unit_price || 1000).toFixed(2)} (≈ ¥{(Number(unit.unit_price || 1000) * 7.25).toFixed(2)})</div>
+                            <div className="mt-1 text-xs text-gray-500">{t('trade.purchasePrice')}: {formatCurrency(Number(unit.unit_price || 1000), i18n.language)}</div>
                           </div>))}
                       </div>}
                   {selectedUnitIds.length > 0 && (() => {
@@ -1012,7 +1015,7 @@ export default function Invest() {
                     return (
                       <button onClick={handleSellToPlatform} disabled={selling}
                         className="mt-4 w-full py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50">
-                        {selling ? t('trade.processing') : `${t('trade.sellBtn')} ${selectedUnitIds.length} ${t('trade.unitsToPlatform')} — ${t('trade.total')} $${totalBuyback.toFixed(2)} (≈ ¥${(totalBuyback * 7.25).toFixed(2)})`}
+                        {selling ? t('trade.processing') : `${t('trade.sellBtn')} ${selectedUnitIds.length} ${t('trade.unitsToPlatform')} — ${t('trade.total')} ${formatCurrency(totalBuyback, i18n.language)} $`}
                       </button>
                     );
                   })()}
@@ -1040,15 +1043,15 @@ export default function Invest() {
                                 </span>
                               </div>
                               <div className="p-3 space-y-1.5 text-sm">
-                                <div className="flex justify-between"><span className="text-gray-500">{t('trade.purchasePrice')}</span><span className="font-medium">${p.purchasePrice?.toFixed(2)} (≈ ¥{(p.purchasePrice * 7.25).toFixed(2)})</span></div>
+                                <div className="flex justify-between"><span className="text-gray-500">{t('trade.purchasePrice')}</span><span className="font-medium">{formatCurrency(p.purchasePrice, i18n.language)}</span></div>
                                 <div className="flex justify-between"><span className="text-gray-500">{t('trade.holding')}</span><span className="font-medium">{p.monthsHeld?.toFixed(1)} {t('trade.months')}</span></div>
-                                <div className="flex justify-between"><span className="text-gray-500">{t('trade.residual')}</span><span className="font-medium">${p.residualValue?.toFixed(2)} ({p.residualRate}%) (≈ ¥{(p.residualValue * 7.25).toFixed(2)})</span></div>
+                                <div className="flex justify-between"><span className="text-gray-500">{t('trade.residual')}</span><span className="font-medium">{formatCurrency(p.residualValue, i18n.language)} ({p.residualRate}%)</span></div>
                                 {p.penaltyRate > 0 && (
-                                  <div className="flex justify-between"><span className="text-red-500">{t('trade.penalty')} ({p.penaltyRate}%)</span><span className="font-medium text-red-500">-${p.penaltyAmount?.toFixed(2)} (≈ ¥{(p.penaltyAmount * 7.25).toFixed(2)})</span></div>
+                                  <div className="flex justify-between"><span className="text-red-500">{t('trade.penalty')} ({p.penaltyRate}%)</span><span className="font-medium text-red-500">-{formatCurrency(p.penaltyAmount, i18n.language)}</span></div>
                                 )}
                                 <div className="border-t pt-1.5 flex justify-between">
                                   <span className="font-medium text-primary-900">{t('trade.buybackPrice')}</span>
-                                  <span className="font-bold text-primary-700">${p.buybackPrice?.toFixed(2)} (≈ ¥{(p.buybackPrice * 7.25).toFixed(2)})</span>
+                                  <span className="font-bold text-primary-700">{formatCurrency(p.buybackPrice, i18n.language)}</span>
                                 </div>
                               </div>
                             </div>
@@ -1057,9 +1060,9 @@ export default function Invest() {
                         <div className="bg-primary-50 rounded-lg p-4 border border-primary-200">
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-primary-600">{t('trade.selectedUnits', { count: selectedPreviews.length })}</span>
-                            <span className="text-2xl font-bold text-primary-700">${totalBuyback.toFixed(2)}</span>
+                            <span className="text-2xl font-bold text-primary-700">{formatCurrency(totalBuyback, i18n.language)}</span>
                           </div>
-                          <div className="text-sm text-gray-500 mt-1">≈ ¥{(totalBuyback * 7.25).toFixed(2)}</div>
+                          
                         </div>
                       </div>
                     );
@@ -1097,8 +1100,8 @@ export default function Invest() {
                       <tr key={o.id} className="border-t hover:bg-gray-50">
                         <td className="p-4"><div className="font-medium">{o.asset?.name || '-'}</div><div className="text-xs text-gray-400">{o.asset?.asset_code}</div></td>
                         <td className="p-4 text-center">{o.units}</td>
-                        <td className="p-4 text-right">${o.unit_price}<div className="text-xs text-gray-400">≈ ¥{((o.unit_price || 0) * 7.25).toFixed(0)}</div></td>
-                        <td className="p-4 text-right font-semibold">${o.total_amount}<div className="text-xs text-gray-400">≈ ¥{((o.total_amount || 0) * 7.25).toFixed(0)}</div></td>
+                        <td className="p-4 text-right">{formatCurrency(o.unit_price || 0, i18n.language)}</td>
+                        <td className="p-4 text-right font-semibold">{formatCurrency(o.total_amount || 0, i18n.language)}</td>
                         <td className="p-4 text-right">
                           {o.order_source === 'store' ? (
                             <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">{o.store?.name || t('invest.orders.store')}</span>
@@ -1128,11 +1131,11 @@ export default function Invest() {
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white">
                     <div className="text-green-100 text-sm mb-1">{t('invest.dividends.thisMonth')}</div>
-                    <div className="text-3xl font-bold">${dividendsThisMonth.toFixed(2)}</div>
+                    <div className="text-3xl font-bold">{formatCurrency(dividendsThisMonth, i18n.language)}</div>
                   </div>
                   <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white">
                     <div className="text-amber-100 text-sm mb-1">{t('invest.dividends.totalDividends')}</div>
-                    <div className="text-3xl font-bold">${dividendsTotal.toFixed(2)}</div>
+                    <div className="text-3xl font-bold">{formatCurrency(dividendsTotal, i18n.language)}</div>
                   </div>
                 </div>
                 {/* Dividend details - holdings */}
@@ -1166,9 +1169,9 @@ export default function Invest() {
                               <td className="p-4 font-mono text-blue-700">{bd.unit_code}</td>
                               <td className="p-4">{bd.asset_name}</td>
                               <td className="p-4 text-gray-500">{bd.rent_start ? formatDate(bd.rent_start, i18n.language) : '-'}</td>
-                              <td className="p-4 text-right">${(bd.monthly_rent || 0).toFixed(2)}<div className="text-xs text-gray-400">≈ ¥{((bd.monthly_rent || 0) * 7.25).toFixed(2)}</div></td>
-                              <td className="p-4 text-right font-semibold text-green-600">${(bd.this_month_dividend || 0).toFixed(2)}</td>
-                              <td className="p-4 text-right font-semibold text-amber-700">${(bd.cumulative_dividend || 0).toFixed(2)}</td>
+                              <td className="p-4 text-right">{formatCurrency(bd.monthly_rent || 0, i18n.language)}</td>
+                              <td className="p-4 text-right font-semibold text-green-600">{formatCurrency(bd.this_month_dividend || 0, i18n.language)}</td>
+                              <td className="p-4 text-right font-semibold text-amber-700">{formatCurrency(bd.cumulative_dividend || 0, i18n.language)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1194,7 +1197,7 @@ export default function Invest() {
               <>
                 <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-xl p-6 text-white mb-6">
                   <div className="text-purple-100 text-sm mb-1">{t('invest.wallet.balance')}</div>
-                  <div className="text-4xl font-bold">${walletBalance != null ? Number(walletBalance).toFixed(2) : '0.00'}</div>
+                  <div className="text-4xl font-bold">{walletBalance != null ? formatCurrency(Number(walletBalance), i18n.language) : formatCurrency(0, i18n.language)}</div>
                   <div className="flex space-x-3 mt-4">
                     <button onClick={() => setShowRechargeModal(true)} className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 backdrop-blur rounded-lg px-4 py-2 text-sm font-medium transition">
                       <ArrowDownCircle className="h-4 w-4" /><span>{t('invest.wallet.rechargeBtn')}</span>
@@ -1244,7 +1247,7 @@ export default function Invest() {
                               (tx.type === 'withdraw' || tx.type === 'fee') ? 'text-red-600' :
                               'text-gray-900'
                             }`}>
-                              {tx.type === 'withdraw' || tx.type === 'fee' ? '-' : '+'}${(tx.amount || 0).toFixed(2)}<div className="text-xs text-gray-400">≈ ¥{((tx.amount || 0) * 7.25).toFixed(2)}</div>
+                              {tx.type === 'withdraw' || tx.type === 'fee' ? '-' : '+'}{formatCurrency(tx.amount || 0, i18n.language)}
                             </td>
                             <td className="p-4 text-right text-gray-500 max-w-xs truncate">{tx.remark || tx.typeLabel || '—'}</td>
                             <td className="p-4 text-right text-gray-400">{tx.createdAt ? formatDate(tx.createdAt, i18n.language) : '—'}</td>
@@ -1267,7 +1270,7 @@ export default function Invest() {
             <h3 className="text-xl font-bold mb-4">{t('invest.purchase.title')}</h3>
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
               <div className="font-semibold">{selectedAsset.name}</div>
-              <div className="text-sm text-gray-600">{t('invest.common.type')}: {selectedAsset.battery_type} · {t('invest.common.unitPrice')}: ${selectedAsset.unit_price}<span className="text-xs text-gray-400 ml-1">≈ ¥{((selectedAsset.unit_price || 0) * 7.25).toFixed(0)}</span></div>
+              <div className="text-sm text-gray-600">{t('invest.common.type')}: {selectedAsset.battery_type} · {t('invest.common.unitPrice')}: {formatCurrency(selectedAsset.unit_price || 0, i18n.language)}<span className="text-xs text-gray-400 ml-1"></span></div>
               <div className="text-sm text-green-600">{t('invest.browse.annualReturn')}: {selectedAsset.expected_roi}%</div>
             </div>
             <div className="mb-4">
@@ -1277,7 +1280,7 @@ export default function Invest() {
                 className="input-field" />
             </div>
             <div className="mb-6 p-4 bg-primary-50 rounded-lg">
-              <div className="flex justify-between"><span>{t('invest.purchase.total')}</span><span className="font-bold text-primary-600">${(Number(selectedAsset.unit_price || 0) * purchaseUnits).toFixed(2)}</span><div className="text-xs text-gray-400 mt-1">≈ ¥{((Number(selectedAsset.unit_price || 0) * purchaseUnits) * 7.25).toFixed(2)}</div></div>
+              <div className="flex justify-between"><span>{t('invest.purchase.total')}</span><span className="font-bold text-primary-600">{formatCurrency(Number(selectedAsset.unit_price || 0) * purchaseUnits, i18n.language)}</span></div>
               {storeRef && <div className="text-xs text-gray-500 mt-1">{t('invest.purchase.viaStore')}</div>}
             </div>
             <div className="flex space-x-4">

@@ -7,7 +7,7 @@ import { adminAPI, batteryTypesAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
 
 import { Users, TrendingUp, DollarSign, BarChart3, Settings, Battery, Store, ClipboardList, Check, X, Eye, Shield, MapPin, Building2, Plus, Edit, Trash2, Loader2, Zap, BadgeCheck, Percent, Cpu, Camera, Phone, FileText, User, CheckSquare, Square } from 'lucide-react';
-import { USD_TO_CNY_RATE, dualCurrency, formatUSD, formatCNY, usdToCny } from '../../lib/currency';
+import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 
 const API_BASE = '/api';
 
@@ -34,7 +34,11 @@ function computeBatteryHealth(soc, temp, cycles) {
 }
 
 export default function Admin() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // 拉取实时汇率
+  useEffect(() => { fetchRates(); }, []);
+
   const { user, canAccessAdmin } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -238,8 +242,7 @@ export default function Admin() {
   const [editingAssetId, setEditingAssetId] = useState(null);
   const [assetForm, setAssetForm] = useState({
     asset_code: '', name: '', description: '', battery_type: 'swap', battery_type_id: '',
-    total_units: '', unit_price_rmb: '', expected_roi: '', monthly_rent: '', location: '', station_id: '', warehouse_id: '',
-  });
+    total_units: '', unit_price_rmb: '', expected_roi: '', monthly_rent: '', location: '', station_id: '', warehouse_id: ''});
   const [assetSubmitting, setAssetSubmitting] = useState(false);
   // JSON批量上传
   const [showJsonImport, setShowJsonImport] = useState(false);
@@ -359,8 +362,7 @@ export default function Admin() {
       ]);
       dispatchCacheRef.current = {
         sites: sitesRes || [],
-        workers: workersRes || [],
-      };
+        workers: workersRes || []};
     } catch (e) {
       // silent — 弹窗打开时回退到实时请求
     }
@@ -596,8 +598,7 @@ export default function Admin() {
       monthly_rent: matchedType?.monthly_rent != null ? String(matchedType.monthly_rent) : (asset.monthly_rent != null ? String(asset.monthly_rent) : ''),
       location: asset.location || '',
       station_id: asset.station_id || '',
-      warehouse_id: asset.warehouse_id || '',
-    });
+      warehouse_id: asset.warehouse_id || ''});
     setShowAssetForm(true);
   };
 
@@ -623,8 +624,7 @@ export default function Admin() {
         expected_roi: assetForm.expected_roi ? parseFloat(assetForm.expected_roi) : undefined,
         location: (assetForm.location || '').trim(),
         station_id: assetForm.station_id || undefined,
-        warehouse_id: assetForm.warehouse_id || undefined,
-      };
+        warehouse_id: assetForm.warehouse_id || undefined};
       if (isEditing) {
         if (!editingAssetId) { alert('编辑状态异常，请重新打开编辑表单'); setAssetSubmitting(false); return; }
         await adminAPI.updateAsset(editingAssetId, payload);
@@ -662,8 +662,7 @@ export default function Admin() {
           monthly_rent: item.monthly_rent ? parseFloat(item.monthly_rent) : undefined,
           location: item.location || '',
           station_id: item.station_id || '',
-          address: item.address || '',
-        });
+          address: item.address || ''});
         okCount++;
       } catch (e) { failCount++; }
     }
@@ -694,8 +693,7 @@ export default function Admin() {
           sensor_cycle_count: cycles,
           sensor_last_online: new Date(Date.now() - Math.floor(Math.random() * 86400000)).toISOString(),
           sensor_longitude: Math.round(lng * 1000000) / 1000000,
-          sensor_latitude: Math.round(lat * 1000000) / 1000000,
-        };
+          sensor_latitude: Math.round(lat * 1000000) / 1000000};
       });
       return mockData;
     } catch (e) {
@@ -780,8 +778,7 @@ export default function Admin() {
         name: storeForm.name,
         city: storeForm.city || null,
         address: storeForm.address || null,
-        phone: storeForm.phone || null,
-      };
+        phone: storeForm.phone || null};
       if (isEditingStore) {
         body.owner_id = storeForm.owner_id || null;
         body.total_batteries = storeForm.total_batteries !== '' ? Number(storeForm.total_batteries) : undefined;
@@ -833,8 +830,7 @@ export default function Admin() {
       commission: agent.commission != null ? String(agent.commission) : '',
       revenue_share: agent.revenue_share != null ? String(agent.revenue_share) : '',
       region: agent.region || '',
-      city: agent.city || '',
-    });
+      city: agent.city || ''});
     setShowAgentForm(true);
   };
 
@@ -1039,7 +1035,7 @@ export default function Admin() {
                       <td className="p-4 text-right text-gray-500">{a.sold_units ?? (a.total_units - a.available_units)}</td>
                                             <td className="p-4 text-right"><div className="font-semibold">${a.battery_type_unit_price ?? a.unit_price}</div><div className="text-xs text-gray-400">{a.unit_price_rmb != null ? `≈ ¥${a.unit_price_rmb}` : '—'}</div></td>
                       <td className="p-4 text-right">{a.battery_type_annualized_return != null ? `${a.battery_type_annualized_return}%` : a.expected_roi != null ? `${a.expected_roi}%` : '—'}</td>
-                      <td className="p-4 text-right">{(a.battery_type_monthly_rent ?? a.monthly_rent) != null ? (() => { const dc = dualCurrency(a.battery_type_monthly_rent ?? a.monthly_rent); return <><div className="text-gray-700 font-semibold">{dc.primary} /月</div><div className="text-xs text-gray-400">{dc.secondary} /月</div></>; })() : '—'}</td>
+                      <td className="p-4 text-right">{(a.battery_type_monthly_rent ?? a.monthly_rent) != null ? (() => { const dc = localeCurrency(a.battery_type_monthly_rent ?? a.monthly_rent, i18n.language); return <><div className="text-gray-700 font-semibold">{dc.primary} /月</div></>; })() : '—'}</td>
                       <td className="p-4 text-xs text-gray-600 max-w-[180px] truncate" title={a.warehouse_name || a.location || '—'}>{a.warehouse_name || a.location || '—'}</td>
                       <td className="p-4 text-center">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -2102,8 +2098,7 @@ export default function Admin() {
                           battery_type_id: selectedType?.id || '',
                           unit_price_rmb: selectedType?.unit_price != null ? String(selectedType.unit_price) : '',
                           monthly_rent: selectedType?.monthly_rent != null ? String(selectedType.monthly_rent) : '',
-                          expected_roi: selectedType?.annualized_return != null ? String(selectedType.annualized_return) : '',
-                        });
+                          expected_roi: selectedType?.annualized_return != null ? String(selectedType.annualized_return) : ''});
                       }}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                       {batteryTypes.map(bt => (
@@ -2153,7 +2148,7 @@ export default function Admin() {
                     <input type="number" min="0" step="0.01" value={assetForm.monthly_rent} readOnly disabled
                       className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 outline-none cursor-default" placeholder="选择电池类型后自动填充" />
                     {assetForm.monthly_rent && parseFloat(assetForm.monthly_rent) > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">{dualCurrency(parseFloat(assetForm.monthly_rent)).secondary} /月</p>
+                      <p className="text-xs text-gray-400 mt-1"> /月</p>
                     )}
                   </div>
                   <div>

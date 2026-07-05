@@ -4,11 +4,15 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { RotateCcw, Package, Calculator } from 'lucide-react';
-import { USD_TO_CNY_RATE, dualCurrency, formatUSD, formatCNY, usdToCny } from '../../lib/currency';
+import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 import { useTranslation } from 'react-i18next';
 
 export default function Trade() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // 拉取实时汇率
+  useEffect(() => { fetchRates(); }, []);
+
   const { user } = useAuth();
   const router = useRouter();
 
@@ -30,8 +34,7 @@ export default function Trade() {
     try {
       const token = localStorage.getItem('token');
       const listRes = await fetch('/api/trades/sell-to-platform?list=1', {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }});
       if (listRes.ok) {
         const json = await listRes.json();
         setMyUnits(json.units || []);
@@ -44,8 +47,7 @@ export default function Trade() {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/trades/sell-to-platform?unitId=${unitId}`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }});
       if (res.ok) {
         const json = await res.json();
         setPreviewMap(prev => ({ ...prev, [unitId]: json }));
@@ -73,8 +75,7 @@ export default function Trade() {
       const res = await fetch('/api/trades/sell-to-platform', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ unitIds: selectedUnitIds }),
-      });
+        body: JSON.stringify({ unitIds: selectedUnitIds })});
       const json = await res.json();
       if (!res.ok) { setSellMsg(json.error || t('trade.sellFailed')); return; }
       setSellMsg(t('trade.sellSuccess', { total: json.totalBuyback.toFixed(2), totalCny: (json.totalBuyback * 7.25).toFixed(2), balance: json.newBalance.toFixed(2), balanceCny: (json.newBalance * 7.25).toFixed(2) }));
@@ -114,7 +115,7 @@ export default function Trade() {
                       </div>
                       <span className="text-xs text-gray-500">{unit.asset_name}</span>
                     </div>
-                    <div className="mt-1 text-xs text-gray-500">{t('trade.purchasePrice')}: ${Number(unit.unit_price || 1000).toFixed(2)} (≈ ¥{(Number(unit.unit_price || 1000) * 7.25).toFixed(2)})</div>
+                    <div className="mt-1 text-xs text-gray-500">{t('trade.purchasePrice')}: {formatCurrency(Number(unit.unit_price || 1000), i18n.language)}</div>
                   </div>))}
               </div>}
           {selectedUnitIds.length > 0 && (
@@ -142,15 +143,15 @@ export default function Trade() {
                       </span>
                     </div>
                     <div className="p-3 space-y-1.5 text-sm">
-                      <div className="flex justify-between"><span className="text-gray-500">{t('trade.purchasePrice')}</span><span className="font-medium">${p.purchasePrice?.toFixed(2)} (≈ ¥{(p.purchasePrice * 7.25).toFixed(2)})</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">{t('trade.purchasePrice')}</span><span className="font-medium">{formatCurrency(p.purchasePrice, i18n.language)}</span></div>
                       <div className="flex justify-between"><span className="text-gray-500">{t('trade.holding')}</span><span className="font-medium">{p.monthsHeld?.toFixed(1)}{t('trade.months')}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">{t('trade.residual')}</span><span className="font-medium">${p.residualValue?.toFixed(2)} ({p.residualRate}%) (≈ ¥{(p.residualValue * 7.25).toFixed(2)})</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">{t('trade.residual')}</span><span className="font-medium">{formatCurrency(p.residualValue, i18n.language)} ({p.residualRate}%)</span></div>
                       {p.penaltyRate > 0 && (
-                        <div className="flex justify-between"><span className="text-red-500">{t('trade.penalty')} ({p.penaltyRate}%)</span><span className="font-medium text-red-500">-${p.penaltyAmount?.toFixed(2)} (≈ ¥{(p.penaltyAmount * 7.25).toFixed(2)})</span></div>
+                        <div className="flex justify-between"><span className="text-red-500">{t('trade.penalty')} ({p.penaltyRate}%)</span><span className="font-medium text-red-500">-{formatCurrency(p.penaltyAmount, i18n.language)}</span></div>
                       )}
                       <div className="border-t pt-1.5 flex justify-between">
                         <span className="font-medium text-primary-900">{t('trade.buybackPrice')}</span>
-                        <span className="font-bold text-primary-700">${p.buybackPrice?.toFixed(2)} (≈ ¥{(p.buybackPrice * 7.25).toFixed(2)})</span>
+                        <span className="font-bold text-primary-700">{formatCurrency(p.buybackPrice, i18n.language)}</span>
                       </div>
                     </div>
                   </div>
@@ -160,7 +161,7 @@ export default function Trade() {
               <div className="bg-primary-50 rounded-lg p-4 border border-primary-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-primary-600">{t('trade.previewTotal', { count: selectedPreviews.length })}</span>
-                  <span className="text-2xl font-bold text-primary-700">${totalBuyback.toFixed(2)}</span><div className="text-sm text-gray-500 mt-1">≈ ¥{(totalBuyback * 7.25).toFixed(2)}</div>
+                  <span className="text-2xl font-bold text-primary-700">{formatCurrency(totalBuyback, i18n.language)}</span>
                 </div>
               </div>
             </div>

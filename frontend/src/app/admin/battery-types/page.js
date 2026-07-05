@@ -5,7 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { adminAPI } from '../../../services/api';
 import { useRouter } from 'next/navigation';
 import { Battery, Plus, Edit, Trash2, Loader2, ArrowLeft, Zap, AlertCircle, Upload, X } from 'lucide-react';
-import { USD_TO_CNY_RATE, dualCurrency, formatUSD, formatCNY, usdToCny } from '../../../lib/currency';
+import { formatCurrency, localeCurrency, fetchRates } from '../../../lib/currency';
 
 const DEFAULT_FORM = {
   name: '', voltage: '', capacity: '', chemistry: '', description: '',
@@ -18,7 +18,11 @@ const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 export default function BatteryTypesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // 拉取实时汇率
+  useEffect(() => { fetchRates(); }, []);
+
   const { user, canAccessAdmin } = useAuth();
   const router = useRouter();
   const [types, setTypes] = useState([]);
@@ -187,8 +191,8 @@ export default function BatteryTypesPage() {
                     <td className="p-3 text-gray-500 text-xs max-w-[160px] truncate" title={t.scenario}>{t.scenario || '—'}</td>
                     <td className="p-3 text-gray-500 text-xs font-mono">{t.dimensions || '—'}</td>
                     <td className="p-3 text-gray-600 text-xs">{t.net_weight || '—'}</td>
-                    <td className="p-3 text-right text-gray-900 font-medium text-xs">{t.unit_price ? (() => { const dc = dualCurrency(Number(t.unit_price)); return <><div className="font-semibold">{dc.primary}</div><div className="text-xs text-gray-400">{dc.secondary}</div></>; })() : '—'}</td>
-                    <td className="p-3 text-right text-xs">{t.monthly_rent != null && t.monthly_rent !== '' ? (() => { const dc = dualCurrency(Number(t.monthly_rent)); return <><div className="text-gray-700 font-semibold">{dc.primary} /月</div><div className="text-xs text-gray-400">{dc.secondary} /月</div></>; })() : '—'}</td>
+                    <td className="p-3 text-right text-gray-900 font-medium text-xs">{t.unit_price ? (() => { const dc = localeCurrency(Number(t.unit_price), i18n.language); return <><div className="font-semibold">{dc.primary}</div></>; })() : '—'}</td>
+                    <td className="p-3 text-right text-xs">{t.monthly_rent != null && t.monthly_rent !== '' ? (() => { const dc = localeCurrency(Number(t.monthly_rent), i18n.language); return <><div className="text-gray-700 font-semibold">{dc.primary} /月</div></>; })() : '—'}</td>
                     <td className="p-3 text-center text-xs font-semibold text-blue-600">{t.annualized_return != null ? `${t.annualized_return}%` : '—'}</td>
                     <td className="p-3 text-center">
                       <div className="flex items-center justify-center gap-0.5">
@@ -267,7 +271,7 @@ export default function BatteryTypesPage() {
                     <input type="text" value={form.unit_price} onChange={e => setForm({ ...form, unit_price: e.target.value })}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 $828" />
                     {form.unit_price && !isNaN(Number(form.unit_price)) && (
-                      <p className="text-xs text-gray-400 mt-1">≈ {formatCNY(usdToCny(Number(form.unit_price)))}</p>
+                      <p className="text-xs text-gray-400 mt-1">≈ {formatCurrency(Number(form.unit_price), 'zh-CN')}</p>
                     )}
                   </div>
                   <div>
@@ -275,7 +279,7 @@ export default function BatteryTypesPage() {
                     <input type="number" min="0" step="0.01" value={form.monthly_rent} onChange={e => setForm({ ...form, monthly_rent: e.target.value })}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 85" />
                     {form.monthly_rent && !isNaN(Number(form.monthly_rent)) && (
-                      <p className="text-xs text-gray-400 mt-1">≈ {formatCNY(usdToCny(Number(form.monthly_rent)))} /月</p>
+                      <p className="text-xs text-gray-400 mt-1">≈ {formatCurrency(Number(form.monthly_rent), 'zh-CN')} /月</p>
                     )}
                   </div>
                   <div>
