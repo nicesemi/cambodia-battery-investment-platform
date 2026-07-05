@@ -2,61 +2,62 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { agentAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
-import { Award, Shield, TrendingUp, DollarSign, Building2, Users, Globe, MapPin, Phone, Mail, Send, Loader2, BadgeCheck, Clock, XCircle, AlertTriangle } from 'lucide-react';
+import { Award, Shield, TrendingUp, DollarSign, Building2, Users, Globe, MapPin, Phone, Mail, Send, Loader2, BadgeCheck, Clock, XCircle, AlertTriangle, Lock } from 'lucide-react';
 import { getCities, getRegionCities } from '../../data/region-cities';
+import { formatUSD, formatCNY, usdToCny } from '../../lib/currency';
 
-const REGIONS = [
-  { code: 'cn', name: '中国大陆' },
-  { code: 'hk', name: '中国香港' },
-  { code: 'tw', name: '中国台湾' },
-  { code: 'bd', name: '孟加拉' },
-  { code: 'kh', name: '柬埔寨' },
+const getRegions = (t) => [
+  { code: 'cn', name: t('applyAgent.region.cn') },
+  { code: 'hk', name: t('applyAgent.region.hk') },
+  { code: 'tw', name: t('applyAgent.region.tw') },
+  { code: 'bd', name: t('applyAgent.region.bd') },
+  { code: 'kh', name: t('applyAgent.region.kh') },
 ];
 
-const PROVINCES = [
-  '北京', '天津', '上海', '重庆',
-  '河北', '山西', '辽宁', '吉林', '黑龙江',
-  '江苏', '浙江', '安徽', '福建', '江西', '山东',
-  '河南', '湖北', '湖南', '广东', '海南',
-  '四川', '贵州', '云南', '陕西', '甘肃', '青海',
-  '广西', '内蒙古', '西藏', '宁夏', '新疆',
-  '香港', '澳门', '台湾',
+const getProvinces = (t) => [
+  t('applyAgent.province.北京'), t('applyAgent.province.天津'), t('applyAgent.province.上海'), t('applyAgent.province.重庆'),
+  t('applyAgent.province.河北'), t('applyAgent.province.山西'), t('applyAgent.province.辽宁'), t('applyAgent.province.吉林'), t('applyAgent.province.黑龙江'),
+  t('applyAgent.province.江苏'), t('applyAgent.province.浙江'), t('applyAgent.province.安徽'), t('applyAgent.province.福建'), t('applyAgent.province.江西'), t('applyAgent.province.山东'),
+  t('applyAgent.province.河南'), t('applyAgent.province.湖北'), t('applyAgent.province.湖南'), t('applyAgent.province.广东'), t('applyAgent.province.海南'),
+  t('applyAgent.province.四川'), t('applyAgent.province.贵州'), t('applyAgent.province.云南'), t('applyAgent.province.陕西'), t('applyAgent.province.甘肃'), t('applyAgent.province.青海'),
+  t('applyAgent.province.广西'), t('applyAgent.province.内蒙古'), t('applyAgent.province.西藏'), t('applyAgent.province.宁夏'), t('applyAgent.province.新疆'),
+  t('applyAgent.province.香港'), t('applyAgent.province.澳门'), t('applyAgent.province.台湾'),
 ];
 
-const AGENT_TYPES = [
+const getAgentTypes = (t) => [
   {
     key: 'province_agent',
-    label: '省级总代理',
-    fee: '¥50万',
-    deposit: '¥20万',
-    firstOrder: '¥200万',
-    total: '¥350万',
+    label: t('applyAgent.typeProvince'),
+    feeUsd: 551724,
+    depositUsd: 137931,
+    performanceTargetUsd: 1379310,
     commission: '5%',
     revShare: '5%',
-    area: '全省独家',
+    area: t('applyAgent.typeProvinceBenefit4'),
     color: 'from-blue-600 to-blue-800',
-    desc: '最高级别代理，覆盖全省范围，享最高佣金比例和下级抽佣',
-    benefits: ['自销佣金5% + 自销租金5%', '下级市级佣金抽佣2%', '下级租金抽佣2%', '全省独家代理权', '优先获取新品配额'],
+    desc: t('applyAgent.typeProvinceDesc'),
+    benefits: [t('applyAgent.typeProvinceBenefit1'), t('applyAgent.typeProvinceBenefit2'), t('applyAgent.typeProvinceBenefit3'), t('applyAgent.typeProvinceBenefit4'), t('applyAgent.typeProvinceBenefit5')],
   },
   {
     key: 'city_franchisee',
-    label: '市级加盟商',
-    fee: '¥20万',
-    deposit: '¥5万',
-    firstOrder: '¥50万',
-    total: '¥105万',
+    label: t('applyAgent.typeCity'),
+    feeUsd: 206897,
+    depositUsd: 68966,
+    performanceTargetUsd: 689655,
     commission: '5%',
     revShare: '5%',
-    area: '全市独家',
+    area: t('applyAgent.typeCityBenefit4'),
     color: 'from-blue-500 to-blue-700',
-    desc: '核心城市运营商，负责市级区域的加盟门店发展与管理',
-    benefits: ['自销佣金5% + 自销租金5%', '下级区县佣金抽佣3%', '下级区县租金抽佣3%', '全市独家代理权', '总部营销资源倾斜'],
+    desc: t('applyAgent.typeCityDesc'),
+    benefits: [t('applyAgent.typeCityBenefit1'), t('applyAgent.typeCityBenefit2'), t('applyAgent.typeCityBenefit3'), t('applyAgent.typeCityBenefit4'), t('applyAgent.typeCityBenefit5')],
   },
 ];
 
 export default function ApplyAgent() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -132,10 +133,10 @@ export default function ApplyAgent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!agentType) { alert('请选择代理商类型'); return; }
-    if (!form.full_name.trim()) { alert('请填写姓名'); return; }
-    if (!form.phone.trim()) { alert('请填写联系电话'); return; }
-    if (agentType === 'city_franchisee' && !parentAgentId) { alert('请选择上级省级总代理'); return; }
+    if (!agentType) { alert(t('applyAgent.alertSelectType')); return; }
+    if (!form.full_name.trim()) { alert(t('applyAgent.alertName')); return; }
+    if (!form.phone.trim()) { alert(t('applyAgent.alertPhone')); return; }
+    if (agentType === 'city_franchisee' && !parentAgentId) { alert(t('applyAgent.alertParentAgent')); return; }
     setSubmitting(true);
     setResultMsg(null);
     try {
@@ -147,21 +148,34 @@ export default function ApplyAgent() {
         payload.parent_agent_id = parentAgentId;
       }
       await agentAPI.apply(payload);
-      setResultMsg({ type: 'success', text: '申请已提交！平台将在 1-3 个工作日内审核，请留意通知。' });
+      setResultMsg({ type: 'success', text: t('applyAgent.successMsg') });
       setForm({ full_name: '', phone: '', region: 'cn', city: '', reason: '' });
       setAgentType('');
       setParentAgentId('');
       loadStatus();
     } catch (err) {
-      setResultMsg({ type: 'error', text: err.message || '提交失败，请重试' });
+      setResultMsg({ type: 'error', text: err.message || t('applyAgent.submitFailed') });
     }
     finally { setSubmitting(false); }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-500"><Loader2 className="h-8 w-8 animate-spin mr-2" />加载中...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-500"><Loader2 className="h-8 w-8 animate-spin mr-2" />{t('common.loading')}</div>;
+
+  const kycApproved = user?.kyc_status === 'approved';
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {user && !kycApproved && (
+        <div className="bg-yellow-50 border border-yellow-200 px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+            <span className="text-yellow-700 font-medium text-sm">{t('applyAgent.kycRequired')}</span>
+          </div>
+          <button onClick={() => router.push('/profile')} className="bg-yellow-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-yellow-700 whitespace-nowrap">
+            {t('applyAgent.goVerify')} →
+          </button>
+        </div>
+      )}
       {/* Hero */}
       <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900 text-white">
         <div className="max-w-7xl mx-auto px-4 py-16 text-center">
@@ -170,10 +184,10 @@ export default function ApplyAgent() {
               <Award className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold mb-3">申请成为代理商</h1>
-          <p className="text-blue-200 max-w-2xl mx-auto">加入 1kwh.store 全球电池资产银行代理网络，共享新能源万亿市场红利</p>
+          <h1 className="text-3xl font-bold mb-3">{t('applyAgent.title')}</h1>
+          <p className="text-blue-200 max-w-2xl mx-auto">{t('applyAgent.subtitle')}</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 max-w-3xl mx-auto">
-            {[{ label: '全球网点', value: '100+' }, { label: '在运电池', value: '50,000+' }, { label: '服务用户', value: '200万+' }, { label: '年增长率', value: '+320%' }].map((item, i) => (
+            {[{ label: t('applyAgent.globalSites'), value: '100+' }, { label: t('applyAgent.activeBatteries'), value: '50,000+' }, { label: t('applyAgent.servedUsers'), value: '200万+' }, { label: t('applyAgent.growthRate'), value: '+320%' }].map((item, i) => (
               <div key={i} className="bg-white/10 backdrop-blur rounded-xl p-4">
                 <div className="text-2xl font-bold">{item.value}</div>
                 <div className="text-blue-200 text-sm">{item.label}</div>
@@ -187,19 +201,19 @@ export default function ApplyAgent() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* 左侧：代理商类型说明 */}
           <div className="lg:col-span-1 space-y-6">
-            <h2 className="text-xl font-bold">选择代理商类型</h2>
-            {AGENT_TYPES.map(type => {
+            <h2 className="text-xl font-bold">{t('applyAgent.selectType')}</h2>
+            {getAgentTypes(t).map(type => {
               const disabled = isProvinceAgent && type.key === 'city_franchisee';
               return (
               <div key={type.key}
-                onClick={() => !disabled && setAgentType(type.key)}
+                onClick={() => !disabled && kycApproved && setAgentType(type.key)}
                 className={`bg-white rounded-xl border-2 p-5 transition ${
-                  disabled ? 'opacity-50 cursor-not-allowed border-gray-200' :
+                  disabled || !kycApproved ? 'opacity-50 cursor-not-allowed border-gray-200' :
                   agentType === type.key ? 'border-blue-500 ring-2 ring-blue-200 cursor-pointer hover:shadow-md' : 'border-gray-200 hover:border-gray-300 cursor-pointer hover:shadow-md'
                 }`}>
                 {disabled && (
                   <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1 mb-2">
-                    <AlertTriangle className="h-3 w-3" />省级代理不可申请市级
+                    <AlertTriangle className="h-3 w-3" />{t('applyAgent.provinceAgentRestricted')}
                   </div>
                 )}
                 <div className="flex items-center gap-3 mb-3">
@@ -208,17 +222,17 @@ export default function ApplyAgent() {
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900">{type.label}</h3>
-                    <p className="text-xs text-gray-500">{type.area}保护</p>
+                    <p className="text-xs text-gray-500">{type.area}{t('applyAgent.areaProtected')}</p>
                   </div>
                 </div>
                 <p className="text-sm text-gray-600 mb-3">{type.desc}</p>
                 <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">加盟费</span><div className="font-semibold">{type.fee}</div></div>
-                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">保证金</span><div className="font-semibold">{type.deposit}</div></div>
-                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">首批采购</span><div className="font-semibold">{type.firstOrder}</div></div>
-                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">销售佣金</span><div className="font-semibold text-green-600">{type.commission}</div></div>
+                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.franchiseFee')}</span><div className="font-semibold text-xs">{formatUSD(type.feeUsd)} <span className="text-gray-400 font-normal">{formatCNY(usdToCny(type.feeUsd))}</span></div></div>
+                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.deposit')}</span><div className="font-semibold text-xs">{formatUSD(type.depositUsd)} <span className="text-gray-400 font-normal">{formatCNY(usdToCny(type.depositUsd))}</span></div></div>
+                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.monthlyTarget')}</span><div className="font-semibold text-xs">{formatUSD(type.performanceTargetUsd)} <span className="text-gray-400 font-normal">{formatCNY(usdToCny(type.performanceTargetUsd))}</span></div></div>
+                  <div className="bg-gray-50 rounded p-2"><span className="text-gray-400">{t('applyAgent.commission')}</span><div className="font-semibold text-green-600">{type.commission}</div></div>
                 </div>
-                <p className="text-xs text-gray-400">初始投入合计: <span className="font-bold text-gray-700">{type.total}</span></p>
+                <p className="text-xs text-gray-400">{t('applyAgent.totalInitial')}: <span className="font-bold text-gray-700">{formatCNY(usdToCny(type.feeUsd) + usdToCny(type.depositUsd))}</span></p>
                 <div className="mt-2 space-y-1">
                   {type.benefits.map((b, i) => (
                     <div key={i} className="flex items-start gap-1.5 text-xs text-gray-600">
@@ -235,12 +249,12 @@ export default function ApplyAgent() {
           <div className="lg:col-span-2 space-y-6">
             {applications.length > 0 && (
               <div className="bg-white rounded-xl border p-5">
-                <h3 className="font-bold text-lg mb-3">我的申请记录</h3>
+                <h3 className="font-bold text-lg mb-3">{t('applyAgent.myApplications')}</h3>
                 <div className="space-y-2">
                   {applications.map(a => (
                     <div key={a.id} className="flex justify-between items-center py-2 border-b last:border-0">
                       <div>
-                        <span className="font-medium">{a.agent_type === 'province_agent' ? '省级总代理' : '市级加盟商'}</span>
+                        <span className="font-medium">{a.agent_type === 'province_agent' ? t('applyAgent.typeProvince') : t('applyAgent.typeCity')}</span>
                         <span className="text-sm text-gray-500 ml-2">{a.full_name} · {a.region}{a.city ? ` · ${a.city}` : ''}</span>
                       </div>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -248,7 +262,7 @@ export default function ApplyAgent() {
                         a.status === 'rejected' ? 'bg-red-100 text-red-700' :
                         'bg-yellow-100 text-yellow-700'
                       }`}>
-                        {a.status === 'approved' ? '已通过' : a.status === 'rejected' ? '已拒绝' : '审核中'}
+                        {a.status === 'approved' ? t('applyAgent.statusApproved') : a.status === 'rejected' ? t('applyAgent.statusRejected') : t('applyAgent.statusPending')}
                       </span>
                     </div>
                   ))}
@@ -257,7 +271,14 @@ export default function ApplyAgent() {
             )}
 
             <div className="bg-white rounded-xl border p-6">
-              <h3 className="font-bold text-lg mb-4">填写申请资料</h3>
+              <h3 className="font-bold text-lg mb-4">{t('applyAgent.fillForm')}</h3>
+
+              {!kycApproved && (
+                <div className="bg-gray-100 border border-gray-300 rounded-lg px-4 py-3 flex items-center gap-3 mb-4">
+                  <Lock className="h-5 w-5 text-gray-500 flex-shrink-0" />
+                  <span className="text-gray-600 text-sm font-medium">{t('applyAgent.kycLock')}</span>
+                </div>
+              )}
 
               {resultMsg && (
                 <div className={`mb-4 p-3 rounded-lg text-sm ${resultMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
@@ -267,10 +288,10 @@ export default function ApplyAgent() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">代理商类型 *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('applyAgent.agentType')} *</label>
                   <div className="grid grid-cols-2 gap-3">
-                    {AGENT_TYPES.map(type => (
-                      <button key={type.key} type="button"
+                    {getAgentTypes(t).map(type => (
+                      <button key={type.key} type="button" disabled={!kycApproved}
                         onClick={() => setAgentType(type.key)}
                         className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
                           agentType === type.key
@@ -284,83 +305,82 @@ export default function ApplyAgent() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">姓名 *</label>
-                    <input type="text" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})}
-                      className="w-full rounded-lg border-gray-300 border p-2.5 text-sm" placeholder="真实姓名" required />
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('applyAgent.fullName')} *</label>
+                    <input type="text" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} disabled={!kycApproved}
+                      className="w-full rounded-lg border-gray-300 border p-2.5 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder={t('applyAgent.namePlaceholder')} required />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">联系电话 *</label>
-                    <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
-                      className="w-full rounded-lg border-gray-300 border p-2.5 text-sm" placeholder="手机号码" required />
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('applyAgent.phone')} *</label>
+                    <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} disabled={!kycApproved}
+                      className="w-full rounded-lg border-gray-300 border p-2.5 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder={t('applyAgent.phonePlaceholder')} required />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">目标地区 *</label>
-                    <select value={form.region} onChange={e => setForm({...form, region: e.target.value})}
-                      className="w-full rounded-lg border-gray-300 border p-2.5 text-sm">
-                      {REGIONS.map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('applyAgent.targetRegion')} *</label>
+                    <select value={form.region} onChange={e => setForm({...form, region: e.target.value})} disabled={!kycApproved}
+                      className="w-full rounded-lg border-gray-300 border p-2.5 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed">
+                      {getRegions(t).map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      {agentType === 'province_agent' ? '省/直辖市 *' : '城市'}
+                      {agentType === 'province_agent' ? t('applyAgent.province') + ' *' : t('applyAgent.city')}
                     </label>
                     {agentType === 'province_agent' ? (
                       (() => {
                         const approvedProvinces = approvedAgents
                           .filter(a => a.agent_type === 'province_agent')
                           .map(a => a.city || a.region);
-                        const availableProvinces = PROVINCES.filter(p => !approvedProvinces.includes(p));
+                        const availableProvinces = getProvinces(t).filter(p => !approvedProvinces.includes(p));
                         return (
-                          <select value={form.city} onChange={e => setForm({...form, city: e.target.value})}
-                            className="w-full rounded-lg border-gray-300 border p-2.5 text-sm" required>
-                            <option value="">请选择省或直辖市</option>
+                          <select value={form.city} onChange={e => setForm({...form, city: e.target.value})} disabled={!kycApproved}
+                            className="w-full rounded-lg border-gray-300 border p-2.5 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" required>
+                            <option value="">{t('applyAgent.selectProvince')}</option>
                             {availableProvinces.map(p => <option key={p} value={p}>{p}</option>)}
                           </select>
                         );
                       })()
                     ) : agentType === 'city_franchisee' && parentAgentId ? (
                       availableCities.length > 0 ? (
-                        <select value={form.city} onChange={e => setForm({...form, city: e.target.value})}
-                          className="w-full rounded-lg border-gray-300 border p-2.5 text-sm" required>
-                          <option value="">请选择城市</option>
+                        <select value={form.city} onChange={e => setForm({...form, city: e.target.value})} disabled={!kycApproved}
+                          className="w-full rounded-lg border-gray-300 border p-2.5 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" required>
+                          <option value="">{t('applyAgent.selectCity')}</option>
                           {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       ) : (
-                        <input type="text" value={form.city} onChange={e => setForm({...form, city: e.target.value})}
-                          className="w-full rounded-lg border-gray-300 border p-2.5 text-sm" placeholder="目标城市" />
+                        <input type="text" value={form.city} onChange={e => setForm({...form, city: e.target.value})} disabled={!kycApproved}
+                          className="w-full rounded-lg border-gray-300 border p-2.5 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder={t('applyAgent.targetCity')} />
                       )
                     ) : (
-                      <input type="text" value={form.city} onChange={e => setForm({...form, city: e.target.value})}
-                        className="w-full rounded-lg border-gray-300 border p-2.5 text-sm" placeholder="目标城市" />
+                      <input type="text" value={form.city} onChange={e => setForm({...form, city: e.target.value})} disabled={!kycApproved}
+                        className="w-full rounded-lg border-gray-300 border p-2.5 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder={t('applyAgent.targetCity')} />
                     )}
                   </div>
                 </div>
                 {agentType === 'city_franchisee' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      上级省级总代理 <span className="text-red-500">*</span>
+                      {t('applyAgent.parentAgent')} <span className="text-red-500">*</span>
                     </label>
-                    <select value={parentAgentId} onChange={e => handleParentChange(e.target.value)}
-                      className="w-full rounded-lg border-gray-300 border p-2.5 text-sm" required>
-                      <option value="">请选择上级省级总代理</option>
+                    <select value={parentAgentId} onChange={e => handleParentChange(e.target.value)} disabled={!kycApproved}
+                      className="w-full rounded-lg border-gray-300 border p-2.5 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" required>
+                      <option value="">{t('applyAgent.selectParentAgent')}</option>
                       {approvedAgents.filter(a => a.agent_type === 'province_agent').map(a => (
                         <option key={a.id} value={a.id}>{a.full_name} ({a.city || a.region || '—'})</option>
                       ))}
                     </select>
-                    <p className="text-xs text-gray-400 mt-1">市级加盟商必须挂靠在已审批通过的省级总代理下</p>
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">申请理由</label>
-                  <textarea value={form.reason} onChange={e => setForm({...form, reason: e.target.value})}
-                    className="w-full rounded-lg border-gray-300 border p-2.5 text-sm" rows={4}
-                    placeholder="简述您的资源优势、团队情况与市场拓展计划..." />
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('applyAgent.reason')}</label>
+                  <textarea value={form.reason} onChange={e => setForm({...form, reason: e.target.value})} disabled={!kycApproved}
+                    className="w-full rounded-lg border-gray-300 border p-2.5 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" rows={4}
+                    placeholder={t('applyAgent.reasonPlaceholder')} />
                 </div>
-                <button type="submit" disabled={submitting}
+                <button type="submit" disabled={submitting || !kycApproved}
                   className="w-full py-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50">
-                  <Send className="h-4 w-4" />{submitting ? '提交中...' : '提交申请'}
+                  <Send className="h-4 w-4" />{submitting ? t('applyAgent.submitting') : t('applyAgent.submit')}
                 </button>
               </form>
             </div>

@@ -4,8 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export default function Register() {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -39,7 +41,7 @@ export default function Register() {
       });
       router.push(formData.role === 'investor' ? '/invest' : '/');
     } catch (err) {
-      setError(err.message || '注册失败，请重试');
+      setError(err.message || t('register.error'));
     } finally {
       setLoading(false);
     }
@@ -50,12 +52,12 @@ export default function Register() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex flex-col items-center gap-0.5">
-            <img src="/logo.png" alt="1kWh" className="h-10 w-10 object-contain" />
-            <span className="text-lg font-bold text-gray-900 leading-tight">1kWh</span>
+            <img src="/logo.png" alt="MTX MOTORS" className="h-10 w-10 object-contain" />
+            <span className="text-lg font-bold text-gray-900 leading-tight">MTX MOTORS</span>
             <span className="text-xs text-gray-400 -mt-1">1kwh.store</span>
           </Link>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">创建账户</h2>
-          <p className="mt-2 text-gray-600">加入我们，开始您的投资之旅</p>
+          <h2 className="mt-6 text-3xl font-bold text-gray-900">{t('register.title')}</h2>
+          <p className="mt-2 text-gray-600">{t('register.subtitle')}</p>
         </div>
 
         <div className="card">
@@ -67,7 +69,7 @@ export default function Register() {
             )}
 
             <div>
-              <label className="label">邮箱 *</label>
+              <label className="label">{t('register.email')} *</label>
               <input
                 type="email"
                 name="email"
@@ -80,57 +82,57 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="label">用户名 *</label>
+              <label className="label">{t('register.username')} *</label>
               <input
                 type="text"
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="用户名"
+                placeholder={t('register.usernamePlaceholder')}
                 required
               />
             </div>
 
             <div>
-              <label className="label">密码 *</label>
+              <label className="label">{t('register.password')} *</label>
               <input
                 type="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="至少6位字符"
+                placeholder={t('register.passwordHint')}
                 required
               />
             </div>
 
             <div>
-              <label className="label">姓名</label>
+              <label className="label">{t('register.fullName')}</label>
               <input
                 type="text"
                 name="fullName"
                 value={formData.fullName}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="真实姓名"
+                placeholder={t('register.fullNameHint')}
               />
             </div>
 
             <div>
-              <label className="label">手机号</label>
+              <label className="label">{t('register.phone')}</label>
               <input
                 type="tel"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="手机号码"
+                placeholder={t('register.phoneHint')}
               />
             </div>
 
             <div>
-              <label className="label">注册身份 *</label>
+              <label className="label">{t('register.role')} *</label>
               <div className="grid grid-cols-2 gap-3 mt-1">
                 <button
                   type="button"
@@ -141,8 +143,8 @@ export default function Register() {
                       : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold">投资者</div>
-                  <div className="text-xs mt-1 opacity-70">购买电池资产，获得分红收益</div>
+                  <div className="font-semibold">{t('register.investor')}</div>
+                  <div className="text-xs mt-1 opacity-70">{t('register.investorDesc')}</div>
                 </button>
                 <button
                   type="button"
@@ -153,8 +155,8 @@ export default function Register() {
                       : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold">加盟商</div>
-                  <div className="text-xs mt-1 opacity-70">卖电池的门店和代理</div>
+                  <div className="font-semibold">{t('register.franchisee')}</div>
+                  <div className="text-xs mt-1 opacity-70">{t('register.franchiseeDesc')}</div>
                 </button>
               </div>
             </div>
@@ -164,14 +166,14 @@ export default function Register() {
               disabled={loading}
               className="w-full btn-primary py-3 mt-6"
             >
-              {loading ? '注册中...' : '立即注册'}
+              {loading ? t('register.submitting') : t('register.submit')}
             </button>
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-600">
-            已有账号？{' '}
+            {t('register.hasAccount')}{' '}
             <Link href="/login" className="text-primary-600 hover:underline font-medium">
-              立即登录
+              {t('register.goLogin')}
             </Link>
           </div>
         </div>

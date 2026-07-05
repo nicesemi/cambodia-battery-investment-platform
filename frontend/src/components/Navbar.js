@@ -5,18 +5,19 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { Menu, X, User, LogOut } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher';
 
 export default function Navbar() {
+  const { t } = useTranslation();
   const { user, logout, isAdmin, isFranchisee, isProvinceAgent, canAccessAdmin } = useAuth();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { href: '/', label: '首页', en: 'Home', all: true },
-    { href: '/invest', label: '投资', en: 'Invest', roles: ['admin', 'operator', 'investor'] },
-    { href: '/trade', label: '交易', en: 'Trade', roles: ['admin', 'operator', 'investor'] },
-    { href: '/dividends', label: '分红', en: 'Dividends', roles: ['admin', 'operator', 'investor'] },
-    { href: '/stores', label: '门店', en: 'Stores', all: true },
+    { href: '/', label: t('nav.home'), en: 'Home', all: true },
+    { href: '/invest', label: t('nav.invest'), en: 'Invest', roles: ['admin', 'operator', 'investor'] },
+    { href: '/stores', label: t('nav.stores'), en: 'Stores', roles: ['admin', 'operator', 'investor', 'franchisee'] },
   ];
 
   // Filter links by role
@@ -28,17 +29,12 @@ export default function Navbar() {
 
   // Admin link for admin/operator
   if (canAccessAdmin()) {
-    visibleLinks.push({ href: '/admin', label: '管理', en: 'Admin', roles: ['admin', 'operator'] });
+    visibleLinks.push({ href: '/admin', label: t('nav.admin'), en: 'Admin', roles: ['admin', 'operator'] });
   }
 
   // Franchisee link
   if (isFranchisee()) {
-    visibleLinks.push({ href: '/franchisee', label: '加盟商', en: 'Franchisee', roles: ['franchisee'] });
-  }
-
-  // Agent application link - only for franchisee who is NOT yet an approved agent
-  if (isFranchisee() && !isProvinceAgent() && !user?.agentType) {
-    visibleLinks.push({ href: '/apply-agent', label: '代理申请', en: 'Agent', roles: ['franchisee'] });
+    visibleLinks.push({ href: '/franchisee', label: t('nav.franchisee'), en: 'Franchisee', roles: ['franchisee'] });
   }
 
   return (
@@ -48,8 +44,8 @@ export default function Navbar() {
           <Link href="/" className="flex items-center space-x-2.5">
             <img src="/logo.png" alt="MTX MOTORS" className="h-8 w-8 object-contain" />
             <div className="inline-flex flex-col items-stretch leading-none">
-              <span className="font-extrabold text-[13px] text-gray-900 tracking-[0.25em] text-center block">MTX MOTORS</span>
-              <span className="text-[13px] text-gray-400 tracking-[0.12em] font-medium text-center block">1kwh.store</span>
+              <span className="font-extrabold text-[13px] text-gray-900 tracking-[0.2em] text-center block">MTX MOTORS</span>
+              <span className="text-[13px] text-gray-400 tracking-[0.2em] font-medium text-center block">1kwh.store</span>
             </div>
           </Link>
 
@@ -70,8 +66,9 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Auth Buttons */}
+          {/* Language & Auth */}
           <div className="hidden md:flex items-center space-x-4">
+            <LanguageSwitcher />
             {user ? (
               <div className="flex items-center space-x-4">
                 <Link href="/profile" className="flex items-center space-x-2 text-gray-600 hover:text-gray-900">
@@ -83,16 +80,16 @@ export default function Navbar() {
                   className="flex items-center space-x-1 text-gray-500 hover:text-gray-700"
                 >
                   <LogOut className="h-4 w-4" />
-                  <span className="text-sm">退出</span>
+                  <span className="text-sm">{t('nav.logout')}</span>
                 </button>
               </div>
             ) : (
               <div className="flex items-center space-x-3">
                 <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">
-                  登录
+                  {t('nav.login')}
                 </Link>
                 <Link href="/register" className="btn-primary text-sm">
-                  注册
+                  {t('nav.register')}
                 </Link>
               </div>
             )}
@@ -111,6 +108,9 @@ export default function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-100">
             <div className="flex flex-col space-y-3">
+              <div className="pb-3 mb-1 border-b border-gray-100">
+                <LanguageSwitcher />
+              </div>
               {visibleLinks.map((link) => (
                 <Link
                   key={link.href}
@@ -126,19 +126,19 @@ export default function Navbar() {
               {user ? (
                 <>
                   <Link href="/profile" className="text-sm text-gray-600" onClick={() => setMobileMenuOpen(false)}>
-                    个人中心
+                    {t('nav.profile')}
                   </Link>
                   <button onClick={logout} className="text-sm text-left text-gray-600">
-                    退出登录
+                    {t('nav.logoutFull')}
                   </button>
                 </>
               ) : (
                 <>
                   <Link href="/login" className="text-sm text-gray-600" onClick={() => setMobileMenuOpen(false)}>
-                    登录
+                    {t('nav.login')}
                   </Link>
                   <Link href="/register" className="text-sm text-gray-600" onClick={() => setMobileMenuOpen(false)}>
-                    注册
+                    {t('nav.register')}
                   </Link>
                 </>
               )}

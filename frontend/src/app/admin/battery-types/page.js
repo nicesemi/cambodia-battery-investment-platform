@@ -5,11 +5,12 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { adminAPI } from '../../../services/api';
 import { useRouter } from 'next/navigation';
 import { Battery, Plus, Edit, Trash2, Loader2, ArrowLeft, Zap, AlertCircle, Upload, X } from 'lucide-react';
+import { USD_TO_CNY_RATE, dualCurrency, formatUSD, formatCNY, usdToCny } from '../../../lib/currency';
 
 const DEFAULT_FORM = {
   name: '', voltage: '', capacity: '', chemistry: '', description: '',
   scenario: '', dimensions: '', net_weight: '', power_kwh: '', unit_price: '',
-  monthly_rent: '', annualized_return: '',
+  monthly_rent: '',
   image_url: '', thumbnail_url: '', is_active: true, sort_order: 0
 };
 
@@ -17,6 +18,7 @@ const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 export default function BatteryTypesPage() {
+  const { t } = useTranslation();
   const { user, canAccessAdmin } = useAuth();
   const router = useRouter();
   const [types, setTypes] = useState([]);
@@ -55,7 +57,7 @@ export default function BatteryTypesPage() {
       chemistry: t.chemistry || '', description: t.description || '',
       scenario: t.scenario || '', dimensions: t.dimensions || '',
       net_weight: t.net_weight || '', power_kwh: t.power_kwh || '', unit_price: t.unit_price || '',
-      monthly_rent: t.monthly_rent != null ? String(t.monthly_rent) : '', annualized_return: t.annualized_return != null ? String(t.annualized_return) : '',
+      monthly_rent: t.monthly_rent != null ? String(t.monthly_rent) : '',
       image_url: t.image_url || '', thumbnail_url: t.thumbnail_url || '',
       is_active: t.is_active !== undefined ? t.is_active : true, sort_order: t.sort_order || 0
     });
@@ -157,15 +159,16 @@ export default function BatteryTypesPage() {
                 <tr>
                   <th className="text-left p-3 w-10">#</th>
                   <th className="text-left p-3 min-w-[180px]">产品型号</th>
-                  <th className="text-left p-3">电压</th>
-                  <th className="text-left p-3">容量</th>
+                  <th className="text-left p-3">{t('adminBt.voltage')}</th>
+                  <th className="text-left p-3">{t('adminBt.capacity')}</th>
                   <th className="text-left p-3">电量</th>
                   <th className="text-left p-3 min-w-[140px]">适用场景</th>
                   <th className="text-left p-3">外形尺寸</th>
                   <th className="text-left p-3">净重</th>
-                  <th className="text-right p-3">出厂单价</th>
-                  <th className="text-center p-3">状态</th>
-                  <th className="text-center p-3 w-24">操作</th>
+                  <th className="text-right p-3">出厂单价（USD）</th>
+                  <th className="text-right p-3">月租金（USD）</th>
+                  <th className="text-center p-3">年化收益率</th>
+                  <th className="text-center p-3 w-24">{t('adminBt.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -184,12 +187,9 @@ export default function BatteryTypesPage() {
                     <td className="p-3 text-gray-500 text-xs max-w-[160px] truncate" title={t.scenario}>{t.scenario || '—'}</td>
                     <td className="p-3 text-gray-500 text-xs font-mono">{t.dimensions || '—'}</td>
                     <td className="p-3 text-gray-600 text-xs">{t.net_weight || '—'}</td>
-                    <td className="p-3 text-right text-gray-900 font-medium text-xs">{t.unit_price || '—'}</td>
-                    <td className="p-3 text-center">
-                      <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                        t.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
-                      }`}>{t.is_active ? '启用' : '禁用'}</span>
-                    </td>
+                    <td className="p-3 text-right text-gray-900 font-medium text-xs">{t.unit_price ? (() => { const dc = dualCurrency(Number(t.unit_price)); return <><div className="font-semibold">{dc.primary}</div><div className="text-xs text-gray-400">{dc.secondary}</div></>; })() : '—'}</td>
+                    <td className="p-3 text-right text-xs">{t.monthly_rent != null && t.monthly_rent !== '' ? (() => { const dc = dualCurrency(Number(t.monthly_rent)); return <><div className="text-gray-700 font-semibold">{dc.primary} /月</div><div className="text-xs text-gray-400">{dc.secondary} /月</div></>; })() : '—'}</td>
+                    <td className="p-3 text-center text-xs font-semibold text-blue-600">{t.annualized_return != null ? `${t.annualized_return}%` : '—'}</td>
                     <td className="p-3 text-center">
                       <div className="flex items-center justify-center gap-0.5">
                         <button onClick={() => openEditForm(t)} className="text-blue-600 hover:bg-blue-50 p-1 rounded transition" title="编辑"><Edit className="h-3 w-3" /></button>
@@ -204,7 +204,7 @@ export default function BatteryTypesPage() {
           {types.length === 0 && (
             <div className="text-center py-16 text-gray-400">
               <Battery className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-lg font-medium text-gray-500 mb-1">暂无电池类型</p>
+              <p className="text-lg font-medium text-gray-500 mb-1">{t('adminBt.noTypes')}</p>
               <button onClick={openAddForm} className="text-blue-600 hover:underline text-sm font-medium">点击新增第一个电池类型</button>
             </div>
           )}
@@ -230,7 +230,7 @@ export default function BatteryTypesPage() {
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 76.8V" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">容量</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{t('adminBt.capacity')}</label>
                     <input type="text" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 50Ah" />
                   </div>
@@ -263,19 +263,20 @@ export default function BatteryTypesPage() {
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 29kg" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">出厂单价</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">出厂单价（USD）</label>
                     <input type="text" value={form.unit_price} onChange={e => setForm({ ...form, unit_price: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 ¥4280" />
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 $828" />
+                    {form.unit_price && !isNaN(Number(form.unit_price)) && (
+                      <p className="text-xs text-gray-400 mt-1">≈ {formatCNY(usdToCny(Number(form.unit_price)))}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">月租 (¥/月)</label>
-                    <input type="text" value={form.monthly_rent} onChange={e => setForm({ ...form, monthly_rent: e.target.value })}
+                    <label className="block text-xs font-medium text-gray-600 mb-1">月租（$/月）</label>
+                    <input type="number" min="0" step="0.01" value={form.monthly_rent} onChange={e => setForm({ ...form, monthly_rent: e.target.value })}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 85" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">年化收益率 (%)</label>
-                    <input type="text" value={form.annualized_return} onChange={e => setForm({ ...form, annualized_return: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 8.5" />
+                    {form.monthly_rent && !isNaN(Number(form.monthly_rent)) && (
+                      <p className="text-xs text-gray-400 mt-1">≈ {formatCNY(usdToCny(Number(form.monthly_rent)))} /月</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">排序</label>
@@ -326,7 +327,7 @@ export default function BatteryTypesPage() {
                 </div>
                 <div className="flex justify-end gap-3 pt-3 border-t">
                   <button type="button" onClick={() => setShowForm(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">取消</button>
+                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">{t('common.cancel')}</button>
                   <button type="submit" disabled={submitting}
                     className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-1.5">
                     {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -350,7 +351,7 @@ export default function BatteryTypesPage() {
             <p className="text-sm text-gray-600 mb-2">确定删除 <span className="font-semibold">"{deleteConfirm.name}"</span>？</p>
             <p className="text-xs text-gray-400 mb-6">已使用该类型的资产仍会保留原有类型值。</p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">取消</button>
+              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">{t('common.cancel')}</button>
               <button onClick={() => handleDelete(deleteConfirm.id)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition">确认删除</button>
             </div>
           </div>

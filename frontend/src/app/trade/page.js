@@ -4,14 +4,17 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { RotateCcw, Package, Calculator } from 'lucide-react';
+import { USD_TO_CNY_RATE, dualCurrency, formatUSD, formatCNY, usdToCny } from '../../lib/currency';
+import { useTranslation } from 'react-i18next';
 
 export default function Trade() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
 
   const [myUnits, setMyUnits] = useState([]);
   const [selectedUnitIds, setSelectedUnitIds] = useState([]);
-  const [previewResult, setPreviewResult] = useState(null);
+  const [previewMap, setPreviewMap] = useState({});  // unitId → buyback result
   const [selling, setSelling] = useState(false);
   const [sellMsg, setSellMsg] = useState('');
   const [loading, setLoading] = useState(true);
@@ -37,7 +40,7 @@ export default function Trade() {
     finally { setLoading(false); }
   };
 
-  const handlePreviewBuyback = async (unitId) => {
+  const fetchPreview = async (unitId) => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/trades/sell-to-platform?unitId=${unitId}`, {
@@ -45,21 +48,25 @@ export default function Trade() {
       });
       if (res.ok) {
         const json = await res.json();
-        setPreviewResult(json);
+        setPreviewMap(prev => ({ ...prev, [unitId]: json }));
       }
     } catch (e) { /* ignore */ }
   };
 
   const toggleUnitSelection = (unitId) => {
     setSelectedUnitIds(prev => {
-      const next = prev.includes(unitId) ? prev.filter(id => id !== unitId) : [...prev, unitId];
-      if (!prev.includes(unitId)) handlePreviewBuyback(unitId);
+      const isAdding = !prev.includes(unitId);
+      const next = isAdding ? [...prev, unitId] : prev.filter(id => id !== unitId);
+      if (isAdding) fetchPreview(unitId);
+      if (!isAdding) {
+        setPreviewMap(p => { const { [unitId]: _, ...rest } = p; return rest; });
+      }
       return next;
     });
   };
 
   const handleSellToPlatform = async () => {
-    if (selectedUnitIds.length === 0) { setSellMsg('请先选择要出售的电池单元'); return; }
+    if (selectedUnitIds.length === 0) { setSellMsg(t('trade.selectFirst')); return; }
     setSelling(true); setSellMsg('');
     try {
       const token = localStorage.getItem('token');
@@ -69,29 +76,32 @@ export default function Trade() {
         body: JSON.stringify({ unitIds: selectedUnitIds }),
       });
       const json = await res.json();
-      if (!res.ok) { setSellMsg(json.error || '出售失败'); return; }
-      setSellMsg(`成功！共获得 $${json.totalBuyback.toFixed(2)}，新余额 $${json.newBalance.toFixed(2)}`);
+      if (!res.ok) { setSellMsg(json.error || t('trade.sellFailed')); return; }
+      setSellMsg(t('trade.sellSuccess', { total: json.totalBuyback.toFixed(2), totalCny: (json.totalBuyback * 7.25).toFixed(2), balance: json.newBalance.toFixed(2), balanceCny: (json.newBalance * 7.25).toFixed(2) }));
       setSelectedUnitIds([]);
-      setPreviewResult(null);
+      setPreviewMap({});
       loadMyUnits();
-    } catch (e) { setSellMsg('出售失败'); }
+    } catch (e) { setSellMsg(t('trade.sellFailed')); }
     finally { setSelling(false); }
   };
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-12 text-center">加载中...</div>;
+  const selectedPreviews = selectedUnitIds.map(id => previewMap[id]).filter(Boolean);
+  const totalBuyback = selectedPreviews.reduce((sum, p) => sum + (p.buybackPrice || 0), 0);
+
+  if (loading) return <div className="max-w-7xl mx-auto px-4 py-12 text-center">{t('trade.loading')}</div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">平台回购</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('trade.title')}</h1>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">我的电池单元</h2>
+            <h2 className="text-lg font-semibold">{t('trade.myUnits')}</h2>
             <button onClick={loadMyUnits} className="p-1 text-gray-400 hover:text-gray-600"><RotateCcw className="h-4 w-4" /></button>
           </div>
           {myUnits.length === 0
-            ? <div className="text-sm text-gray-400 text-center py-8">暂无可回购的电池单元</div>
+            ? <div className="text-sm text-gray-400 text-center py-8">{t('trade.noUnits')}</div>
             : <div className="space-y-2 max-h-96 overflow-y-auto">
                 {myUnits.map(unit => (
                   <div key={unit.id} onClick={() => toggleUnitSelection(unit.id)}
@@ -104,47 +114,57 @@ export default function Trade() {
                       </div>
                       <span className="text-xs text-gray-500">{unit.asset_name}</span>
                     </div>
-                    <div className="mt-1 text-xs text-gray-500">购入价: ${Number(unit.unit_price || 1000).toFixed(2)}</div>
+                    <div className="mt-1 text-xs text-gray-500">{t('trade.purchasePrice')}: ${Number(unit.unit_price || 1000).toFixed(2)} (≈ ¥{(Number(unit.unit_price || 1000) * 7.25).toFixed(2)})</div>
                   </div>))}
               </div>}
           {selectedUnitIds.length > 0 && (
             <button onClick={handleSellToPlatform} disabled={selling}
               className="mt-4 w-full py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50">
-              {selling ? '处理中...' : `出售 ${selectedUnitIds.length} 个单元给平台`}
+              {selling ? t('trade.processing') : t('trade.sellConfirm', { count: selectedUnitIds.length, totalBuyback: totalBuyback.toFixed(2), totalCny: (totalBuyback * 7.25).toFixed(2) })}
             </button>)}
           {sellMsg && (
-            <div className={`mt-3 p-2 rounded text-sm ${sellMsg.includes('成功') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{sellMsg}</div>)}
+            <div className={`mt-3 p-2 rounded text-sm ${sellMsg.includes('$') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{sellMsg}</div>)}
         </div>
 
         <div className="card">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Calculator className="h-5 w-5" />回购价格预览</h2>
-          {!previewResult && <div className="text-sm text-gray-400 text-center py-12">点击左侧电池单元查看回购价格</div>}
-          {previewResult && (
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg space-y-2 text-sm">
-                {[
-                  ['购入价格', `$${previewResult.purchasePrice?.toFixed(2)}`, 'text-gray-600'],
-                  ['持有时间', `${previewResult.monthsHeld?.toFixed(1)} 月`, 'text-gray-600'],
-                  ['残值', `$${previewResult.residualValue?.toFixed(2)}`, 'text-gray-600'],
-                  ['残值率', `${previewResult.residualRate}%`, 'text-gray-600'],
-                ].map(([label, val, cls]) => (
-                  <div key={label} className="flex justify-between"><span className={cls}>{label}</span><span className="font-medium">{val}</span></div>
-                ))}
-                {previewResult.penaltyRate > 0 && <>
-                  <div className="border-t pt-2 flex justify-between"><span className="text-red-600">罚金 ({previewResult.penaltyRate}%)</span><span className="font-medium text-red-600">-${previewResult.penaltyAmount?.toFixed(2)}</span></div>
-                </>}
-              </div>
-              <div className="p-4 bg-primary-50 rounded-lg">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Calculator className="h-5 w-5" />{t('trade.preview')}</h2>
+          {selectedPreviews.length === 0 && <div className="text-sm text-gray-400 text-center py-12">{t('trade.previewHint')}</div>}
+          {selectedPreviews.length > 0 && (
+            <div className="space-y-3">
+              {selectedPreviews.map((p, i) => {
+                const unit = myUnits.find(u => u.id === selectedUnitIds[i]);
+                return (
+                  <div key={selectedUnitIds[i]} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-2 flex items-center justify-between text-xs text-gray-500">
+                      <span className="font-medium text-gray-700">{unit?.unit_code || selectedUnitIds[i]?.slice(0, 10)}</span>
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${p.penaltyRate > 30 ? 'bg-red-100 text-red-700' : p.penaltyRate > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                        {p.tier}
+                      </span>
+                    </div>
+                    <div className="p-3 space-y-1.5 text-sm">
+                      <div className="flex justify-between"><span className="text-gray-500">{t('trade.purchasePrice')}</span><span className="font-medium">${p.purchasePrice?.toFixed(2)} (≈ ¥{(p.purchasePrice * 7.25).toFixed(2)})</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">{t('trade.holding')}</span><span className="font-medium">{p.monthsHeld?.toFixed(1)}{t('trade.months')}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">{t('trade.residual')}</span><span className="font-medium">${p.residualValue?.toFixed(2)} ({p.residualRate}%) (≈ ¥{(p.residualValue * 7.25).toFixed(2)})</span></div>
+                      {p.penaltyRate > 0 && (
+                        <div className="flex justify-between"><span className="text-red-500">{t('trade.penalty')} ({p.penaltyRate}%)</span><span className="font-medium text-red-500">-${p.penaltyAmount?.toFixed(2)} (≈ ¥{(p.penaltyAmount * 7.25).toFixed(2)})</span></div>
+                      )}
+                      <div className="border-t pt-1.5 flex justify-between">
+                        <span className="font-medium text-primary-900">{t('trade.buybackPrice')}</span>
+                        <span className="font-bold text-primary-700">${p.buybackPrice?.toFixed(2)} (≈ ¥{(p.buybackPrice * 7.25).toFixed(2)})</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {/* 合计汇总 */}
+              <div className="bg-primary-50 rounded-lg p-4 border border-primary-200">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-primary-900">回购价格</span>
-                  <span className="text-2xl font-bold text-primary-700">${previewResult.buybackPrice?.toFixed(2)}</span>
+                  <span className="text-sm text-primary-600">{t('trade.previewTotal', { count: selectedPreviews.length })}</span>
+                  <span className="text-2xl font-bold text-primary-700">${totalBuyback.toFixed(2)}</span><div className="text-sm text-gray-500 mt-1">≈ ¥{(totalBuyback * 7.25).toFixed(2)}</div>
                 </div>
-                <div className="mt-2 text-xs text-primary-600">{previewResult.formula}</div>
               </div>
-              <div className="p-3 rounded-lg text-xs bg-blue-50 text-blue-800">
-                {previewResult.tier}：残值 = 购入价 × (1 - 持有月数 / 60)，回购价 = 残值 × (1 - 罚金比例)
-              </div>
-            </div>)}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -4,9 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 
 export default function Login() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,7 +25,7 @@ export default function Login() {
       await login(email, password);
       router.push('/');
     } catch (err) {
-      setError(err.message || '登录失败，请重试');
+      setError(err.message || t('login.error'));
     } finally {
       setLoading(false);
     }
@@ -34,12 +36,12 @@ export default function Login() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex flex-col items-center gap-0.5">
-            <img src="/logo.png" alt="1kWh" className="h-10 w-10 object-contain" />
-            <span className="text-lg font-bold text-gray-900 leading-tight">1kWh</span>
+            <img src="/logo.png" alt="MTX MOTORS" className="h-10 w-10 object-contain" />
+            <span className="text-lg font-bold text-gray-900 leading-tight">MTX MOTORS</span>
             <span className="text-xs text-gray-400 -mt-1">1kwh.store</span>
           </Link>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">登录账户</h2>
-          <p className="mt-2 text-gray-600">欢迎回来，请登录您的账户</p>
+          <h2 className="mt-6 text-3xl font-bold text-gray-900">{t('login.title')}</h2>
+          <p className="mt-2 text-gray-600">{t('login.welcome')}</p>
         </div>
 
         <div className="card">
@@ -51,7 +53,7 @@ export default function Login() {
             )}
 
             <div>
-              <label className="label">邮箱</label>
+              <label className="label">{t('login.email')}</label>
               <input
                 type="email"
                 value={email}
@@ -63,7 +65,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="label">密码</label>
+              <label className="label">{t('login.password')}</label>
               <input
                 type="password"
                 value={password}
@@ -79,14 +81,14 @@ export default function Login() {
               disabled={loading}
               className="w-full btn-primary py-3"
             >
-              {loading ? '登录中...' : '立即登录'}
+              {loading ? t('login.submitting') : t('login.submit')}
             </button>
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-600">
-            还没有账号？{' '}
+            {t('login.noAccount')}{' '}
             <Link href="/register" className="text-primary-600 hover:underline font-medium">
-              立即注册
+              {t('login.goRegister')}
             </Link>
           </div>
 

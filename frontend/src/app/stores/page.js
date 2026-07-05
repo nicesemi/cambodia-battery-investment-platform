@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { MapPin, Phone, Store, Battery, Globe, DollarSign, ShoppingBag, Camera, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { storesAPI } from '../../services/api';
+import { formatUSD, formatCNY, usdToCny } from '../../lib/currency';
+import { useTranslation } from 'react-i18next';
 
 // ─── 门店坐标硬编码 ──────────────────────────────────
 const STORE_COORDS = {
@@ -31,28 +33,36 @@ function useAmap() {
   return loaded;
 }
 
-// ─── 数据映射 ──────────────────────────────────────
-function mapStore(s) {
-  const coord = STORE_COORDS[s.store_code] || {};
-  return {
-    id: s.id,
-    name: s.name || s.store_name || '—',
-    city: s.city || '',
-    region: s.country || s.city || '',
-    address: s.address || '',
-    phone: s.phone || '',
-    lng: s.lng || s.longitude || coord.lng || 0,
-    lat: s.lat || s.latitude || coord.lat || 0,
-    soldBattery: s.type || '区县门店',
-    soldCount: s.battery_count || s.total_batteries || 0,
-    revenue: (s.battery_count || s.total_batteries) ? `¥${((s.battery_count || s.total_batteries) * 1.8).toFixed(0)}万` : '¥0',
-    status: s.status || '运营中',
-    img: (s.images && s.images.length > 0) ? s.images[0] : null,
-    storeCode: s.store_code || '',
-  };
-}
-
 export default function StoresPage() {
+  const { t } = useTranslation();
+
+  // ─── 数据映射（组件内部，可访问 t）─────────────────
+  function mapStore(s) {
+    const coord = STORE_COORDS[s.store_code] || {};
+    const totalSales = Number(s.total_sales) || 0;
+    const orderCount = Number(s.order_count) || 0;
+    return {
+      id: s.id,
+      name: s.name || s.store_name || '—',
+      city: s.city || '',
+      region: s.country || s.city || '',
+      address: s.address || '',
+      phone: s.phone || '',
+      lng: s.lng || s.longitude || coord.lng || 0,
+      lat: s.lat || s.latitude || coord.lat || 0,
+      soldBattery: orderCount ? `${orderCount} ${t('stores.orderUnit')}` : (s.battery_count ? `${s.battery_count} ${t('stores.groupUnit')}` : '—'),
+      soldCount: orderCount || (s.battery_count || s.total_batteries || 0),
+      revenue: totalSales,
+      revenueDisplay: totalSales ? formatUSD(totalSales) : '$0',
+      revenueSecondary: totalSales ? `≈ ${formatCNY(usdToCny(totalSales))}` : '≈ ¥0',
+      status: s.status || 'operating',
+      img: (s.images && s.images.length > 0) ? s.images[0] : (s.photo_url || null),
+      images: s.images || [],
+      photo_url: s.photo_url || null,
+      storeCode: s.store_code || '',
+      totalSales,
+    };
+  }
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const amapReady = useAmap();
@@ -76,7 +86,7 @@ export default function StoresPage() {
       const data = await storesAPI.getApprovedStores();
       setStores((data.stores || []).map(mapStore));
     } catch (e) {
-      setError(e.message || '门店数据加载失败');
+      setError(e.message || t('stores.loadError'));
     } finally { setLoading(false); }
   };
 
@@ -113,15 +123,15 @@ export default function StoresPage() {
   };
 
   if (authLoading || loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="text-gray-500">加载门店数据中...</div></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="text-gray-500">{t('stores.loading')}</div></div>;
   }
 
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
-        <div className="text-red-500 text-lg font-medium">数据加载失败</div>
+        <div className="text-red-500 text-lg font-medium">{t('stores.loadError')}</div>
         <p className="text-gray-400">{error}</p>
-        <button onClick={() => { setError(null); setLoading(true); loadStores(); }} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">重试</button>
+        <button onClick={() => { setError(null); setLoading(true); loadStores(); }} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">{t('stores.retry')}</button>
       </div>
     );
   }
@@ -132,26 +142,31 @@ export default function StoresPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center bg-purple-100 text-purple-700 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
-            <Store className="h-4 w-4 mr-2" /> 加盟门店
+            <Store className="h-4 w-4 mr-2" />{t('stores.franchiseStores')}
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">加盟门店网络</h2>
-          <p className="text-gray-500 max-w-2xl mx-auto">投资者购买电池资产的销售门店，覆盖中国大陆、香港、澳门</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{t('stores.network')}</h2>
+          <p className="text-gray-500 max-w-2xl mx-auto">{t('stores.description')}</p>
         </div>
 
         {/* 统计概览 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[
-            { icon: Store, label: '门店总数', value: `${stores.length}` },
-            { icon: ShoppingBag, label: '累计销量', value: `${stores.reduce((a, b) => a + b.soldCount, 0)}` },
-            { icon: DollarSign, label: '累计收益', value: '¥2.86亿' },
-            { icon: Globe, label: '覆盖区域', value: '大陆/香港/澳门' },
-          ].map((s, i) => (
-            <div key={i} className="bg-gray-50 rounded-2xl p-5 text-center">
-              <s.icon className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-gray-900">{s.value}</div>
-              <div className="text-xs text-gray-400 mt-1">{s.label}</div>
-            </div>
-          ))}
+          {(() => {
+            const totalRevenue = stores.reduce((a, b) => a + (b.totalSales || 0), 0);
+            const totalOrders = stores.reduce((a, b) => a + (b.soldCount || 0), 0);
+            return [
+              { icon: Store, label: t('stores.totalStores'), value: `${stores.length}` },
+              { icon: ShoppingBag, label: t('stores.totalSales'), value: `${totalOrders}` },
+              { icon: DollarSign, label: t('stores.totalRevenue'), value: formatUSD(totalRevenue), secondary: `≈ ${formatCNY(usdToCny(totalRevenue))}` },
+              { icon: Globe, label: t('stores.coverage'), value: t('stores.global') },
+            ].map((s, i) => (
+              <div key={i} className="bg-gray-50 rounded-2xl p-5 text-center">
+                <s.icon className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-gray-900">{s.value}</div>
+                {s.secondary && <div className="text-xs text-gray-400 mt-0.5">{s.secondary}</div>}
+                <div className="text-xs text-gray-400 mt-1">{s.label}</div>
+              </div>
+            ));
+          })()}
         </div>
 
         {/* 左地图 右列表 */}
@@ -159,15 +174,15 @@ export default function StoresPage() {
           <div className="lg:col-span-2">
             <div ref={containerRef} className="w-full h-[550px] rounded-2xl shadow-lg bg-gray-100 border border-gray-200" />
             <div className="flex justify-center gap-6 mt-3">
-              <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 bg-gray-900 rounded-full" />中国大陆</span>
-              <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 bg-red-600 rounded-full" />香港</span>
-              <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 bg-green-600 rounded-full" />澳门</span>
+              <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 bg-gray-900 rounded-full" />{t('stores.chinaMainland')}</span>
+              <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 bg-red-600 rounded-full" />{t('stores.hongkong')}</span>
+              <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 bg-green-600 rounded-full" />{t('stores.macau')}</span>
             </div>
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">加盟门店</span>
-              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{stores.length} 家</span>
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('stores.franchiseStores')}</span>
+              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{t('stores.storeCount', { count: stores.length })}</span>
             </div>
             <div className="space-y-2.5 overflow-y-auto max-h-[510px] pr-1">
               {stores.map((s) => (
@@ -191,12 +206,14 @@ export default function StoresPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
                         <span className="font-semibold text-sm text-gray-900 truncate">{s.name}</span>
-                        <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full flex-shrink-0 ml-1">{s.status}</span>
+                        <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full flex-shrink-0 ml-1">{t(`stores.status.${s.status}`, s.status)}</span>
                       </div>
                       <p className="text-xs text-gray-400 flex items-center"><MapPin className="h-2.5 w-2.5 mr-0.5" />{s.city} · {s.address}</p>
                       <div className="flex flex-wrap gap-4 mt-2 text-xs">
-                        <span className="text-gray-500">售 <span className="font-semibold text-gray-700">{s.soldCount}</span> 组</span>
-                        <span className="text-gray-500">收益 <span className="font-semibold text-gray-700">{s.revenue}</span></span>
+                        <span className="text-gray-500">{t('stores.soldLabel2')} <span className="font-semibold text-gray-700">{s.soldCount}</span>{t('stores.groupUnit')}</span>
+                        <span className="text-gray-500">{t('stores.revenueLabel2')} <span className="font-semibold text-gray-700">{s.revenueDisplay}</span>
+                          <span className="text-gray-400 ml-1">{s.revenueSecondary}</span>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -219,26 +236,31 @@ export default function StoresPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: '已售电池类型', value: selectedStore.soldBattery },
-                  { label: '累计销量', value: `${selectedStore.soldCount} 组电池` },
-                  { label: '累计收益', value: selectedStore.revenue },
-                  { label: '联系电话', value: selectedStore.phone || '—' },
-                  { label: '门店地址', value: selectedStore.address },
+                  { label: t('stores.soldBatteryType'), value: selectedStore.soldBattery },
+                  { label: t('stores.totalSales'), value: `${selectedStore.soldCount} ${t('stores.batteryGroup')}` },
+                  { label: t('stores.totalRevenue'), value: selectedStore.revenueDisplay, secondary: selectedStore.revenueSecondary },
+                  { label: t('stores.phone'), value: selectedStore.phone || '—' },
+                  { label: t('stores.address'), value: selectedStore.address },
                 ].map((p, i) => (
                   <div key={i} className="bg-gray-50 rounded-xl p-3">
                     <div className="text-xs text-gray-400 mb-1">{p.label}</div>
                     <div className="text-sm font-semibold text-gray-900">{p.value}</div>
+                    {p.secondary && <div className="text-xs text-gray-400 mt-0.5">{p.secondary}</div>}
                   </div>
                 ))}
               </div>
             </div>
             <div className="rounded-2xl overflow-hidden border border-gray-200 h-56 bg-gray-100">
-              {selectedStore.img ? (
-                <img src={selectedStore.img} alt={selectedStore.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+              {((selectedStore.images && selectedStore.images.length > 0) || selectedStore.photo_url) ? (
+                <div className="flex gap-2 overflow-x-auto h-full p-2">
+                  {[...(selectedStore.images || []), ...(selectedStore.photo_url ? [selectedStore.photo_url] : [])].map((url, i) => (
+                    <img key={i} src={url} alt={`${selectedStore.name} ${t('stores.photoAlt2', { index: i + 1 })}`} loading="lazy" decoding="async" className="h-full object-contain rounded-lg bg-gray-50 flex-shrink-0" />
+                  ))}
+                </div>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
                   <Camera className="h-10 w-10 mb-2" />
-                  <span className="text-sm">门店照片待上传</span>
+                  <span className="text-sm">{t('stores.photoPending')}</span>
                 </div>
               )}
             </div>
