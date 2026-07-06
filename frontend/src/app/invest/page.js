@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { assetAPI, orderAPI, dividendAPI } from '../../services/api';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -74,7 +74,7 @@ function resolveI18n(obj, i18nKey, fallback, i18n) {
   return i18nData[i18n.language] || i18nData['zh-CN'] || fallback;
 }
 
-export default function Invest() {
+function InvestPageContent() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
@@ -1408,5 +1408,13 @@ const getPenaltyTierDisplay = (tier, t) => {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Invest() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <InvestPageContent />
+    </Suspense>
   );
 }
