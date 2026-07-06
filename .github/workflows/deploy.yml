@@ -16,5 +16,3 @@ jobs:
           cd frontend
           npm install
           npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
