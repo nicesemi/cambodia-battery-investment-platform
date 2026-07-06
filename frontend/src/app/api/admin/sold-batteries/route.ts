@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       supabase.from('battery_units').select(`
         id, unit_code, site_name, status, investor_id, sensor_battery_level, sensor_temperature,
         sensor_cycle_count, sensor_health_status, sensor_longitude, sensor_latitude, created_at, updated_at,
-        battery_assets!inner(id, name, battery_type, unit_price, unit_price_rmb),
+        battery_assets!inner(id, name, name_i18n, battery_type, unit_price, unit_price_rmb),
         users:investor_id(id, username, email, full_name)
       `, { count: 'exact' })
         .eq('status', 'sold')

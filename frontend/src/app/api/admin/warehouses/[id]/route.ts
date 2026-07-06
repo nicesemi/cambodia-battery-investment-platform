@@ -15,7 +15,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     const { id } = params
     const body = await request.json()
-    const { warehouse_code, name, address, manager_id } = body
+    const { warehouse_code, name, address, manager_id, name_i18n, address_i18n } = body
 
     if (!name) {
       return badRequest('仓库名称为必填项')
@@ -24,6 +24,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const updateData: Record<string, any> = {
       name,
       address: address || null,
+      name_i18n: name_i18n || null,
+      address_i18n: address_i18n || null,
     }
     // manager_id 有效时才加入 update，避免空串/null 触发 FK 约束
     const cleanManagerId = manager_id && String(manager_id).trim() ? manager_id : null

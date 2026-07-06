@@ -24,4 +24,10 @@ router.put('/agent-applications/:applicationId/review', authenticateToken, requi
 router.get('/franchisee-applications', authenticateToken, requireAdmin, adminController.getFranchiseeApplications);
 router.put('/franchisee-applications/:applicationId/review', authenticateToken, requireAdmin, adminController.reviewFranchiseeApplication);
 
+// 站点类型管理
+router.get('/site-types', authenticateToken, requireAdmin, adminController.getSiteTypes);
+router.post('/site-types', authenticateToken, requireAdmin, adminController.createSiteType);
+router.put('/site-types/:typeId', authenticateToken, requireAdmin, adminController.updateSiteType);
+router.delete('/site-types/:typeId', authenticateToken, requireAdmin, adminController.deleteSiteType);
+
 module.exports = router;

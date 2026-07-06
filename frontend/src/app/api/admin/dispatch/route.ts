@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     // 查询选中的已售电池信息
     const { data: batteries, error: batteryError } = await adminClient
       .from('battery_units')
-      .select('id, unit_code, site_name, sensor_longitude, sensor_latitude, battery_assets!inner(id, name)')
+      .select('id, unit_code, site_name, sensor_longitude, sensor_latitude, battery_assets!inner(id, name, name_i18n)')
       .in('id', battery_ids)
 
     if (batteryError) return serverError(batteryError.message)

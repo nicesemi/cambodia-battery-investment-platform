@@ -1,13 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Image from 'next/image';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { MapPin, Plus, Edit, Trash2, Loader2, ArrowLeft, Zap, AlertCircle, Search } from 'lucide-react';
+const LANGUAGES = [
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'en', label: 'English' },
+  { code: 'bn', label: 'বাংলা' },
+  { code: 'km', label: 'ខ្មែរ' },
+];
+const EMPTY_I18N = { 'zh-CN': '', 'zh-TW': '', 'en': '', 'bn': '', 'km': '' };
+
 
 const DEFAULT_FORM = {
-  name: '', country: '', city: '', address: '', longitude: '', latitude: '',
+  name: '', name_i18n: { ...EMPTY_I18N },
+  country: '', country_i18n: { ...EMPTY_I18N },
+  city: '', city_i18n: { ...EMPTY_I18N },
+  address: '', longitude: '', latitude: '',
   battery_count: '', status: '运营中', site_type: '', contact: '', description: '',
   battery_type: '', cabinet_slots: '', image_url: ''
 };
@@ -15,7 +28,7 @@ const DEFAULT_FORM = {
 const DEFAULT_FILE = null;
 
 export default function OperationSitesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, canAccessAdmin } = useAuth();
   const router = useRouter();
   const [sites, setSites] = useState([]);
@@ -32,6 +45,8 @@ export default function OperationSitesPage() {
   const [file, setFile] = useState(DEFAULT_FILE);
   const [previewUrl, setPreviewUrl] = useState('');
   const [batteryTypes, setBatteryTypes] = useState([]);
+  const [siteTypes, setSiteTypes] = useState([]);
+  const [selectedLang, setSelectedLang] = useState('zh-CN');
 
   // 地理编码：优先通过后端代理调 Nominatim，失败则打开 Google Maps 手动查
   const handleGeocode = async () => {
@@ -62,6 +77,9 @@ export default function OperationSitesPage() {
     fetch('/api/battery-types').then(res => res.json()).then(data => {
       setBatteryTypes(data.battery_types || []);
     }).catch(() => {});
+    fetch('/api/admin/site-types', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()).then(data => {
+      setSiteTypes(data.site_types || []);
+    }).catch(() => {});
   }, [user]);
 
   const loadSites = async () => {
@@ -84,8 +102,15 @@ export default function OperationSitesPage() {
     setIsEditing(true); setEditingId(s.id);
     setFile(DEFAULT_FILE);
     setPreviewUrl(s.image_url || '');
+    const parseI18nOs = (v, fallback) => {
+      if (v && typeof v === 'object') { const f = { ...EMPTY_I18N }; for (const l of LANGUAGES) { if (v[l.code]) f[l.code] = v[l.code]; } return f; }
+      const e = { ...EMPTY_I18N }; if (fallback) e['zh-CN'] = fallback; return e;
+    };
+    setSelectedLang('zh-CN');
     setForm({
-      name: s.name || '', country: s.country || '', city: s.city || '',
+      name: s.name || '', name_i18n: parseI18nOs(s.name_i18n, s.name),
+      country: s.country || '', country_i18n: parseI18nOs(s.country_i18n, s.country),
+      city: s.city || '', city_i18n: parseI18nOs(s.city_i18n, s.city),
       address: s.address || '', longitude: s.longitude != null ? String(s.longitude) : '',
       latitude: s.latitude != null ? String(s.latitude) : '',
       battery_count: s.battery_count != null ? String(s.battery_count) : '',
@@ -109,10 +134,15 @@ export default function OperationSitesPage() {
       const url = isEditing ? `/api/admin/operation-sites/${editingId}` : '/api/admin/operation-sites';
       const method = isEditing ? 'PUT' : 'POST';
 
+      const buildI18nOs = (obj) => { const r = {}; let h = false; for (const l of LANGUAGES) { if (obj[l.code]?.trim()) { r[l.code] = obj[l.code].trim(); h = true; } } return h ? r : null; };
+
       const fd = new FormData();
       fd.append('name', form.name);
+      fd.append('name_i18n', JSON.stringify(buildI18nOs(form.name_i18n || {}) || {}));
       fd.append('country', form.country);
+      fd.append('country_i18n', JSON.stringify(buildI18nOs(form.country_i18n || {}) || {}));
       fd.append('city', form.city);
+      fd.append('city_i18n', JSON.stringify(buildI18nOs(form.city_i18n || {}) || {}));
       fd.append('address', form.address);
       fd.append('longitude', form.longitude);
       fd.append('latitude', form.latitude);
@@ -219,11 +249,11 @@ export default function OperationSitesPage() {
                     <td className="p-3">
                       <div className="flex items-center gap-1.5">
                         <MapPin className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                        <span className="font-medium text-gray-900 text-xs">{s.name}</span>
+                        <span className="font-medium text-gray-900 text-xs">{s.name_i18n?.[i18n.language] || s.name_i18n?.['zh-CN'] || s.name}</span>
                       </div>
                     </td>
-                    <td className="p-3 text-gray-600 text-xs">{s.country}</td>
-                    <td className="p-3 text-gray-600 text-xs">{s.city}</td>
+                    <td className="p-3 text-gray-600 text-xs">{s.country_i18n?.[i18n.language] || s.country_i18n?.['zh-CN'] || s.country}</td>
+                    <td className="p-3 text-gray-600 text-xs">{s.city_i18n?.[i18n.language] || s.city_i18n?.['zh-CN'] || s.city}</td>
                     <td className="p-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <Zap className="h-3 w-3 text-green-500" />
@@ -231,12 +261,14 @@ export default function OperationSitesPage() {
                       </div>
                     </td>
                     <td className="p-3 text-center text-xs">
-                      {s.battery_type ? (
-                        <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">{s.battery_type}</span>
-                      ) : <span className="text-gray-300">-</span>}
+                      {s.battery_type ? (() => {
+                          const bt = batteryTypes.find(b => b.name === s.battery_type);
+                          const display = bt ? (bt.name_i18n?.[i18n.language] || bt.name_i18n?.['zh-CN'] || bt.name) : s.battery_type;
+                          return <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">{display}</span>;
+                        })() : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="p-3 text-center text-gray-500 text-xs">
-                      {s.site_type ? s.site_type : '-'}
+                      {s.site_type ? (() => { const st = siteTypes.find(t => t.name === s.site_type); return st ? (st.name_i18n?.[i18n.language] || st.name_i18n?.['zh-CN'] || st.name) : s.site_type; })() : '-'}
                     </td>
                     <td className="p-3 text-center text-gray-500 text-xs">
                       {['4820', '6035', '7250', '72100'].some(p => s.battery_type?.startsWith(p)) && s.cabinet_slots != null ? s.cabinet_slots : '-'}
@@ -284,18 +316,48 @@ export default function OperationSitesPage() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="col-span-3">
                     <label className="block text-xs font-medium text-gray-600 mb-1">站点名称 *</label>
-                    <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 金边旗舰店" />
+                    <div className="flex gap-1 mb-2">
+                      {LANGUAGES.map(lang => (
+                        <button type="button" key={lang.code}
+                          onClick={() => setSelectedLang(lang.code)}
+                          className={`px-2 py-0.5 text-xs rounded-full transition ${selectedLang === lang.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          {lang.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="text" value={form.name_i18n?.[selectedLang] || ''}
+                      onChange={e => setForm({ ...form, name_i18n: { ...form.name_i18n, [selectedLang]: e.target.value } })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`站点名称（${LANGUAGES.find(l=>l.code===selectedLang)?.label}）`} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">国家 *</label>
-                    <input type="text" value={form.country} onChange={e => setForm({ ...form, country: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 柬埔寨" />
+                    <div className="flex gap-1 mb-2">
+                      {LANGUAGES.map(lang => (
+                        <button type="button" key={lang.code}
+                          onClick={() => setSelectedLang(lang.code)}
+                          className={`px-2 py-0.5 text-xs rounded-full transition ${selectedLang === lang.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          {lang.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="text" value={form.country_i18n?.[selectedLang] || ''}
+                      onChange={e => setForm({ ...form, country_i18n: { ...form.country_i18n, [selectedLang]: e.target.value } })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`国家（${LANGUAGES.find(l=>l.code===selectedLang)?.label}）`} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">城市 *</label>
-                    <input type="text" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 金边" />
+                    <div className="flex gap-1 mb-2">
+                      {LANGUAGES.map(lang => (
+                        <button type="button" key={lang.code}
+                          onClick={() => setSelectedLang(lang.code)}
+                          className={`px-2 py-0.5 text-xs rounded-full transition ${selectedLang === lang.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          {lang.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="text" value={form.city_i18n?.[selectedLang] || ''}
+                      onChange={e => setForm({ ...form, city_i18n: { ...form.city_i18n, [selectedLang]: e.target.value } })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`城市（${LANGUAGES.find(l=>l.code===selectedLang)?.label}）`} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">电池数量 *</label>
@@ -318,7 +380,7 @@ export default function OperationSitesPage() {
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                       <option value="">请选择</option>
                       {batteryTypes.map(bt => (
-                        <option key={bt.id} value={bt.name}>{bt.name}</option>
+                        <option key={bt.id} value={bt.name}>{bt.name_i18n?.[i18n.language] || bt.name_i18n?.['zh-CN'] || bt.name}</option>
                       ))}
                     </select>
                   </div>
@@ -354,10 +416,9 @@ export default function OperationSitesPage() {
                     <select value={form.site_type} onChange={e => setForm({ ...form, site_type: e.target.value })}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                       <option value="">请选择</option>
-                      <option value="换电站">换电站</option>
-                      <option value="运营线路">运营线路</option>
-                      <option value="移动储能柜">移动储能柜</option>
-                      <option value="固定储能柜">固定储能柜</option>
+                      {siteTypes.map(st => (
+                        <option key={st.id} value={st.name}>{st.name_i18n?.[i18n.language] || st.name_i18n?.['zh-CN'] || st.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div>

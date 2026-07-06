@@ -10,6 +10,13 @@ import { useTranslation } from 'react-i18next';
 export default function Trade() {
   const { t, i18n } = useTranslation();
 
+  const resolveI18n = (obj, i18nKey, fallback, i18nObj) => {
+    if (!obj) return fallback || '';
+    const i18nData = obj[i18nKey];
+    if (!i18nData || typeof i18nData !== 'object') return fallback || '';
+    return i18nData[i18nObj.language] || i18nData['zh-CN'] || fallback || '';
+  };
+
   // 拉取实时汇率
   useEffect(() => { fetchRates(); }, []);
 
@@ -113,7 +120,7 @@ export default function Trade() {
                         <Package className="h-4 w-4 text-gray-400" />
                         <span className="font-medium text-sm">{unit.unit_code || unit.id?.slice(0, 8)}</span>
                       </div>
-                      <span className="text-xs text-gray-500">{unit.asset_name}</span>
+                      <span className="text-xs text-gray-500">{resolveI18n(unit, 'asset_name_i18n', unit.asset_name, i18n)}</span>
                     </div>
                     <div className="mt-1 text-xs text-gray-500">{t('trade.purchasePrice')}: {formatCurrency(Number(unit.unit_price || 1000), i18n.language)}</div>
                   </div>))}

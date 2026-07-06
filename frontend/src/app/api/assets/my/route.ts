@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     if (!user) return unauthorized()
 
     const { data: userAssets, error } = await supabase.from('user_assets')
-      .select('id, units, average_cost, total_dividends_received, asset_id, battery_assets!inner(id, asset_code, name, unit_price, expected_roi, location, battery_type, total_units, available_units, stock)')
+      .select('id, units, average_cost, total_dividends_received, asset_id, battery_assets!inner(id, asset_code, name, name_i18n, unit_price, expected_roi, location, battery_type, total_units, available_units, stock)')
       .eq('user_id', user.id)
     if (error) return serverError(error.message)
 
@@ -46,6 +46,38 @@ export async function GET(request: Request) {
       }
     }
 
+    // Fetch operation_sites name_i18n for battery_units
+    const siteIds = [...new Set(
+      (myUnits || []).map(ibu => (ibu.battery_units as any)?.[0]?.site_id || ibu.battery_units?.site_id).filter(Boolean)
+    )]
+    let siteI18nMap: Record<string, any> = {}
+    let locationI18nMap: Record<string, any> = {}
+    if (siteIds.length > 0) {
+      const { data: sitesI18n } = await adminClient.from('operation_sites')
+        .select('id, name_i18n, country, city, country_i18n, city_i18n')
+        .in('id', siteIds)
+      if (sitesI18n) {
+        for (const s of sitesI18n) {
+          siteI18nMap[s.id] = s.name_i18n
+          // 构建 location_i18n
+          const locKey = `${s.country}·${s.city}`
+          if (!locationI18nMap[locKey] && s.country_i18n && s.city_i18n) {
+            const locI18n: Record<string, string> = {}
+            for (const lang of ['zh-CN', 'zh-TW', 'en', 'bn', 'km']) {
+              const cn = (s.country_i18n as any)?.[lang] || (s.country_i18n as any)?.['zh-CN'] || ''
+              const ci = (s.city_i18n as any)?.[lang] || (s.city_i18n as any)?.['zh-CN'] || ''
+              if (cn || ci) locI18n[lang] = [cn, ci].filter(Boolean).join('·')
+            }
+            if (Object.keys(locI18n).length > 0) {
+              locationI18nMap[locKey] = locI18n
+              // 兼容 battery_assets.location 无分隔符的旧格式（如"柬埔寨金边"）
+              locationI18nMap[`${s.country}${s.city}`] = locI18n
+            }
+          }
+        }
+      }
+    }
+
     const formatted = userAssets.map((ua: any) => ({
       id: ua.id,
       units: ua.units,
@@ -54,14 +86,19 @@ export async function GET(request: Request) {
       total_dividends_received: ua.total_dividends_received || 0,
       asset_code: ua.battery_assets?.asset_code,
       name: ua.battery_assets?.name,
+      name_i18n: ua.battery_assets?.name_i18n,
       unit_price: ua.battery_assets?.unit_price,
       expected_roi: ua.battery_assets?.expected_roi,
       location: ua.battery_assets?.location,
+      location_i18n: locationI18nMap[ua.battery_assets?.location] || null,
       battery_type: ua.battery_assets?.battery_type,
       total_units: ua.battery_assets?.total_units,
       available_units: ua.battery_assets?.available_units,
       stock: ua.battery_assets?.stock,
-      battery_units: unitsByAsset[ua.asset_id] || []
+      battery_units: (unitsByAsset[ua.asset_id] || []).map((bu: any) => ({
+        ...bu,
+        name_i18n: bu.site_id ? siteI18nMap[bu.site_id] || null : null
+      }))
     }))
     return ok({ userAssets: formatted })
   } catch (e: any) {

@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       return unauthorized('Admin or operator only')
 
     const body = await request.json()
-    const { name, address, manager_id } = body
+    const { name, address, manager_id, name_i18n, address_i18n } = body
 
     if (!name) {
       return badRequest('仓库名称为必填项')
@@ -88,6 +88,8 @@ export async function POST(request: Request) {
       warehouse_code,
       name,
       address: address || null,
+      name_i18n: name_i18n || null,
+      address_i18n: address_i18n || null,
     }
     // manager_id 有效时才加入 insert，避免空串/null 触发 FK 约束
     const cleanManagerId = manager_id && String(manager_id).trim() ? manager_id : null

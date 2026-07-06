@@ -217,7 +217,7 @@ export async function GET(request: Request) {
     if (assetIds.length > 0) {
       const { data: assets } = await adminClient
         .from('battery_assets')
-        .select('id, name, unit_price, monthly_rent, battery_type, battery_type_id')
+        .select('id, name, name_i18n, unit_price, monthly_rent, battery_type, battery_type_id')
         .in('id', assetIds)
 
       // 批量查询 battery_types 获取 monthly_rent
@@ -329,6 +329,7 @@ export async function GET(request: Request) {
         store_code: storeInfo?.store_code || '',
         order_type: '投资者绑定',
         asset_name: asset?.name || '—',
+        asset_name_i18n: asset?.name_i18n,
         battery_type: asset?.battery_type || '—',
         product_id: BATTERY_TYPE_TO_PRODUCT_ID[asset?.battery_type] || null,
         purchase_amount: purchaseAmount,

@@ -34,6 +34,24 @@ const BATTERY_PRODUCTS = [
   { id: 'cont600', name: '40尺6MWh液冷集装箱', scene: '大型调峰/新能源消纳', voltage: '1433.6V', capacity: '314Ah', energy: '6000kWh', weight: '72吨', price: 11600000, monthlyRent: 510000, category: 'container' },
 ];
 
+const getOrderTypeDisplay = (orderType, t) => {
+  const map = {
+    '购买': t('franchisee.orders.typePurchase'),
+    '出售': t('franchisee.orders.typeSell'),
+    '投资者绑定': t('franchisee.orders.typeInvestorBinding'),
+    '代理商绑定': t('franchisee.orders.typeAgentBinding'),
+    '线上订单': t('franchisee.orders.typeOnline'),
+    '门店订单': t('franchisee.orders.typeStore'),
+  };
+  return map[orderType] || orderType || t('franchisee.store.orderDefault');
+};
+
+function resolveI18n(obj, i18nKey, fallback, i18n) {
+  const i18nData = obj?.[i18nKey];
+  if (!i18nData || typeof i18nData !== 'object') return fallback;
+  return i18nData[i18n.language] || i18nData['zh-CN'] || fallback;
+}
+
 const getFranchiseLevels = (t) => [
   { level: t('franchisee.level.province'), fee: 68966, deposit: 27586, performanceTarget: 2068965, commission: '2%', revShare: '2%', area: t('franchisee.level.provinceArea'), color: 'from-blue-600 to-blue-800', badge: t('franchisee.level.highest'), totalInvestment: 482759, downstreamRate: t('franchisee.level.comm2Split2') },
   { level: t('franchisee.level.city'), fee: 27586, deposit: 6897, performanceTarget: 689655, commission: '3%', revShare: '3%', area: t('franchisee.level.cityArea'), color: 'from-blue-500 to-blue-700', badge: t('franchisee.level.recommended'), totalInvestment: 144828, downstreamRate: t('franchisee.level.comm3Split3') },
@@ -316,26 +334,31 @@ export default function Franchisee() {
   useEffect(() => {
     const loadBatteryTypes = async () => {
       try {
-        const res = await fetch('/api/battery-types');
+        const res = await fetch(`/api/battery-types?locale=${i18n.language}`);
         const data = await res.json();
         if (data.battery_types) {
           const mapped = data.battery_types.map(bt => {
             // 映射 API 数据到组件使用的字段名
             const price = (typeof bt.unit_price === 'string' ? parseFloat(bt.unit_price) : bt.unit_price) || 0;
             const rent = (typeof bt.monthly_rent === 'string' ? parseFloat(bt.monthly_rent) : bt.monthly_rent) || 0;
+            // 使用 API 解析后的多语言值
+            const displayName = bt.resolved_name || bt.name_i18n?.[i18n.language] || bt.name_i18n?.['zh-CN'] || bt.name;
+            const displayScenario = bt.resolved_scenario || bt.scenario_i18n?.[i18n.language] || bt.scenario_i18n?.['zh-CN'] || bt.scenario || '';
             // 推断 category
             let category = 'swap';
-            const nameLower = (bt.name || '').toLowerCase();
+            const nameLower = (displayName || '').toLowerCase();
             if (nameLower.includes('集装箱') || nameLower.includes('container')) category = 'container';
             else if (nameLower.includes('工商业') || nameLower.includes('ess') || nameLower.includes('储能柜') || nameLower.includes('液冷柜') || nameLower.includes('风冷柜')) category = 'ess';
             else if (nameLower.includes('物流') || nameLower.includes('中巴') || nameLower.includes('大巴') || nameLower.includes('客车') || nameLower.includes('货车')) category = 'vehicle';
             return {
               id: bt.name,
               name: bt.name,
+              displayName: displayName,
               price: price,
               monthlyRent: rent,
               category: category,
               scene: bt.scenario || '',
+              displayScene: displayScenario,
               voltage: bt.voltage || '',
               capacity: bt.capacity || '',
               energy: bt.power_kwh || '',
@@ -349,7 +372,7 @@ export default function Franchisee() {
       finally { setBatteryTypesLoaded(true); }
     };
     loadBatteryTypes();
-  }, []);
+  }, [i18n.language]);
 
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
@@ -1177,7 +1200,7 @@ export default function Franchisee() {
       const rent = (battery.monthlyRent || 0) * count;
       totalInvestment += invest;
       totalMonthlyRent += rent;
-      details.push({ id: battery.id, name: battery.name, count, unitPrice: battery.price, invest, monthlyRent: battery.monthlyRent, totalRent: rent });
+      details.push({ id: battery.id, name: battery.name, displayName: battery.displayName || battery.name, count, unitPrice: battery.price, invest, monthlyRent: battery.monthlyRent, totalRent: rent });
     }
 
     if (details.length === 0) return null;
@@ -1709,9 +1732,9 @@ export default function Franchisee() {
                     <tbody>{allStoreOrders.slice(0, 10).map(o => (
                       <tr key={o.id} className="border-t"><td className="p-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${o.order_type === '投资者绑定' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {o.order_type || t('franchisee.store.orderDefault')}
+                          {getOrderTypeDisplay(o.order_type, t)}
                         </span>
-                      </td><td className="p-3">{o.asset?.name || o.asset_name || o.battery_type || '-'}</td><td className="p-3">{o.store?.name || o.store_name || '-'}</td><td className="p-3 text-right">{o.units || 1}</td><td className="p-3 text-right font-medium">{formatCurrency(o.purchase_amount || o.total_amount || o.amount || 0, i18n.language)}</td><td className="p-3 text-right text-gray-600">{formatCurrency(o._monthlyRent || 0, i18n.language)}</td><td className="p-3 text-right font-medium text-green-600">{formatCurrency(o.store_commission || 0, i18n.language)}</td><td className="p-3 text-right font-medium text-blue-600">{formatCurrency(o.revenue_share || 0, i18n.language)}</td><td className="p-3 text-right text-gray-400">{formatDate(o.created_at, i18n.language)}</td></tr>
+                      </td><td className="p-3">{resolveI18n(o, 'asset_name_i18n', o.asset_name, i18n) || o.battery_type || '-'}</td><td className="p-3">{o.store?.name || o.store_name || '-'}</td><td className="p-3 text-right">{o.units || 1}</td><td className="p-3 text-right font-medium">{formatCurrency(o.purchase_amount || o.total_amount || o.amount || 0, i18n.language)}</td><td className="p-3 text-right text-gray-600">{formatCurrency(o._monthlyRent || 0, i18n.language)}</td><td className="p-3 text-right font-medium text-green-600">{formatCurrency(o.store_commission || 0, i18n.language)}</td><td className="p-3 text-right font-medium text-blue-600">{formatCurrency(o.revenue_share || 0, i18n.language)}</td><td className="p-3 text-right text-gray-400">{formatDate(o.created_at, i18n.language)}</td></tr>
                     ))}</tbody></table>
                 </div>
               )}
@@ -2000,10 +2023,10 @@ export default function Franchisee() {
                   <div key={p.id || p.name} className="bg-white rounded-xl border p-4 hover:shadow-md transition">
                     <div className="flex items-center gap-2 mb-3">
                       <Battery className="h-5 w-5 text-blue-600" />
-                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{p.id || p.name}</span>
+                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{p.displayName || p.id || p.name}</span>
                     </div>
-                    <h4 className="font-bold text-sm mb-1">{p.name}</h4>
-                    <p className="text-xs text-gray-500 mb-3">{p.scene}</p>
+                    <h4 className="font-bold text-sm mb-1">{p.displayName || p.name}</h4>
+                    <p className="text-xs text-gray-500 mb-3">{p.displayScene || p.scene}</p>
                     <div className="grid grid-cols-2 gap-1 text-xs border-t pt-3">
                       <div><span className="text-gray-400">{t("franchisee.product.voltage")}:</span> {p.voltage}</div>
                       <div><span className="text-gray-400">{t("franchisee.product.energy")}:</span> {p.energy}</div>
@@ -2057,7 +2080,7 @@ export default function Franchisee() {
                     {(batteryTypes.length > 0 ? batteryTypes : BATTERY_PRODUCTS).filter(p => p.category === 'swap').map(battery => (
                       <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
+                          <div className="text-sm font-semibold text-gray-900 truncate">{battery.displayName || battery.name}</div>
                           <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatCurrency(battery.monthlyRent, i18n.language) : formatCurrency(Math.round(battery.price * 0.05), i18n.language)}</div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
@@ -2071,7 +2094,7 @@ export default function Franchisee() {
                     {(batteryTypes.length > 0 ? batteryTypes : BATTERY_PRODUCTS).filter(p => p.category === 'vehicle').map(battery => (
                       <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
+                          <div className="text-sm font-semibold text-gray-900 truncate">{battery.displayName || battery.name}</div>
                           <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatCurrency(battery.monthlyRent, i18n.language) : formatCurrency(Math.round(battery.price * 0.05), i18n.language)}</div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
@@ -2085,7 +2108,7 @@ export default function Franchisee() {
                     {(batteryTypes.length > 0 ? batteryTypes : BATTERY_PRODUCTS).filter(p => p.category === 'ess').map(battery => (
                       <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
+                          <div className="text-sm font-semibold text-gray-900 truncate">{battery.displayName || battery.name}</div>
                           <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatCurrency(battery.monthlyRent, i18n.language) : formatCurrency(Math.round(battery.price * 0.05), i18n.language)}</div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
@@ -2099,7 +2122,7 @@ export default function Franchisee() {
                     {(batteryTypes.length > 0 ? batteryTypes : BATTERY_PRODUCTS).filter(p => p.category === 'container').map(battery => (
                       <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
+                          <div className="text-sm font-semibold text-gray-900 truncate">{battery.displayName || battery.name}</div>
                           <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('franchisee.calculator.perUnit')} · {t('franchisee.calculator.monthlyRentLabel')}{battery.monthlyRent > 0 ? formatCurrency(battery.monthlyRent, i18n.language) : formatCurrency(Math.round(battery.price * 0.05), i18n.language)}</div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
@@ -2136,7 +2159,7 @@ export default function Franchisee() {
                         <h3 className="font-bold">{t('franchisee.calculator.detail')}</h3>
                         <div className="text-xs text-gray-500 space-y-1 mb-3">
                           <p className="font-semibold text-gray-700 text-sm mb-2">{t('franchisee.calculator.deployList')}</p>
-                          {r.details.map(d => (<div key={d.id} className="flex justify-between"><span>{d.name} × {d.count}</span><span className="text-gray-700">{formatCurrency(d.invest, i18n.language)}</span></div>))}
+                          {r.details.map(d => (<div key={d.id} className="flex justify-between"><span>{d.displayName || d.name} × {d.count}</span><span className="text-gray-700">{formatCurrency(d.invest, i18n.language)}</span></div>))}
                         </div>
                         <hr className="border-gray-100" />
                         {[{ label: t('franchisee.calculator.totalInvestment'), value: formatCurrency(r.totalInvestment, i18n.language), bold: true }, { label: t('franchisee.calculator.totalMonthlyRent'), value: formatCurrency(r.totalMonthlyRent, i18n.language) }].map((item, i) => (
@@ -2155,7 +2178,7 @@ export default function Franchisee() {
                           { label: '---', value: '', color: 'text-gray-300' },
                           { label: `${t('franchisee.calculator.selfCommissionTemplate', { rate: (r.selfCommissionRate * 100).toFixed(0) })}`, value: formatCurrency(r.selfCommissionAmount || 0, i18n.language), color: 'text-orange-600 font-medium' },
                           ...(r.downstreamCommissionRate > 0 ? [
-                            { label: `下级${t('franchisee.earnings.commission')}抽成 (${(r.downstreamCommissionRate * 100).toFixed(0)}%,一次性)`, value: formatCurrency(r.downstreamCommissionAnnual || 0, i18n.language), color: 'text-purple-600 font-medium' },
+                            { label: t('franchisee.calculator.downstreamCommissionTemplate', { rate: (r.downstreamCommissionRate * 100).toFixed(0) }), value: formatCurrency(r.downstreamCommissionAnnual || 0, i18n.language), color: 'text-purple-600 font-medium' },
                           ] : []),
                           { label: '---', value: '', color: 'text-gray-300' },
                           { label: t('franchisee.calculator.investorMonthly'), value: formatCurrency(r.investorMonthly, i18n.language), color: 'text-green-600' },

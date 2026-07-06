@@ -6,10 +6,19 @@ import { useAuth } from '../../contexts/AuthContext';
 import { adminAPI, batteryTypesAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
 
-import { Users, TrendingUp, DollarSign, BarChart3, Settings, Battery, Store, ClipboardList, Check, X, Eye, Shield, MapPin, Building2, Plus, Edit, Trash2, Loader2, Zap, BadgeCheck, Percent, Cpu, Camera, Phone, FileText, User, CheckSquare, Square } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, BarChart3, Settings, Battery, Store, ClipboardList, Check, X, Eye, Shield, MapPin, Building2, Plus, Edit, Trash2, Loader2, Zap, BadgeCheck, Percent, Cpu, Camera, Phone, FileText, User, CheckSquare, Square, LayoutList } from 'lucide-react';
 import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 
 const API_BASE = '/api';
+
+export const LANGUAGES = [
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'en', label: 'English' },
+  { code: 'bn', label: 'বাংলা' },
+  { code: 'km', label: 'ខ្មែរ' },
+];
+export const EMPTY_I18N = { 'zh-CN': '', 'zh-TW': '', 'en': '', 'bn': '', 'km': '' };
 
 function computeBatteryHealth(soc, temp, cycles) {
   function sensorHealth(val, g, y, o, gt) {
@@ -57,6 +66,15 @@ export default function Admin() {
   const [rejectReason, setRejectReason] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
+
+  // 站点类型管理
+  const [siteTypes, setSiteTypes] = useState([]);
+  const [siteTypesLoading, setSiteTypesLoading] = useState(false);
+  const [showSiteTypeForm, setShowSiteTypeForm] = useState(false);
+  const [siteTypeForm, setSiteTypeForm] = useState({ id: '', name: '', name_i18n: { ...EMPTY_I18N } });
+  const [isEditingSiteType, setIsEditingSiteType] = useState(false);
+  const [selectedSiteTypeLang, setSelectedSiteTypeLang] = useState('zh-CN');
+  const [siteTypeSubmitting, setSiteTypeSubmitting] = useState(false);
 
   // 表格排序配置 - 每个tab独立管理排序状态
   const [sortConfigs, setSortConfigs] = useState({});
@@ -238,6 +256,7 @@ export default function Admin() {
 
   // 电池资产管理表单
   const [showAssetForm, setShowAssetForm] = useState(false);
+  const [selectedAssetLang, setSelectedAssetLang] = useState('zh-CN');
   const [isEditing, setIsEditing] = useState(false);
   const [editingAssetId, setEditingAssetId] = useState(null);
   const [assetForm, setAssetForm] = useState({
@@ -312,11 +331,12 @@ export default function Admin() {
   const [warehouses, setWarehouses] = useState([]);
   const [warehousesLoading, setWarehousesLoading] = useState(false);
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
+  const [selectedWarehouseLang, setSelectedWarehouseLang] = useState('zh-CN');
   const [isEditingWarehouse, setIsEditingWarehouse] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ id: '', warehouse_code: '', name: '', address: '', manager_id: '' });
   const [warehouseSubmitting, setWarehouseSubmitting] = useState(false);
   const [employeeOptions, setEmployeeOptions] = useState([]);
-  const [assetSubTab, setAssetSubTab] = useState('workers'); // 'workers' | 'warehouses'
+  const [assetSubTab, setAssetSubTab] = useState('workers'); // 'workers' | 'warehouses' | 'siteTypes'
 
   // 已售电池列表中的单个派工弹窗
   const [dispatchBattery, setDispatchBattery] = useState(null);
@@ -476,7 +496,7 @@ export default function Admin() {
       switch (activeTab) {
         case 'dashboard': setStats(await adminAPI.getDashboard()); break;
         case 'users': { const r = await adminAPI.getUsers(1, 100); setUsers(r.users || []); } break;
-        case 'assets': { const r = await adminAPI.getAssets(); setAssets(r.assets || []); } break;
+        case 'assets': { const r = await adminAPI.getAssets(); setAssets(r.assets || []); try { const wh = await adminAPI.getWarehouses(); setWarehouses(wh || []); } catch(e){} } break;
         case 'stores': { const r = await adminAPI.getStores(); setStores(r.stores || []); } break;
         case 'applications': { const r = await adminAPI.getApplications(); setApplications(r.applications || []); } break;
         case 'agent-applications': { const r = await adminAPI.getAgentApplications(); setAgentApplications(r.applications || []); } break;
@@ -485,20 +505,25 @@ export default function Admin() {
         case 'my-workers':
           setMyWorkersLoading(true);
           setWarehousesLoading(true);
+          setSiteTypesLoading(true);
           try {
-            const [workersData, whData, empData] = await Promise.all([
+            const [workersData, whData] = await Promise.all([
               adminAPI.getWorkers(),
               adminAPI.getWarehouses(),
-              adminAPI.getWorkers(),
             ]);
             setMyWorkers(workersData || []);
             setWarehouses(whData || []);
-            setEmployeeOptions(empData || []);
+            setEmployeeOptions(workersData || []);
           } catch (e) { /* silent */ }
           finally {
             setMyWorkersLoading(false);
             setWarehousesLoading(false);
           }
+          // siteTypes 独立加载，不阻塞页面渲染
+          adminAPI.getSiteTypes()
+            .then(stData => setSiteTypes(stData?.site_types || []))
+            .catch(() => {})
+            .finally(() => setSiteTypesLoading(false));
           break;
         case 'configs': { const r = await adminAPI.getConfigs(); setConfigs(r.configs || []); } break;
         case 'withdrawals': { const r = await adminAPI.getWithdrawals(); setWithdrawals(r.withdrawals || []); } break;
@@ -577,7 +602,7 @@ export default function Admin() {
   const openAddAssetForm = () => {
     setIsEditing(false);
     setEditingAssetId(null);
-    setAssetForm({ asset_code: '', name: '', description: '', battery_type: 'swap', battery_type_id: '', total_units: '', unit_price_rmb: '', expected_roi: '', monthly_rent: '', location: '', station_id: '', warehouse_id: '' });
+    setAssetForm({ asset_code: '', name: '', name_i18n: { ...EMPTY_I18N }, description: '', description_i18n: { ...EMPTY_I18N }, battery_type: 'swap', battery_type_id: '', total_units: '', unit_price_rmb: '', expected_roi: '', monthly_rent: '', location: '', station_id: '', warehouse_id: '' }); setSelectedAssetLang('zh-CN');
     setShowAssetForm(true);
   };
 
@@ -586,14 +611,20 @@ export default function Admin() {
     setIsEditing(true);
     setEditingAssetId(asset.id);
     const matchedType = batteryTypes.find(bt => bt.name === asset.battery_type);
+    const parseI18nA = (v) => { if (v && typeof v === 'object') { const f = { ...EMPTY_I18N }; for (const l of LANGUAGES) { if (v[l.code]) f[l.code] = v[l.code]; } return f; } return { ...EMPTY_I18N }; };
+    const nameI18nA = parseI18nA(asset.name_i18n);
+    const descI18nA = parseI18nA(asset.description_i18n);
+    if (!asset.name_i18n && asset.name) nameI18nA['zh-CN'] = asset.name;
+    if (!asset.description_i18n && asset.description) descI18nA['zh-CN'] = asset.description;
+    setSelectedAssetLang('zh-CN');
     setAssetForm({
       asset_code: asset.asset_code || '',
-      name: asset.name || '',
-      description: asset.description || '',
+      name: asset.name || '', name_i18n: nameI18nA,
+      description: asset.description || '', description_i18n: descI18nA,
       battery_type: asset.battery_type || 'swap',
       battery_type_id: asset.battery_type_id || matchedType?.id || '',
       total_units: String(asset.total_units || ''),
-      unit_price_rmb: asset.unit_price_rmb != null ? String((asset.unit_price_rmb / 7.25).toFixed(2)) : '',
+      unit_price_rmb: matchedType?.unit_price != null ? String(matchedType.unit_price) : (asset.unit_price_rmb != null ? String((asset.unit_price_rmb / 7.25).toFixed(2)) : ''),
       expected_roi: matchedType?.annualized_return != null ? String(matchedType.annualized_return) : String(asset.expected_roi || ''),
       monthly_rent: matchedType?.monthly_rent != null ? String(matchedType.monthly_rent) : (asset.monthly_rent != null ? String(asset.monthly_rent) : ''),
       location: asset.location || '',
@@ -612,10 +643,13 @@ export default function Admin() {
     }
     setAssetSubmitting(true);
     try {
+      const buildI18nA = (obj) => { const r = {}; let h = false; for (const l of LANGUAGES) { if (obj[l.code]?.trim()) { r[l.code] = obj[l.code].trim(); h = true; } } return h ? r : null; };
       const payload = {
         asset_code: asset_code.trim(),
         name: name.trim(),
+        name_i18n: buildI18nA(assetForm.name_i18n || {}),
         description: assetForm.description.trim(),
+        description_i18n: buildI18nA(assetForm.description_i18n || {}),
         battery_type: assetForm.battery_type,
         battery_type_id: assetForm.battery_type_id || undefined,
         total_units: parseInt(total_units),
@@ -937,7 +971,7 @@ export default function Admin() {
                 <h3 className="font-bold text-gray-900 mb-4">分红概览</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between"><span className="text-gray-500">分红期数</span><span className="font-semibold">{stats.dividends?.total_dividends || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500">累计分红金额</span><span className="font-semibold text-green-600">${(stats.dividends?.total_dividend_amount || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-2">≈ ¥{((stats.dividends?.total_dividend_amount || 0) * 7.25).toFixed(0)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">累计分红金额</span><span className="font-semibold text-green-600">${(stats.dividends?.total_dividend_amount || 0).toFixed(0)}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">已分配分红</span><span className="font-semibold">${(stats.users?.total_dividends_distributed || 0).toFixed(0)}</span></div>
                 </div>
               </div>
@@ -952,16 +986,16 @@ export default function Admin() {
                     <div className="flex justify-between"><span className="text-gray-500">投资者充值总额</span><span className="font-semibold text-green-600">${(stats.finance.total_recharge || 0).toFixed(0)}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">提现总额（已批准）</span><span className="font-semibold">${(stats.finance.total_withdrawal_approved || 0).toFixed(0)}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">提现待审批</span><span className="font-semibold text-orange-600">${(stats.finance.total_withdrawal_pending || 0).toFixed(0)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">上级佣金汇总（估算）</span><span className="font-semibold">${(stats.finance.total_agent_commission || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-2">≈ ¥{((stats.finance.total_agent_commission || 0) * 7.25).toFixed(0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">上级佣金汇总（估算）</span><span className="font-semibold">${(stats.finance.total_agent_commission || 0).toFixed(0)}</span></div>
                   </div>
                 </div>
                 <div className="bg-white rounded-xl border p-6">
                   <h3 className="font-bold text-gray-900 mb-4">平台分账 & 回购</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between"><span className="text-gray-500">平台分红留存</span><span className="font-semibold text-purple-600">${(stats.finance.total_platform_dividend_share || 0).toFixed(0)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">平台手续费</span><span className="font-semibold">${(stats.finance.total_platform_fees || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-2">≈ ¥{((stats.finance.total_platform_fees || 0) * 7.25).toFixed(0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">平台手续费</span><span className="font-semibold">${(stats.finance.total_platform_fees || 0).toFixed(0)}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">平台回购笔数</span><span className="font-semibold">{stats.finance.total_buyback_count || 0} 笔</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">平台回购金额</span><span className="font-semibold text-blue-600">${(stats.finance.total_buyback_amount || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-2">≈ ¥{((stats.finance.total_buyback_amount || 0) * 7.25).toFixed(0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">平台回购金额</span><span className="font-semibold text-blue-600">${(stats.finance.total_buyback_amount || 0).toFixed(0)}</span></div>
                   </div>
                 </div>
               </div>
@@ -972,7 +1006,7 @@ export default function Admin() {
                 <h3 className="font-bold text-gray-900 mb-4">电池资产销售分布</h3>
                 <table className="w-full text-sm"><thead className="bg-gray-50"><tr><th className="text-left p-3">电池名称</th><th className="text-right p-3">售出份数</th><th className="text-right p-3">销售金额</th></tr></thead>
                   <tbody>{(stats.finance.battery_type_sales || []).map(s => (
-                    <tr key={s.name} className="border-t"><td className="p-3 font-medium">{s.name}</td><td className="p-3 text-right">{s.units || 0}</td><td className="p-3 text-right"><span className="text-green-600 font-semibold">${(s.amount || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-1">≈ ¥{((s.amount || 0) * 7.25).toFixed(0)}</span></td></tr>
+                    <tr key={s.name} className="border-t"><td className="p-3 font-medium">{s.name}</td><td className="p-3 text-right">{s.units || 0}</td><td className="p-3 text-right"><span className="text-green-600 font-semibold">${(s.amount || 0).toFixed(0)}</span></td></tr>
                   ))}</tbody></table>
               </div>
             )}
@@ -1028,12 +1062,12 @@ export default function Admin() {
                     <tr key={a.id} className="border-t hover:bg-gray-50">
                       <td className="p-4 font-mono text-xs">{a.asset_code}</td>
                       <td className="p-4 font-medium">{a.name}</td>
-                      <td className="p-4 text-gray-500">{a.battery_type}</td>
+                      <td className="p-4 text-gray-500">{(() => { const bt = batteryTypes.find(bt => bt.id === a.battery_type_id) || batteryTypes.find(bt => bt.name === a.battery_type); return bt ? (bt.name_i18n?.[i18n.language] || bt.name_i18n?.['zh-CN'] || bt.name) : a.battery_type; })()}</td>
                       <td className="p-4 text-right">{a.total_units}</td>
                       <td className="p-4 text-right text-green-600 font-semibold">{a.available_units}</td>
                       <td className="p-4 text-right font-semibold">{a.stock ?? a.available_units}</td>
                       <td className="p-4 text-right text-gray-500">{a.sold_units ?? (a.total_units - a.available_units)}</td>
-                                            <td className="p-4 text-right"><div className="font-semibold">${a.battery_type_unit_price ?? a.unit_price}</div><div className="text-xs text-gray-400">{a.unit_price_rmb != null ? `≈ ¥${a.unit_price_rmb}` : '—'}</div></td>
+                                            <td className="p-4 text-right"><div className="font-semibold">${a.battery_type_unit_price ?? a.unit_price}</div></td>
                       <td className="p-4 text-right">{a.battery_type_annualized_return != null ? `${a.battery_type_annualized_return}%` : a.expected_roi != null ? `${a.expected_roi}%` : '—'}</td>
                       <td className="p-4 text-right">{(a.battery_type_monthly_rent ?? a.monthly_rent) != null ? (() => { const dc = localeCurrency(a.battery_type_monthly_rent ?? a.monthly_rent, i18n.language); return <><div className="text-gray-700 font-semibold">{dc.primary} /月</div></>; })() : '—'}</td>
                       <td className="p-4 text-xs text-gray-600 max-w-[180px] truncate" title={a.warehouse_name || a.location || '—'}>{a.warehouse_name || a.location || '—'}</td>
@@ -1445,7 +1479,7 @@ export default function Admin() {
                       <td className="p-3 font-mono text-xs">{b.unit_code}</td>
                       <td className="p-3 font-medium">{b.asset_name}</td>
                       <td className="p-3">{b.investor_name}</td>
-                      <td className="p-3 text-center text-gray-500">{b.battery_assets?.battery_type || '-'}</td>
+                      <td className="p-3 text-center text-gray-500">{(() => { const btName = b.battery_assets?.battery_type; if (!btName) return '-'; const bt = batteryTypes.find(bt => bt.id === b.battery_assets?.battery_type_id) || batteryTypes.find(bt => bt.name === btName); return bt ? (bt.name_i18n?.[i18n.language] || bt.name_i18n?.['zh-CN'] || bt.name) : btName; })()}</td>
                       <td className="p-3 text-xs text-gray-600 max-w-[120px] truncate" title={b.site_name || b.site_code || '—'}>{b.site_name || b.site_code || '—'}</td>
                       <td className="p-3 text-center">{b.sensor_battery_level != null ? `${b.sensor_battery_level}%` : '-'}</td>
                       <td className="p-3 text-center font-mono text-xs text-gray-500">
@@ -1465,7 +1499,7 @@ export default function Admin() {
                       </td>
                       <td className="p-3 text-right">
                         {b.battery_assets?.unit_price != null ? (
-                          <><div className="font-semibold">${b.battery_assets.unit_price.toLocaleString()}</div><div className="text-xs text-gray-400">≈ ¥{Math.round(b.battery_assets.unit_price * 7.25).toLocaleString()}</div></>
+                          <><div className="font-semibold">${b.battery_assets.unit_price.toLocaleString()}</div></>
                         ) : '-'}
                       </td>
                       <td className="p-3 text-right text-gray-400">{b.created_at ? new Date(b.created_at).toLocaleDateString('zh-CN') : '-'}</td>
@@ -1516,7 +1550,7 @@ export default function Admin() {
         <h2 className="text-2xl font-bold flex items-center gap-2">
           <Users className="h-6 w-6 text-blue-600" /> 我的资产
         </h2>
-        <p className="text-gray-500 text-sm mt-1">{assetSubTab === 'workers' ? '管理派工人员的联系方式与证件信息' : '管理仓库信息与负责人配置'}</p>
+        <p className="text-gray-500 text-sm mt-1">{assetSubTab === 'workers' ? '管理派工人员的联系方式与证件信息' : assetSubTab === 'warehouses' ? '管理仓库信息与负责人配置' : '管理站点类型分类'}</p>
       </div>
       <div className="flex items-center gap-3">
         <div className="flex bg-gray-100 rounded-lg p-1">
@@ -1527,6 +1561,10 @@ export default function Admin() {
           <button onClick={() => setAssetSubTab('warehouses')}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition flex items-center gap-1 ${assetSubTab === 'warehouses' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
             <Building2 className="h-4 w-4" />仓库管理
+          </button>
+          <button onClick={() => setAssetSubTab('siteTypes')}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition flex items-center gap-1 ${assetSubTab === 'siteTypes' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
+            <LayoutList className="h-4 w-4" />站点类型
           </button>
         </div>
       </div>
@@ -1578,7 +1616,7 @@ export default function Admin() {
                         </div>
                       )}
                     </td>
-                    <td className="p-4 font-medium">{w.name}</td>
+                    <td className="p-4 font-medium">{w.name_i18n?.[i18n.language] || w.name_i18n?.['zh-CN'] || w.name}</td>
                     <td className="p-4 text-gray-600">{w.age || '-'}</td>
                     <td className="p-4 text-gray-600">{w.id_number}</td>
                     <td className="p-4">
@@ -1611,7 +1649,7 @@ export default function Admin() {
     {assetSubTab === 'warehouses' && (
       <>
         <div className="flex justify-end">
-          <button onClick={() => { setWarehouseForm({ id: '', name: '', address: '', manager_id: '' }); setIsEditingWarehouse(false); setShowWarehouseForm(true); }}
+          <button onClick={() => { setWarehouseForm({ id: '', name: '', name_i18n: { ...EMPTY_I18N }, address: '', address_i18n: { ...EMPTY_I18N }, manager_id: '' }); setSelectedWarehouseLang('zh-CN'); setIsEditingWarehouse(false); setShowWarehouseForm(true); }}
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition">
             <Plus className="h-4 w-4" />新增仓库
           </button>
@@ -1642,12 +1680,12 @@ export default function Admin() {
                 {warehouses.map(w => (
                   <tr key={w.id} className="border-t hover:bg-gray-50">
                     <td className="p-4 font-mono text-xs text-blue-600">{w.warehouse_code}</td>
-                    <td className="p-4 font-medium">{w.name}</td>
-                    <td className="p-4 text-gray-600">{w.address || '—'}</td>
+                    <td className="p-4 font-medium">{w.name_i18n?.[i18n.language] || w.name_i18n?.['zh-CN'] || w.name}</td>
+                    <td className="p-4 text-gray-600">{w.address_i18n?.[i18n.language] || w.address_i18n?.['zh-CN'] || w.address || '—'}</td>
                     <td className="p-4 text-gray-600">{w.manager_name || '—'}</td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => { setWarehouseForm({ id: w.id, warehouse_code: w.warehouse_code || '', name: w.name || '', address: w.address || '', manager_id: w.manager_id || '' }); setIsEditingWarehouse(true); setShowWarehouseForm(true); }}
+                        <button onClick={() => { { const parseI18n = (v) => { if (v && typeof v === 'object') { const f = { ...EMPTY_I18N }; for (const l of LANGUAGES) { if (v[l.code]) f[l.code] = v[l.code]; } return f; } const e = { ...EMPTY_I18N }; return e; }; const nameI18n = parseI18n(w.name_i18n); const addrI18n = parseI18n(w.address_i18n); if (!w.name_i18n && w.name) nameI18n['zh-CN'] = w.name; if (!w.address_i18n && w.address) addrI18n['zh-CN'] = w.address; setWarehouseForm({ id: w.id, warehouse_code: w.warehouse_code || '', name: w.name || '', name_i18n: nameI18n, address: w.address || '', address_i18n: addrI18n, manager_id: w.manager_id || '' }); setSelectedWarehouseLang('zh-CN'); setIsEditingWarehouse(true); setShowWarehouseForm(true); } }}
                           className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="编辑">
                           <Edit className="h-4 w-4" />
                         </button>
@@ -1770,16 +1808,20 @@ export default function Admin() {
           </div>
           <form onSubmit={async (e) => {
             e.preventDefault();
-            if (!warehouseForm.name) return;
+            const buildI18nWh = (obj) => { const r = {}; let h = false; for (const l of LANGUAGES) { if (obj && obj[l.code]?.trim()) { r[l.code] = obj[l.code].trim(); h = true; } } return h ? r : null; };
+            if (!warehouseForm.name_i18n?.['zh-CN']?.trim() && !warehouseForm.name) return;
             setWarehouseSubmitting(true);
             try {
+              const i18nName = buildI18nWh(warehouseForm.name_i18n);
+              const i18nAddr = buildI18nWh(warehouseForm.address_i18n);
               if (isEditingWarehouse) {
-                const updateData = { ...warehouseForm, manager_id: warehouseForm.manager_id || null };
+                const updateData = { ...warehouseForm, manager_id: warehouseForm.manager_id || null, name_i18n: i18nName, address_i18n: i18nAddr };
                 await adminAPI.updateWarehouse(warehouseForm.id, updateData);
               } else {
-                // 新建时不传 warehouse_code，由后端自动生成
                 const { warehouse_code, ...createData } = warehouseForm;
                 createData.manager_id = createData.manager_id || null;
+                createData.name_i18n = i18nName;
+                createData.address_i18n = i18nAddr;
                 await adminAPI.createWarehouse(createData);
               }
               setShowWarehouseForm(false);
@@ -1796,13 +1838,33 @@ export default function Admin() {
             )}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">仓库名称 *</label>
-              <input type="text" value={warehouseForm.name} onChange={e => setWarehouseForm({ ...warehouseForm, name: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 金边中央仓" />
+              <div className="flex gap-1 mb-2">
+                {LANGUAGES.map(lang => (
+                  <button type="button" key={lang.code}
+                    onClick={() => setSelectedWarehouseLang(lang.code)}
+                    className={`px-2 py-0.5 text-xs rounded-full transition ${selectedWarehouseLang === lang.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    {lang.label}
+                  </button>
+                ))}
+              </div>
+              <input type="text" value={warehouseForm.name_i18n?.[selectedWarehouseLang] || ''}
+                onChange={e => setWarehouseForm({ ...warehouseForm, name_i18n: { ...warehouseForm.name_i18n, [selectedWarehouseLang]: e.target.value } })}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`仓库名称（${LANGUAGES.find(l=>l.code===selectedWarehouseLang)?.label}）`} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">详细地址</label>
-              <input type="text" value={warehouseForm.address} onChange={e => setWarehouseForm({ ...warehouseForm, address: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 柬埔寨金边市莫尼旺大道128号" />
+              <div className="flex gap-1 mb-2">
+                {LANGUAGES.map(lang => (
+                  <button type="button" key={lang.code}
+                    onClick={() => setSelectedWarehouseLang(lang.code)}
+                    className={`px-2 py-0.5 text-xs rounded-full transition ${selectedWarehouseLang === lang.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    {lang.label}
+                  </button>
+                ))}
+              </div>
+              <input type="text" value={warehouseForm.address_i18n?.[selectedWarehouseLang] || ''}
+                onChange={e => setWarehouseForm({ ...warehouseForm, address_i18n: { ...warehouseForm.address_i18n, [selectedWarehouseLang]: e.target.value } })}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`地址（${LANGUAGES.find(l=>l.code===selectedWarehouseLang)?.label}）`} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">仓库负责人</label>
@@ -1825,6 +1887,121 @@ export default function Admin() {
             </div>
           </form>
         </div>
+      </div>
+    )}
+    {/* 站点类型 */}
+    {assetSubTab === 'siteTypes' && (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-semibold">站点类型管理</h3>
+            <p className="text-gray-500 text-sm mt-0.5">配置站点类型及多语言名称，供运营站点选择使用</p>
+          </div>
+          <button onClick={() => { setSiteTypeForm({ id: '', name: '', name_i18n: { ...EMPTY_I18N } }); setIsEditingSiteType(false); setSelectedSiteTypeLang('zh-CN'); setShowSiteTypeForm(true); }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition">
+            <Plus className="h-4 w-4" />新增类型
+          </button>
+        </div>
+        {siteTypesLoading ? (
+          <div className="bg-white rounded-xl border p-12 text-center text-gray-500"><Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />加载中...</div>
+        ) : siteTypes.length === 0 ? (
+          <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
+            <Building2 className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-lg">暂无站点类型</p>
+            <p className="text-sm mt-1">点击"新增类型"添加</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left p-4">编码名称</th>
+                  <th className="text-left p-4">显示名称</th>
+                  <th className="text-right p-4">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {siteTypes.map(st => (
+                  <tr key={st.id} className="border-t hover:bg-gray-50">
+                    <td className="p-4 font-mono text-xs">{st.name}</td>
+                    <td className="p-4">{st.name_i18n?.[i18n.language] || st.name_i18n?.['zh-CN'] || st.name}</td>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => { const parseI18nST = (v) => { if (v && typeof v === 'object') { const f = { ...EMPTY_I18N }; for (const l of LANGUAGES) { if (v[l.code]) f[l.code] = v[l.code]; } return f; } const e = { ...EMPTY_I18N }; if (!v && st.name) e['zh-CN'] = st.name; return e; }; setSiteTypeForm({ id: st.id, name: st.name, name_i18n: parseI18nST(st.name_i18n) }); setIsEditingSiteType(true); setSelectedSiteTypeLang('zh-CN'); setShowSiteTypeForm(true); }}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="编辑"><Edit className="h-4 w-4" /></button>
+                        <button onClick={async () => { if (!confirm('确定删除？')) return; await adminAPI.deleteSiteType(st.id); setSiteTypesLoading(true); adminAPI.getSiteTypes().then(stData => setSiteTypes(stData?.site_types || [])).catch(()=>{}).finally(()=>setSiteTypesLoading(false)); }}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition" title="删除"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Site Type Form Modal */}
+        {showSiteTypeForm && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
+              <div className="flex items-center justify-between px-6 py-4 border-b">
+                <h3 className="text-lg font-bold">{isEditingSiteType ? '编辑站点类型' : '新增站点类型'}</h3>
+                <button onClick={() => setShowSiteTypeForm(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!siteTypeForm.name.trim()) { alert('请输入编码名称'); return; }
+                if (!siteTypeForm.name_i18n['zh-CN']?.trim()) { alert('至少填写简体中文名称'); return; }
+                setSiteTypeSubmitting(true);
+                try {
+                  const buildI18nST = (obj) => { const r = {}; let h = false; for (const l of LANGUAGES) { if (obj[l.code]?.trim()) { r[l.code] = obj[l.code].trim(); h = true; } } return h ? r : null; };
+                  const payload = { name: siteTypeForm.name.trim(), name_i18n: buildI18nST(siteTypeForm.name_i18n) };
+                  if (isEditingSiteType) { await adminAPI.updateSiteType(siteTypeForm.id, payload); }
+                  else { await adminAPI.createSiteType(payload); }
+                  setShowSiteTypeForm(false);
+                  // 仅刷新 siteTypes，不重载 workers/warehouses
+                  setSiteTypesLoading(true);
+                  adminAPI.getSiteTypes()
+                    .then(stData => setSiteTypes(stData?.site_types || []))
+                    .catch(() => {})
+                    .finally(() => setSiteTypesLoading(false));
+                } catch (err) { alert(err.message || '操作失败'); }
+                finally { setSiteTypeSubmitting(false); }
+              }} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">编码名称 <span className="text-red-500">*</span></label>
+                  <input type="text" value={siteTypeForm.name} onChange={e => setSiteTypeForm({ ...siteTypeForm, name: e.target.value })}
+                    disabled={isEditingSiteType}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100" placeholder="如 换电站" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">显示名称 <span className="text-red-500">*</span></label>
+                  <div className="flex gap-1 mb-2">
+                    {LANGUAGES.map(lang => (
+                      <button type="button" key={lang.code}
+                        onClick={() => setSelectedSiteTypeLang(lang.code)}
+                        className={`px-2 py-0.5 text-xs rounded-full transition ${selectedSiteTypeLang === lang.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input type="text" value={siteTypeForm.name_i18n?.[selectedSiteTypeLang] || ''}
+                    onChange={e => setSiteTypeForm({ ...siteTypeForm, name_i18n: { ...siteTypeForm.name_i18n, [selectedSiteTypeLang]: e.target.value } })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`${LANGUAGES.find(l=>l.code===selectedSiteTypeLang)?.label} 名称`} />
+                </div>
+                <div className="flex justify-end gap-3 pt-3 border-t">
+                  <button type="button" onClick={() => setShowSiteTypeForm(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">取消</button>
+                  <button type="submit" disabled={siteTypeSubmitting}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-1.5">
+                    {siteTypeSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    {isEditingSiteType ? '保存修改' : '创建类型'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     )}
   </div>
@@ -2084,9 +2261,19 @@ export default function Admin() {
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 BAT-CAMB-004" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">资产名称 *</label>
-                    <input type="text" value={assetForm.name} onChange={e => setAssetForm({ ...assetForm, name: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 金边核心区电池包D" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">资产名称 <span className="text-red-500">*</span></label>
+                    <div className="flex gap-1 mb-2">
+                      {LANGUAGES.map(lang => (
+                        <button type="button" key={lang.code}
+                          onClick={() => setSelectedAssetLang(lang.code)}
+                          className={`px-2 py-0.5 text-xs rounded-full transition ${selectedAssetLang === lang.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          {lang.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="text" value={assetForm.name_i18n?.[selectedAssetLang] || ''}
+                      onChange={e => setAssetForm({ ...assetForm, name_i18n: { ...assetForm.name_i18n, [selectedAssetLang]: e.target.value } })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`资产名称（${LANGUAGES.find(l=>l.code===selectedAssetLang)?.label}）`} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">电池类型</label>
@@ -2133,9 +2320,6 @@ export default function Admin() {
                     <label className="block text-xs font-medium text-gray-600 mb-1">单价 (USD) *</label>
                     <input type="number" min="0" step="0.01" value={assetForm.unit_price_rmb} readOnly disabled
                       className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 outline-none cursor-default" placeholder="选择电池类型后自动填充" />
-                    {assetForm.unit_price_rmb && parseFloat(assetForm.unit_price_rmb) > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">≈ ¥{(parseFloat(assetForm.unit_price_rmb) * 7.25).toFixed(2)}（按当日汇率自动换算）</p>
-                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">年化收益率 (%)</label>
@@ -2164,8 +2348,18 @@ export default function Admin() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">描述</label>
-                  <textarea value={assetForm.description} onChange={e => setAssetForm({ ...assetForm, description: e.target.value })}
-                    rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" placeholder="电池资产描述（可选）" />
+                  <div className="flex gap-1 mb-2">
+                    {LANGUAGES.map(lang => (
+                      <button type="button" key={lang.code}
+                        onClick={() => setSelectedAssetLang(lang.code)}
+                        className={`px-2 py-0.5 text-xs rounded-full transition ${selectedAssetLang === lang.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea value={assetForm.description_i18n?.[selectedAssetLang] || ''}
+                    onChange={e => setAssetForm({ ...assetForm, description_i18n: { ...assetForm.description_i18n, [selectedAssetLang]: e.target.value } })}
+                    rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" placeholder={`描述（${LANGUAGES.find(l=>l.code===selectedAssetLang)?.label}）`} />
                 </div>
                 <div className="flex justify-end gap-3 pt-3 border-t">
                   <button type="button" onClick={() => setShowAssetForm(false)}

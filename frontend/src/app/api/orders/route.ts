@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20')
 
     let query = supabase.from('investor_orders')
-      .select('*, asset:asset_id(id, name, asset_code, battery_type, location, unit_price, expected_roi), store:store_id(id, name, city)', { count: 'exact' })
+      .select('*, asset:asset_id(id, name, name_i18n, asset_code, battery_type, location, unit_price, expected_roi), store:store_id(id, name, city)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
 

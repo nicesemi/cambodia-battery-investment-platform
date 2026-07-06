@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const admin = getSupabaseAdmin()
     const [{ data: assets, error }, { data: types }] = await Promise.all([
       supabase.from('battery_assets')
-        .select('id, asset_code, name, description, battery_type, total_units, available_units, unit_price, unit_price_rmb, expected_roi, location, station_id, warehouse_id, status, created_at, updated_at')
+        .select('id, asset_code, name, name_i18n, description, description_i18n, battery_type, total_units, available_units, unit_price, unit_price_rmb, expected_roi, location, station_id, warehouse_id, status, created_at, updated_at')
         .order('created_at', { ascending: false }),
       admin.from('battery_types').select('id, name, image_url, monthly_rent, unit_price').eq('is_active', true)
     ])
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     if (!user || (user.role !== 'admin' && user.role !== 'operator')) return unauthorized('Admin only')
 
     const body = await request.json()
-    const { asset_code, name, description, battery_type, total_units, unit_price, unit_price_rmb, monthly_rent, location, station_id, warehouse_id } = body
+    const { asset_code, name, name_i18n, description, description_i18n, battery_type, total_units, unit_price, unit_price_rmb, monthly_rent, location, station_id, warehouse_id } = body
 
     // 必填项：unit_price_rmb（RMB单价）或 unit_price（USD单价），二选一
     const rmbPrice = unit_price_rmb !== undefined && unit_price_rmb !== '' ? parseFloat(unit_price_rmb) : null
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     }
 
     const insertData: any = {
-      asset_code, name, description, battery_type: battery_type || '72V50Ah',
+      asset_code, name, name_i18n, description, description_i18n, battery_type: battery_type || '72V50Ah',
       total_units, available_units: total_units,
       unit_price: finalUnitPrice,
       unit_price_rmb: finalRmbPrice,

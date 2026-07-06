@@ -67,6 +67,13 @@ function computeBatteryHealth(soc, temp, cycles) {
   return { status: 'normal', color: '#10B981' };
 }
 
+
+function resolveI18n(obj, i18nKey, fallback, i18n) {
+  const i18nData = obj?.[i18nKey];
+  if (!i18nData || typeof i18nData !== 'object') return fallback;
+  return i18nData[i18n.language] || i18nData['zh-CN'] || fallback;
+}
+
 export default function Invest() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -211,29 +218,67 @@ export default function Invest() {
   const [sellSuccess, setSellSuccess] = useState(false);
   const [tradeLoading, setTradeLoading] = useState(true);
 
+const getTxRemark = (tx, t, i18n) => {
+  // 优先使用 DB 中的 remark_i18n（多语言），其次 remark（纯文本），否则基于 type 做 i18n
+  if (tx.remark_i18n) return resolveI18n(tx, 'remark_i18n', tx.remark, i18n);
+  if (tx.remark) return tx.remark;
+  const typeMap = {
+    deposit: t('wallet.typeDeposit'),
+    withdraw: t('wallet.typeWithdraw'),
+    dividend: t('wallet.typeDividend'),
+    trade: t('wallet.typeTrade'),
+    fee: t('wallet.typeFee'),
+  };
+  return typeMap[tx.type] || tx.typeLabel || '—';
+};
+
+const getPenaltyTierDisplay = (tier, t) => {
+  const tierMap = {
+    '12个月内（罚60%）': t('trade.penaltyTier.tier1'),
+    '13-24个月（罚40%）': t('trade.penaltyTier.tier2'),
+    '25-36个月（罚20%）': t('trade.penaltyTier.tier3'),
+    '36个月以上（不罚）': t('trade.penaltyTier.tier4'),
+  };
+  return tierMap[tier] || tier;
+};
+
+
 
   const products = batteryTypes.length > 0 ? batteryTypes : BATTERY_PRODUCTS;
 
+  const getBatteryTypeDisplay = (batteryType) => {
+    if (!batteryType) return '—';
+    const bt = batteryTypes.find(b => (b.id && b.id === batteryType) || b.name === batteryType || b.id === batteryType);
+    if (bt) return bt.resolved_name || bt.name_i18n?.[i18n.language] || bt.name_i18n?.['zh-CN'] || batteryType;
+    return batteryType;
+  };
+
   useEffect(() => {
-    fetch('/api/battery-types')
+    fetch(`/api/battery-types?locale=${i18n.language}`)
       .then(r => r.json())
       .then(data => {
         if (data.battery_types) {
           const mapped = data.battery_types.map(bt => {
             const price = (typeof bt.unit_price === 'string' ? parseFloat(bt.unit_price) : bt.unit_price) || 0;
             const rent = (typeof bt.monthly_rent === 'string' ? parseFloat(bt.monthly_rent) : bt.monthly_rent) || 0;
+            // 使用 API 解析后的多语言值
+            const displayName = bt.resolved_name || bt.name_i18n?.[i18n.language] || bt.name_i18n?.['zh-CN'] || bt.name;
+            const displayScenario = bt.resolved_scenario || bt.scenario_i18n?.[i18n.language] || bt.scenario_i18n?.['zh-CN'] || bt.scenario || '';
             let category = 'swap';
-            const nameLower = (bt.name || '').toLowerCase();
+            const nameLower = (displayName || '').toLowerCase();
             if (nameLower.includes('集装箱') || nameLower.includes('container')) category = 'container';
             else if (nameLower.includes('工商业') || nameLower.includes('ess') || nameLower.includes('储能柜') || nameLower.includes('液冷柜') || nameLower.includes('风冷柜')) category = 'ess';
             else if (nameLower.includes('物流') || nameLower.includes('中巴') || nameLower.includes('大巴') || nameLower.includes('客车') || nameLower.includes('货车')) category = 'vehicle';
             return {
               id: bt.name,
               name: bt.name,
+              name_i18n: bt.name_i18n,
+              displayName: displayName,
               price: price,
               monthlyRent: rent,
               category: category,
               scene: bt.scenario || '',
+              displayScene: displayScenario,
               voltage: bt.voltage || '',
               capacity: bt.capacity || '',
               energy: bt.power_kwh || '',
@@ -244,7 +289,7 @@ export default function Invest() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [i18n.language]);
 
   const getInvestCalcResult = () => {
     const investorRate = 0.70;
@@ -259,7 +304,7 @@ export default function Invest() {
       const rent = (battery.monthlyRent || 0) * count;
       totalInvestment += invest;
       totalMonthlyRent += rent;
-      details.push({ id: battery.id, name: battery.name, count, unitPrice: battery.price, invest, monthlyRent: battery.monthlyRent, totalRent: rent });
+      details.push({ id: battery.id, name: battery.name, displayName: battery.displayName || battery.name, count, unitPrice: battery.price, invest, monthlyRent: battery.monthlyRent, totalRent: rent });
     }
 
     if (details.length === 0) return null;
@@ -282,6 +327,10 @@ export default function Invest() {
     if (activeTab === 'dividends') loadDividends();
     if (activeTab === 'wallet') loadWallet();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (user) loadData();
+  }, [i18n.language]);
 
   const loadData = async () => {
     // 静态电池数据fallback（当后端API不可用时使用）
@@ -307,7 +356,7 @@ export default function Invest() {
 
     try {
       const [assetsRes, userAssetsRes, ordersRes, bindingRes] = await Promise.all([
-        assetAPI.getAssets(),
+        assetAPI.getAssets(i18n.language),
         assetAPI.getUserAssets(),
         orderAPI.getMyOrders(1, 50),
         orderAPI.getMyBinding().catch(() => null),
@@ -640,14 +689,14 @@ export default function Invest() {
                     ) : (
                       <Battery className="h-16 w-16 text-blue-300" />
                     )}
-                    <span className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium bg-white/80 text-blue-700">{asset.battery_type}</span>
+                    <span className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium bg-white/80 text-blue-700">{asset.resolved_battery_type || getBatteryTypeDisplay(asset.battery_type)}</span>
                   </div>
                   <div className="p-5">
-                    <h3 className="font-bold text-lg text-gray-900">{asset.name}</h3>
+                    <h3 className="font-bold text-lg text-gray-900">{asset.resolved_name || asset.name}</h3>
                     <p className="flex items-center text-sm text-gray-500 mt-1">
-                      <MapPin className="h-3 w-3 mr-1" />{asset.location} · {asset.asset_code}
+                      <MapPin className="h-3 w-3 mr-1" />{resolveI18n(asset, 'location_i18n', asset.location, i18n)} · {asset.asset_code}
                     </p>
-                    <p className="text-sm text-gray-600 mt-3 line-clamp-2">{asset.description}</p>
+                    <p className="text-sm text-gray-600 mt-3 line-clamp-2">{asset.resolved_description || asset.description}</p>
                     <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t text-sm">
                       <div><div className="text-gray-400">{t('invest.browse.unitPrice')}</div><div className="font-bold text-gray-900">{formatCurrency(asset.unit_price, i18n.language)}</div></div>
                       {asset.monthly_rent != null && <div><div className="text-gray-400">{t('invest.browse.monthlyRent')}</div><div className="font-bold text-gray-900">{formatCurrency(asset.monthly_rent, i18n.language)}{' '}<span className="text-xs text-gray-400">{t('invest.calculator.perMonth')}</span></div></div>}
@@ -692,14 +741,14 @@ export default function Invest() {
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="font-bold text-lg text-gray-900">{ua.name}</h3>
-                          <p className="text-sm text-gray-500">{ua.asset_code} · {ua.battery_type} · {ua.location}</p>
+                          <h3 className="font-bold text-lg text-gray-900">{resolveI18n(ua, 'name_i18n', ua.name, i18n)}</h3>
+                          <p className="text-sm text-gray-500">{ua.asset_code} · {ua.resolved_battery_type || getBatteryTypeDisplay(ua.battery_type)} · {resolveI18n(ua, 'location_i18n', ua.location, i18n)}</p>
                         </div>
                         <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">{t('invest.portfolio.holding')}</span>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                         <div className="bg-gray-50 rounded-lg p-3 text-center">
-                          <div className="text-xs text-gray-400">{t('invest.portfolio.holdingUnits')}</div>
+                          <div className="text-xs text-gray-400">{t('invest.portfolio.holdingUnits', { count: ua.units })}</div>
                           <div className="font-bold text-lg">{ua.units}</div>
                         </div>
                         <div className="bg-gray-50 rounded-lg p-3 text-center">
@@ -741,7 +790,7 @@ export default function Invest() {
                               {ua.battery_units.map((bu, idx) => (
                                 <tr key={bu.holding_id || idx} className="border-t hover:bg-gray-50/50">
                                   <td className="p-3 font-mono font-medium text-blue-700">{bu.unit_code}</td>
-                                  <td className="p-3 text-gray-600">{bu.site_name || bu.site_id || '—'}</td>
+                                  <td className="p-3 text-gray-600">{resolveI18n(bu, 'name_i18n', bu.site_name, i18n) || bu.site_id || '—'}</td>
                                   <td className="p-3 text-center">
                                     <span className={`font-medium ${(bu.sensor_battery_level ?? 100) > 50 ? 'text-green-600' : (bu.sensor_battery_level ?? 100) > 20 ? 'text-yellow-600' : 'text-red-600'}`}>
                                       {bu.sensor_battery_level ?? '—'}{bu.sensor_battery_level != null ? '%' : ''}
@@ -817,8 +866,8 @@ export default function Invest() {
                           return (
                             <tr key={bu.id || idx} className="border-t hover:bg-gray-50/50">
                               <td className="p-3 font-mono font-medium text-blue-700">{bu.unit_code}</td>
-                              <td className="p-3 text-gray-600">{bu.battery_type || '—'}</td>
-                              <td className="p-3 text-gray-600">{bu.site_name || bu.site_id || '—'}</td>
+                              <td className="p-3 text-gray-600">{getBatteryTypeDisplay(bu.battery_type) || '—'}</td>
+                              <td className="p-3 text-gray-600">{resolveI18n(bu, 'name_i18n', bu.site_name, i18n) || bu.site_id || '—'}</td>
                               <td className="p-3 text-center">
                                 <span className={`font-medium ${soc != null && soc > 50 ? 'text-green-600' : soc != null && soc > 20 ? 'text-yellow-600' : 'text-red-600'}`}>
                                   {soc != null ? `${soc}%` : '—'}
@@ -872,7 +921,7 @@ export default function Invest() {
                   {products.filter(p => p.category === 'swap').map(battery => (
                     <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
+                        <div className="text-sm font-semibold text-gray-900 truncate">{battery.displayName || battery.name}</div>
                         <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatCurrency(battery.monthlyRent, i18n.language)}</div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -886,7 +935,7 @@ export default function Invest() {
                   {products.filter(p => p.category === 'vehicle').map(battery => (
                     <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
+                        <div className="text-sm font-semibold text-gray-900 truncate">{battery.displayName || battery.name}</div>
                         <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatCurrency(battery.monthlyRent, i18n.language)}</div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -900,7 +949,7 @@ export default function Invest() {
                   {products.filter(p => p.category === 'ess').map(battery => (
                     <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
+                        <div className="text-sm font-semibold text-gray-900 truncate">{battery.displayName || battery.name}</div>
                         <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatCurrency(battery.monthlyRent, i18n.language)}</div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -914,7 +963,7 @@ export default function Invest() {
                   {products.filter(p => p.category === 'container').map(battery => (
                     <div key={battery.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-blue-50 transition-colors">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 truncate">{battery.name}</div>
+                        <div className="text-sm font-semibold text-gray-900 truncate">{battery.displayName || battery.name}</div>
                         <div className="text-xs text-gray-500 mt-0.5">{battery.energy} · {battery.voltage} · {formatCurrency(battery.price, i18n.language)}{t('invest.calculator.perUnit')} · {t('invest.calculator.monthlyRentLabel')}{formatCurrency(battery.monthlyRent, i18n.language)}</div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -950,7 +999,7 @@ export default function Invest() {
                         <h3 className="font-bold">{t('invest.calculator.details')}</h3>
                         <div className="text-xs text-gray-500 space-y-1 mb-3">
                           <p className="font-semibold text-gray-700 text-sm mb-2">{t('invest.calculator.deployList')}</p>
-                          {r.details.map(d => (<div key={d.id} className="flex justify-between"><span>{d.name} × {d.count}</span><span className="text-gray-700">{formatCurrency(d.invest, i18n.language)}</span></div>))}
+                          {r.details.map(d => (<div key={d.id} className="flex justify-between"><span>{d.displayName || d.name} × {d.count}</span><span className="text-gray-700">{formatCurrency(d.invest, i18n.language)}</span></div>))}
                         </div>
                         <hr className="border-gray-100" />
                         {[{ label: t('invest.calculator.totalInvestment'), value: formatCurrency(r.totalInvestment, i18n.language), bold: true }, { label: t('invest.calculator.totalMonthlyRent'), value: formatCurrency(r.totalMonthlyRent, i18n.language) }].map((item, i) => (
@@ -1015,7 +1064,7 @@ export default function Invest() {
                     return (
                       <button onClick={handleSellToPlatform} disabled={selling}
                         className="mt-4 w-full py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50">
-                        {selling ? t('trade.processing') : `${t('trade.sellBtn')} ${selectedUnitIds.length} ${t('trade.unitsToPlatform')} — ${t('trade.total')} ${formatCurrency(totalBuyback, i18n.language)} $`}
+                        {selling ? t('trade.processing') : `${t('trade.sellBtn')} ${selectedUnitIds.length} ${t('trade.unitsToPlatform')} — ${t('trade.total')} ${formatCurrency(totalBuyback, i18n.language)}`}
                       </button>
                     );
                   })()}
@@ -1039,7 +1088,7 @@ export default function Invest() {
                               <div className="bg-gray-50 px-4 py-2 flex items-center justify-between text-xs text-gray-500">
                                 <span className="font-medium text-gray-700">{unit?.unit_code || selectedUnitIds[i]?.slice(0, 10)}</span>
                                 <span className={`px-2 py-0.5 rounded-full font-medium ${p.penaltyRate > 30 ? 'bg-red-100 text-red-700' : p.penaltyRate > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
-                                  {p.tier}
+                                  {getPenaltyTierDisplay(p.tier, t)}
                                 </span>
                               </div>
                               <div className="p-3 space-y-1.5 text-sm">
@@ -1098,7 +1147,7 @@ export default function Invest() {
                   <tbody>
                     {orders.map(o => (
                       <tr key={o.id} className="border-t hover:bg-gray-50">
-                        <td className="p-4"><div className="font-medium">{o.asset?.name || '-'}</div><div className="text-xs text-gray-400">{o.asset?.asset_code}</div></td>
+                        <td className="p-4"><div className="font-medium">{resolveI18n(o.asset, 'name_i18n', o.asset?.name, i18n) || '-'}</div><div className="text-xs text-gray-400">{o.asset?.asset_code}</div></td>
                         <td className="p-4 text-center">{o.units}</td>
                         <td className="p-4 text-right">{formatCurrency(o.unit_price || 0, i18n.language)}</td>
                         <td className="p-4 text-right font-semibold">{formatCurrency(o.total_amount || 0, i18n.language)}</td>
@@ -1167,7 +1216,7 @@ export default function Invest() {
                           {batteryDetails.map((bd, idx) => (
                             <tr key={bd.unit_code || idx} className="border-t hover:bg-gray-50">
                               <td className="p-4 font-mono text-blue-700">{bd.unit_code}</td>
-                              <td className="p-4">{bd.asset_name}</td>
+                              <td className="p-4">{resolveI18n(bd, 'name_i18n', bd.asset_name, i18n)}</td>
                               <td className="p-4 text-gray-500">{bd.rent_start ? formatDate(bd.rent_start, i18n.language) : '-'}</td>
                               <td className="p-4 text-right">{formatCurrency(bd.monthly_rent || 0, i18n.language)}</td>
                               <td className="p-4 text-right font-semibold text-green-600">{formatCurrency(bd.this_month_dividend || 0, i18n.language)}</td>
@@ -1249,7 +1298,7 @@ export default function Invest() {
                             }`}>
                               {tx.type === 'withdraw' || tx.type === 'fee' ? '-' : '+'}{formatCurrency(tx.amount || 0, i18n.language)}
                             </td>
-                            <td className="p-4 text-right text-gray-500 max-w-xs truncate">{tx.remark || tx.typeLabel || '—'}</td>
+                            <td className="p-4 text-right text-gray-500 max-w-xs truncate">{getTxRemark(tx, t, i18n)}</td>
                             <td className="p-4 text-right text-gray-400">{tx.createdAt ? formatDate(tx.createdAt, i18n.language) : '—'}</td>
                           </tr>
                         ))}
@@ -1270,7 +1319,7 @@ export default function Invest() {
             <h3 className="text-xl font-bold mb-4">{t('invest.purchase.title')}</h3>
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
               <div className="font-semibold">{selectedAsset.name}</div>
-              <div className="text-sm text-gray-600">{t('invest.common.type')}: {selectedAsset.battery_type} · {t('invest.common.unitPrice')}: {formatCurrency(selectedAsset.unit_price || 0, i18n.language)}<span className="text-xs text-gray-400 ml-1"></span></div>
+              <div className="text-sm text-gray-600">{t('invest.common.type')}: {getBatteryTypeDisplay(selectedAsset.battery_type)} · {t('invest.common.unitPrice')}: {formatCurrency(selectedAsset.unit_price || 0, i18n.language)}<span className="text-xs text-gray-400 ml-1"></span></div>
               <div className="text-sm text-green-600">{t('invest.browse.annualReturn')}: {selectedAsset.expected_roi}%</div>
             </div>
             <div className="mb-4">

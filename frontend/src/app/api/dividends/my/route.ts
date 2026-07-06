@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const period = searchParams.get('period')
 
     let query = supabase.from('dividend_records')
-      .select('*, battery_assets!inner(name, asset_code)')
+      .select('*, battery_assets!inner(name, name_i18n, asset_code)')
       .eq('user_id', user.id)
       .order('calculated_at', { ascending: false })
 
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     if (error) return serverError(error.message)
 
     const formatted = dividends?.map((d: any) => ({
-      ...d, asset_name: d.battery_assets?.name, asset_code: d.battery_assets?.asset_code, battery_assets: undefined
+      ...d, asset_name: d.battery_assets?.name, asset_name_i18n: d.battery_assets?.name_i18n, asset_code: d.battery_assets?.asset_code, battery_assets: undefined
     }))
 
     // Summary
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
         battery_units!inner(
           unit_code,
           status,
-          battery_assets!inner(name, asset_code, unit_price, expected_roi, battery_type_id)
+          battery_assets!inner(name, name_i18n, asset_code, unit_price, expected_roi, battery_type_id)
         )
       `)
       .eq('investor_id', user.id)
@@ -117,6 +117,7 @@ export async function GET(request: Request) {
       return {
         unit_code: bu?.unit_code,
         asset_name: asset?.name,
+        name_i18n: asset?.name_i18n,
         asset_code: asset?.asset_code,
         monthly_rent: Math.round(monthly_rent * 100) / 100,
         this_month_dividend: Math.round(this_month_dividend * 100) / 100,

@@ -215,7 +215,7 @@ export async function GET(_request: Request) {
       // 1d. 全部运营站点（用于四分类 Tab：换电站/运营线路/移动储能柜/固定储能柜）
       supabase
         .from('operation_sites')
-        .select('id, name, site_code, site_type, latitude, longitude, city, country, cabinet_slots, battery_count'),
+        .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n, cabinet_slots, battery_count'),
     ])
 
     const { data: unitsRaw, error: unitsError } = assignedResult
@@ -272,7 +272,7 @@ export async function GET(_request: Request) {
       assignedSiteIds.length > 0
         ? supabase
             .from('operation_sites')
-            .select('id, name, site_code, site_type, latitude, longitude, city, country')
+            .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n')
             .in('id', assignedSiteIds)
         : Promise.resolve({ data: [], error: null }),
 
@@ -280,7 +280,7 @@ export async function GET(_request: Request) {
       soldSiteNames.length > 0
         ? supabase
             .from('operation_sites')
-            .select('id, name, site_code, site_type, latitude, longitude, city, country')
+            .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n')
             .in('name', soldSiteNames)
         : Promise.resolve({ data: [], error: null }),
 
@@ -538,12 +538,15 @@ export async function GET(_request: Request) {
           siteGroups[siteKey] = {
             site_id: resolvedSiteId,
             site_name: site.name || '',
+            name_i18n: site.name_i18n || null,
             site_code: site.site_code || '',
             site_type: site.site_type || '',
             latitude: site.latitude || null,
             longitude: site.longitude || null,
             city: site.city || '',
+            city_i18n: site.city_i18n || null,
             country: site.country || '',
+            country_i18n: site.country_i18n || null,
             battery_count: 0,
             real_battery_count: (resolvedSiteId != null ? cabSiteMap[resolvedSiteId]?.battery_count : null) ?? 0,
             units: [] as any[],
@@ -583,12 +586,15 @@ export async function GET(_request: Request) {
           siteGroups[key] = {
             site_id: cs.id,
             site_name: cs.name || '',
+            name_i18n: cs.name_i18n || null,
             site_code: cs.site_code || '',
             site_type: cs.site_type || '',
             latitude: cs.latitude || null,
             longitude: cs.longitude || null,
             city: cs.city || '',
+            city_i18n: cs.city_i18n || null,
             country: cs.country || '',
+            country_i18n: cs.country_i18n || null,
             battery_count: 0,
             real_battery_count: cs.battery_count ?? 0,
             units: [],

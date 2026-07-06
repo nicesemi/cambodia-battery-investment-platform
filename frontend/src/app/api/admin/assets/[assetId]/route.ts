@@ -13,13 +13,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ asse
     if (!assetId || assetId === 'undefined') return badRequest('Invalid asset ID')
 
     const body = await request.json()
-    const { name, description, battery_type, total_units, unit_price, unit_price_rmb, location, station_id, warehouse_id, status } = body
+    const { name, name_i18n, description, description_i18n, battery_type, total_units, unit_price, unit_price_rmb, location, station_id, warehouse_id, status } = body
 
     const admin = getSupabaseAdmin()
 
     const updates: any = {}
     if (name !== undefined) updates.name = name
+    if (name_i18n !== undefined) updates.name_i18n = name_i18n
     if (description !== undefined) updates.description = description
+    if (description_i18n !== undefined) updates.description_i18n = description_i18n
     if (battery_type !== undefined) updates.battery_type = battery_type
 
     // RMB 单价优先：若传了 unit_price_rmb，根据汇率换算 USD

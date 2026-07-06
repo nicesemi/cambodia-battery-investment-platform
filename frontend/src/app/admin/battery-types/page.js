@@ -1,15 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../contexts/AuthContext';
 import { adminAPI } from '../../../services/api';
 import { useRouter } from 'next/navigation';
 import { Battery, Plus, Edit, Trash2, Loader2, ArrowLeft, Zap, AlertCircle, Upload, X } from 'lucide-react';
 import { formatCurrency, localeCurrency, fetchRates } from '../../../lib/currency';
 
+const LANGUAGES = [
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'en', label: 'English' },
+  { code: 'bn', label: 'বাংলা' },
+  { code: 'km', label: 'ខ្មែរ' },
+];
+
+const EMPTY_I18N = { 'zh-CN': '', 'zh-TW': '', 'en': '', 'bn': '', 'km': '' };
+
 const DEFAULT_FORM = {
-  name: '', voltage: '', capacity: '', chemistry: '', description: '',
-  scenario: '', dimensions: '', net_weight: '', power_kwh: '', unit_price: '',
+  name: '', name_i18n: { ...EMPTY_I18N },
+  voltage: '', capacity: '', chemistry: '',
+  description: '', description_i18n: { ...EMPTY_I18N },
+  scenario: '', scenario_i18n: { ...EMPTY_I18N },
+  dimensions: '', net_weight: '', power_kwh: '', unit_price: '',
   monthly_rent: '',
   image_url: '', thumbnail_url: '', is_active: true, sort_order: 0
 };
@@ -32,6 +46,7 @@ export default function BatteryTypesPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(DEFAULT_FORM);
+  const [selectedLang, setSelectedLang] = useState('zh-CN');
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [uploadFile, setUploadFile] = useState(null);
@@ -53,13 +68,36 @@ export default function BatteryTypesPage() {
     finally { setLoading(false); }
   };
 
-  const openAddForm = () => { setIsEditing(false); setEditingId(null); setForm(DEFAULT_FORM); setUploadFile(null); setUploadPreview(''); setShowForm(true); };
+  const openAddForm = () => { setIsEditing(false); setEditingId(null); setForm(DEFAULT_FORM); setSelectedLang('zh-CN'); setUploadFile(null); setUploadPreview(''); setShowForm(true); };
   const openEditForm = (t) => {
     setIsEditing(true); setEditingId(t.id);
+    setSelectedLang('zh-CN');
+    // 从 name_i18n / description_i18n / scenario_i18n 解析多语言值
+    const parseI18n = (i18nVal) => {
+      if (i18nVal && typeof i18nVal === 'object') {
+        const filled = { ...EMPTY_I18N };
+        for (const lang of LANGUAGES) {
+          if (i18nVal[lang.code]) filled[lang.code] = i18nVal[lang.code];
+        }
+        return filled;
+      }
+      return { ...EMPTY_I18N };
+    };
+    const nameI18n = parseI18n(t.name_i18n);
+    const descI18n = parseI18n(t.description_i18n);
+    const scenarioI18n = parseI18n(t.scenario_i18n);
+    // 如果无 i18n 数据但 name 字段有值，回填到 zh-CN
+    if (!t.name_i18n && t.name) nameI18n['zh-CN'] = t.name;
+    if (!t.description_i18n && t.description) descI18n['zh-CN'] = t.description;
+    if (!t.scenario_i18n && t.scenario) scenarioI18n['zh-CN'] = t.scenario;
+
     setForm({
-      name: t.name || '', voltage: t.voltage || '', capacity: t.capacity || '',
-      chemistry: t.chemistry || '', description: t.description || '',
-      scenario: t.scenario || '', dimensions: t.dimensions || '',
+      name: t.name || '', name_i18n: nameI18n,
+      voltage: t.voltage || '', capacity: t.capacity || '',
+      chemistry: t.chemistry || '',
+      description: t.description || '', description_i18n: descI18n,
+      scenario: t.scenario || '', scenario_i18n: scenarioI18n,
+      dimensions: t.dimensions || '',
       net_weight: t.net_weight || '', power_kwh: t.power_kwh || '', unit_price: t.unit_price || '',
       monthly_rent: t.monthly_rent != null ? String(t.monthly_rent) : '',
       image_url: t.image_url || '', thumbnail_url: t.thumbnail_url || '',
@@ -87,7 +125,7 @@ export default function BatteryTypesPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) { alert('请输入电池类型名称'); return; }
+    if (!form.name_i18n['zh-CN']?.trim() && !form.name.trim()) { alert('请输入电池类型名称（至少简体中文）'); return; }
     setSubmitting(true);
     try {
       let imageUrl = form.image_url;
@@ -111,7 +149,25 @@ export default function BatteryTypesPage() {
         thumbnailUrl = thumbnail_url || '';
         setUploading(false);
       }
-      const payload = { ...form, image_url: imageUrl, thumbnail_url: thumbnailUrl };
+      // 构建 i18n 字段，仅保留有值的语种
+      const buildI18n = (i18nObj) => {
+        const result = {};
+        let hasValue = false;
+        for (const lang of LANGUAGES) {
+          if (i18nObj[lang.code]?.trim()) {
+            result[lang.code] = i18nObj[lang.code].trim();
+            hasValue = true;
+          }
+        }
+        return hasValue ? result : null;
+      };
+      const payload = {
+        ...form,
+        name_i18n: buildI18n(form.name_i18n),
+        description_i18n: buildI18n(form.description_i18n),
+        scenario_i18n: buildI18n(form.scenario_i18n),
+        image_url: imageUrl, thumbnail_url: thumbnailUrl
+      };
       if (isEditing) { await adminAPI.updateBatteryType(editingId, payload); }
       else { await adminAPI.createBatteryType(payload); }
       setShowForm(false);
@@ -182,13 +238,13 @@ export default function BatteryTypesPage() {
                     <td className="p-3">
                       <div className="flex items-center gap-1.5">
                         <Zap className="h-3 w-3 text-amber-500 flex-shrink-0" />
-                        <span className="font-medium text-gray-900 text-xs">{t.name}</span>
+                        <span className="font-medium text-gray-900 text-xs">{t.name_i18n?.[i18n.language] || t.name_i18n?.['zh-CN'] || t.name}</span>
                       </div>
                     </td>
                     <td className="p-3 text-gray-600 text-xs">{t.voltage || '—'}</td>
                     <td className="p-3 text-gray-600 text-xs">{t.capacity || '—'}</td>
                     <td className="p-3 text-gray-600 text-xs">{t.power_kwh || '—'}</td>
-                    <td className="p-3 text-gray-500 text-xs max-w-[160px] truncate" title={t.scenario}>{t.scenario || '—'}</td>
+                    <td className="p-3 text-gray-500 text-xs max-w-[160px] truncate" title={t.scenario_i18n?.[i18n.language] || t.scenario_i18n?.['zh-CN'] || t.scenario}>{t.scenario_i18n?.[i18n.language] || t.scenario_i18n?.['zh-CN'] || t.scenario || '—'}</td>
                     <td className="p-3 text-gray-500 text-xs font-mono">{t.dimensions || '—'}</td>
                     <td className="p-3 text-gray-600 text-xs">{t.net_weight || '—'}</td>
                     <td className="p-3 text-right text-gray-900 font-medium text-xs">{t.unit_price ? (() => { const dc = localeCurrency(Number(t.unit_price), i18n.language); return <><div className="font-semibold">{dc.primary}</div></>; })() : '—'}</td>
@@ -224,9 +280,18 @@ export default function BatteryTypesPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="col-span-3">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">产品型号 *</label>
-                    <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 7250 高速电摩换电" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">产品型号 * ({LANGUAGES.find(l => l.code === selectedLang)?.label})</label>
+                    <div className="flex gap-1 mb-2">
+                      {LANGUAGES.map(lang => (
+                        <button key={lang.code} type="button"
+                          onClick={() => setSelectedLang(lang.code)}
+                          className={`px-2.5 py-1 text-xs rounded-md transition ${selectedLang === lang.code ? 'bg-blue-600 text-white font-medium' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          {lang.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="text" value={form.name_i18n[selectedLang]} onChange={e => setForm({ ...form, name_i18n: { ...form.name_i18n, [selectedLang]: e.target.value } })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`${LANGUAGES.find(l => l.code === selectedLang)?.label} — 如 7250 高速电摩换电`} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">标称电压</label>
@@ -312,14 +377,14 @@ export default function BatteryTypesPage() {
                     )}
                   </div>
                   <div className="col-span-3">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">适用场景</label>
-                    <input type="text" value={form.scenario} onChange={e => setForm({ ...form, scenario: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 单块：72V两轮电摩、山区爬坡" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">适用场景 ({LANGUAGES.find(l => l.code === selectedLang)?.label})</label>
+                    <input type="text" value={form.scenario_i18n[selectedLang]} onChange={e => setForm({ ...form, scenario_i18n: { ...form.scenario_i18n, [selectedLang]: e.target.value } })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`${LANGUAGES.find(l => l.code === selectedLang)?.label} — 如 单块：72V两轮电摩、山区爬坡`} />
                   </div>
                   <div className="col-span-3">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">描述</label>
-                    <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-                      rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" placeholder="补充说明（可选）" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">描述 ({LANGUAGES.find(l => l.code === selectedLang)?.label})</label>
+                    <textarea value={form.description_i18n[selectedLang]} onChange={e => setForm({ ...form, description_i18n: { ...form.description_i18n, [selectedLang]: e.target.value } })}
+                      rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" placeholder={`${LANGUAGES.find(l => l.code === selectedLang)?.label} — 补充说明（可选）`} />
                   </div>
                   <div className="col-span-3">
                     <label className="flex items-center gap-2 cursor-pointer">

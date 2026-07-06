@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     const status = searchParams.get('status')
 
     let query = supabase.from('trade_orders')
-      .select('*, battery_assets!inner(name, asset_code)')
+      .select('*, battery_assets!inner(name, name_i18n, asset_code)')
       .eq('user_id', user.id)
       .order('order_time', { ascending: false })
 
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
     const { data: orders, error } = await query
     if (error) return serverError(error.message)
 
-    const formatted = orders?.map((o: any) => ({ ...o, asset_name: o.battery_assets?.name, asset_code: o.battery_assets?.asset_code, battery_assets: undefined }))
+    const formatted = orders?.map((o: any) => ({ ...o, asset_name: o.battery_assets?.name, asset_name_i18n: o.battery_assets?.name_i18n, asset_code: o.battery_assets?.asset_code, battery_assets: undefined }))
     return ok({ orders: formatted })
   } catch (e: any) {
     return serverError()

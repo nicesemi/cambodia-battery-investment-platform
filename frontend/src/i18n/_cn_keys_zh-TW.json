@@ -747,7 +747,7 @@
   "invest.calculator.investIncome": "投資者月收益",
   "invest.calculator.investorDetails": "投資者收益明細",
   "invest.calculator.investorMonthlyEarnings": "投資者月收益 ({{pct}}%)",
-  "invest.calculator.investorShare": "投資者占 {{share}}%",
+  "invest.calculator.investorShare": "投資者佔 {{pct}}%",
   "invest.calculator.monthlyRentLabel": "月租",
   "invest.calculator.months": "個月",
   "invest.calculator.paybackPeriod": "回本週期",

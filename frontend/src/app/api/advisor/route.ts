@@ -44,7 +44,7 @@ async function querySupabase(question: string) {
     const { count: available } = await sb.from('battery_assets').select('*', { count: 'exact', head: true }).eq('status', 'available')
     const { count: inUse } = await sb.from('battery_assets').select('*', { count: 'exact', head: true }).eq('status', 'in_use')
     const { count: totalUnits } = await sb.from('battery_units').select('*', { count: 'exact', head: true })
-    const { data: types } = await sb.from('battery_types').select('name,capacity_wh,max_daily_orders').limit(100)
+    const { data: types } = await sb.from('battery_types').select('name,name_i18n,capacity_wh,max_daily_orders').limit(100)
     data = { totalAssets, available, inUse, totalUnits, types }
     intentLabel = '电池'
   } else if (isTrade) {

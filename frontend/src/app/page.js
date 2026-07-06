@@ -7,6 +7,7 @@ import { Battery, Zap, Globe, Shield, TrendingUp, Users, MapPin, ArrowRight, Che
 import { isLoggedIn } from '@/lib/api';
 import { storesAPI, batteryTypesAPI } from '@/services/api';
 import { formatDate, formatTime } from '@/lib/date-format';
+import i18n from '@/i18n';
 
 // ─── 门店坐标硬编码 ──────────────────────────────────
 const STORE_COORDS = {
@@ -19,16 +20,34 @@ const STORE_COORDS = {
 // ─── 高德地图加载（单例） ──────────────────────────────
 let _amapLoading = false;
 let _amapResolvers = [];
-function useAmap() {
+let _amapScriptEl = null;
+
+function getAmapLang(i18nLang) {
+  const map = { 'zh-CN': 'zh_cn', 'en': 'en', 'zh-TW': 'zh_tw' };
+  return map[i18nLang] || 'en';
+}
+
+function useAmap(language) {
   const [loaded, setLoaded] = useState(typeof window !== 'undefined' && !!window.AMap);
+  const amapLang = getAmapLang(language);
   useEffect(() => {
     if (typeof window === 'undefined' || !process.env.NEXT_PUBLIC_AMAP_KEY) return;
+    // 语言切换时重新加载地图
+    if (_amapScriptEl && _amapScriptEl.dataset.lang !== amapLang) {
+      _amapScriptEl.remove();
+      _amapScriptEl = null;
+      _amapLoading = false;
+      _amapResolvers = [];
+      delete window.AMap;
+      setLoaded(false);
+    }
     if (window.AMap) { setLoaded(true); return; }
     _amapResolvers.push(setLoaded);
     if (!_amapLoading) {
       _amapLoading = true;
       const script = document.createElement('script');
-      script.src = `https://webapi.amap.com/maps?v=2.0&key=${process.env.NEXT_PUBLIC_AMAP_KEY}`;
+      script.dataset.lang = amapLang;
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${process.env.NEXT_PUBLIC_AMAP_KEY}&language=${amapLang}`;
       script.onload = () => {
         _amapResolvers.forEach((resolve) => resolve(true));
         _amapResolvers = [];
@@ -39,11 +58,12 @@ function useAmap() {
         _amapLoading = false;
       };
       document.head.appendChild(script);
+      _amapScriptEl = script;
     }
     return () => {
       _amapResolvers = _amapResolvers.filter((r) => r !== setLoaded);
     };
-  }, []);
+  }, [amapLang]);
   return loaded;
 }
 
@@ -118,6 +138,8 @@ let _batteryAssetsPromise = null;
 function useBatteryAssets() {
   const [assets, setAssets] = useState({ swap: [], vehicle: [], commercial: [], container: [] });
   useEffect(() => {
+    _batteryAssetsLoaded = false;
+    _batteryAssetsPromise = null;
     if (_batteryAssetsLoaded) { setAssets(_batteryAssetsCache); return; }
     if (_batteryAssetsPromise) {
       _batteryAssetsPromise.then(data => setAssets(data));
@@ -129,10 +151,12 @@ function useBatteryAssets() {
         const grouped = { swap: [], vehicle: [], commercial: [], container: [] };
         types.forEach((t, idx) => {
           const category = categorizeBatteryType(t);
+          const displayModel = t.name_i18n?.[i18n.language] || t.name_i18n?.['zh-CN'] || t.name || '—';
+          const displayScene = t.scenario_i18n?.[i18n.language] || t.scenario_i18n?.['zh-CN'] || t.scenario || '—';
           grouped[category].push({
             id: t.id || idx,
-            model: t.name || '—',
-            scene: t.scenario || '—',
+            model: displayModel,
+            scene: displayScene,
             voltage: t.voltage || '—',
             capacity: t.capacity || '—',
             current: '—',
@@ -153,7 +177,7 @@ function useBatteryAssets() {
         return empty;
       });
     _batteryAssetsPromise.then(data => setAssets(data));
-  }, []);
+  }, [i18n.language]);
   return assets;
 }
 
@@ -431,9 +455,16 @@ function getDisplayStatus(unit) {
   return computeBatteryHealth(unit.soc, unit.temperature, unit.cycle_count).status;
 }
 
+// ─── i18n 字段解析工具 ─────────────────────────────────
+function resolveI18n(obj, i18nKey, fallback, i18n) {
+  const i18nData = obj?.[i18nKey];
+  if (!i18nData || typeof i18nData !== 'object') return fallback;
+  return i18nData[i18n.language] || i18nData['zh-CN'] || fallback;
+}
+
 // ─── 板块 3：电池网络分布（四种图标 + 电池独立标记） ────
 function BatteryNetworkSection({ amapReady }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const mapRef = useRef(null);
   const containerRef = useRef(null);
   const [activeTab, setActiveTab] = useState(0);
@@ -447,6 +478,10 @@ function BatteryNetworkSection({ amapReady }) {
   const tempMarkerRef = useRef(null);
   const tempMarkerTimerRef = useRef(null);
   const batteryLive = useBatteryLive();
+  const [siteTypes, setSiteTypes] = useState([]);
+  useEffect(() => {
+    fetch('/api/site-types').then(r => r.json()).then(d => setSiteTypes(d.site_types || [])).catch(() => {});
+  }, []);
 
   // ─── 苹果风格 SVG 矢量图标 ─────────────────
   const svgIcons = {
@@ -463,34 +498,44 @@ function BatteryNetworkSection({ amapReady }) {
     'container': { color:'#ef4444', svg:svgIcons.container, label:t('home.nodeType.container'), iconBg:'bg-red-100', iconText:'text-red-700' },
   };
 
-  // ─── 站点类型配置 ──────────────────
-  const siteTypeConfig = useMemo(() => ({
-    [t('home.nodeType.swap')]: 'bg-blue-100 text-blue-700',
-    [t('home.nodeType.bus')]: 'bg-amber-100 text-amber-700',
-    [t('home.nodeType.commercial')]: 'bg-purple-100 text-purple-700',
-    [t('home.nodeType.container')]: 'bg-red-100 text-red-700',
-  }), [t]);
+  // ─── 站点类型配置（从DB动态加载）──────────────────
+  const SITE_TYPE_COLORS = ['bg-blue-100 text-blue-700', 'bg-amber-100 text-amber-700', 'bg-purple-100 text-purple-700', 'bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-cyan-100 text-cyan-700'];
+  const siteTypeConfig = useMemo(() => {
+    const config = {};
+    (siteTypes || []).forEach((st, idx) => {
+      const display = st.name_i18n?.[i18n.language] || st.name_i18n?.['zh-CN'] || st.name;
+      config[st.name] = { color: SITE_TYPE_COLORS[idx % SITE_TYPE_COLORS.length], label: display };
+    });
+    return config;
+  }, [siteTypes, i18n.language]);
 
-  // ─── 按 site.site_type 精确匹配四分类（site_type 直接从 DB 取值）──────────────────
-  const swapSites = useMemo(() =>
-    (batteryLive.sites || []).filter(s => s.site_type === '换电站'),
-    [batteryLive.sites]
-  );
+  // ─── 按站点类型筛选（基于 siteTypes 数据）──────────────────
+  const siteTypeNameMap = useMemo(() => {
+    const map = {};
+    siteTypes.forEach(st => { map[st.name] = st; });
+    return map;
+  }, [siteTypes]);
 
-  const lineSites = useMemo(() =>
-    (batteryLive.sites || []).filter(s => s.site_type === '运营线路'),
-    [batteryLive.sites]
-  );
+  const swapKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '换电站' || st.name === '换电站')?.name || '换电站', [siteTypes]);
+  const lineKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '运营线路' || st.name === '运营线路')?.name || '运营线路', [siteTypes]);
+  const mobileKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '移动储能柜' || st.name === '移动储能柜')?.name || '移动储能柜', [siteTypes]);
+  const fixedKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '固定储能柜' || st.name === '固定储能柜')?.name || '固定储能柜', [siteTypes]);
 
-  const mobileSites = useMemo(() =>
-    (batteryLive.sites || []).filter(s => s.site_type === '移动储能柜'),
-    [batteryLive.sites]
-  );
+  const swapSites = useMemo(() => {
+    return (batteryLive.sites || []).filter(s => s.site_type === swapKey);
+  }, [batteryLive.sites, swapKey]);
 
-  const fixedSites = useMemo(() =>
-    (batteryLive.sites || []).filter(s => s.site_type === '固定储能柜'),
-    [batteryLive.sites]
-  );
+  const lineSites = useMemo(() => {
+    return (batteryLive.sites || []).filter(s => s.site_type === lineKey);
+  }, [batteryLive.sites, lineKey]);
+
+  const mobileSites = useMemo(() => {
+    return (batteryLive.sites || []).filter(s => s.site_type === mobileKey);
+  }, [batteryLive.sites, mobileKey]);
+
+  const fixedSites = useMemo(() => {
+    return (batteryLive.sites || []).filter(s => s.site_type === fixedKey);
+  }, [batteryLive.sites, fixedKey]);
 
   const vehicleUnits = useMemo(() =>
     (batteryLive.units || []).filter(u =>
@@ -554,8 +599,8 @@ function BatteryNetworkSection({ amapReady }) {
       if (!bu.longitude || !bu.latitude) return;
       if (bu.soc == null && bu.temperature == null && bu.cycle_count == null) return;
       const isVehicle = bu.unit_code && (bu.unit_code.startsWith('BAT-BUS') || bu.unit_code.startsWith('BAT-TRUCK'));
-      const isMobileStorage = bu.site_name && (batteryLive.sites || []).some(s => s.site_name === bu.site_name && s.site_type && s.site_type.includes('移动储能'));
-      const isFixedStorage = bu.site_name && (batteryLive.sites || []).some(s => s.site_name === bu.site_name && s.site_type && s.site_type.includes('固定储能'));
+      const isMobileStorage = bu.site_name && (batteryLive.sites || []).some(s => s.site_name === bu.site_name && s.site_type && s.site_type === mobileKey);
+      const isFixedStorage = bu.site_name && (batteryLive.sites || []).some(s => s.site_name === bu.site_name && s.site_type && s.site_type === fixedKey);
       const health = computeBatteryHealth(bu.soc, bu.temperature, bu.cycle_count);
       const color = health.color;
       const markerContent = isVehicle
@@ -573,16 +618,20 @@ function BatteryNetworkSection({ amapReady }) {
       });
       marker.on('click', () => {
         map.setZoomAndCenter(14, [bu.longitude, bu.latitude]);
+        const lineKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '运营线路' || st.name === '运营线路')?.name || '运营线路';
+        const mobileKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '移动储能柜' || st.name === '移动储能柜')?.name || '移动储能柜';
+        const fixedKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '固定储能柜' || st.name === '固定储能柜')?.name || '固定储能柜';
+        const swapKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '换电站' || st.name === '换电站')?.name || '换电站';
         if (bu.unit_code && (bu.unit_code.startsWith('BAT-BUS') || bu.unit_code.startsWith('BAT-TRUCK'))) {
-          // Vehicle battery: find matching lineSite, set selectedLineSite + selectedVehicle (no selectedBatteryUnit to avoid duplicate sensor display)
-          const lineSitesFiltered = (batteryLive.sites || []).filter(s => s.site_type && s.site_type.includes('运营线路'));
+          // Vehicle battery: find matching lineSite, set selectedLineSite + selectedVehicle
+          const lineSitesFiltered = (batteryLive.sites || []).filter(s => s.site_type && s.site_type === lineKeyInner);
           const matchedSite = lineSitesFiltered.find(s => s.site_name === bu.site_name);
           if (matchedSite) setSelectedLineSite(matchedSite);
           setSelectedVehicle(bu);
           setActiveTab(1);
         } else if (isMobileStorage) {
-          // Mobile storage battery: find matching mobileSite, set selectedMobileSite + selectedVehicle, switch to Tab 2
-          const mobileSitesFiltered = (batteryLive.sites || []).filter(s => s.site_type && s.site_type.includes('移动储能'));
+          // Mobile storage battery
+          const mobileSitesFiltered = (batteryLive.sites || []).filter(s => s.site_type && s.site_type === mobileKeyInner);
           const matchedSite = mobileSitesFiltered.find(s => s.site_name === bu.site_name);
           if (matchedSite) setSelectedMobileSite(matchedSite);
           setSelectedVehicle(bu);
@@ -590,8 +639,8 @@ function BatteryNetworkSection({ amapReady }) {
         } else {
           setSelectedBatteryUnit(bu);
           if (bu.unit_code && bu.container_sensors) {
-            const mSites = (batteryLive.sites || []).filter(s => s.site_type && s.site_type.includes('移动储能'));
-            const fSites = (batteryLive.sites || []).filter(s => s.site_type && s.site_type.includes('固定储能'));
+            const mSites = (batteryLive.sites || []).filter(s => s.site_type && s.site_type === mobileKeyInner);
+            const fSites = (batteryLive.sites || []).filter(s => s.site_type && s.site_type === fixedKeyInner);
             const matchedMobileSite = mSites.find(s => s.site_name === bu.site_name);
             const matchedFixedSite = fSites.find(s => s.site_name === bu.site_name);
             if (matchedMobileSite) {
@@ -608,7 +657,7 @@ function BatteryNetworkSection({ amapReady }) {
               setActiveTab(0);
             }
           } else {
-            const swapSitesList = (batteryLive.sites || []).filter(s => !s.site_type || s.site_type.includes('换电站'));
+            const swapSitesList = (batteryLive.sites || []).filter(s => !s.site_type || s.site_type === swapKeyInner);
             const matchedSite = swapSitesList.find(s => s.site_name === bu.site_name);
             if (matchedSite) setSelectedCabinetSite(matchedSite);
             setActiveTab(0);
@@ -769,13 +818,13 @@ function BatteryNetworkSection({ amapReady }) {
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Zap className="h-4 w-4 text-orange-500" />
-                                    <span className="font-medium text-sm text-gray-900">{site.site_name}</span>
+                                    <span className="font-medium text-sm text-gray-900">{resolveI18n(site, 'name_i18n', site.site_name, i18n)}</span>
                                   </div>
                                   <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
                                     {(batteryLive.units || []).filter(u => u.site_name === site.site_name).length}{t('home.blockUnit')}
                                   </span>
                                 </div>
-                                <p className="text-[10px] text-gray-400 mt-1">{site.city} · {site.country}</p>
+                                <p className="text-[10px] text-gray-400 mt-1">{resolveI18n(site, 'city_i18n', site.city, i18n)} · {resolveI18n(site, 'country_i18n', site.country, i18n)}</p>
                               </button>
                             ))}
                           </div>
@@ -859,7 +908,7 @@ function BatteryNetworkSection({ amapReady }) {
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Bus className="h-4 w-4 text-blue-500" />
-                                    <span className="font-medium text-sm text-gray-900">{site.site_name}</span>
+                                    <span className="font-medium text-sm text-gray-900">{resolveI18n(site, 'name_i18n', site.site_name, i18n)}</span>
                                   </div>
                                   <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
                                     {site.real_battery_count}{t('home.blockUnit')}
@@ -966,7 +1015,7 @@ function BatteryNetworkSection({ amapReady }) {
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Truck className="h-4 w-4 text-purple-500" />
-                                    <span className="font-medium text-sm text-gray-900">{site.site_name}</span>
+                                    <span className="font-medium text-sm text-gray-900">{resolveI18n(site, 'name_i18n', site.site_name, i18n)}</span>
                                   </div>
                                   <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
                                     {site.real_battery_count}{t('home.blockUnit')}
@@ -1073,13 +1122,13 @@ function BatteryNetworkSection({ amapReady }) {
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Container className="h-4 w-4 text-red-500" />
-                                    <span className="font-medium text-sm text-gray-900">{site.site_name}</span>
+                                    <span className="font-medium text-sm text-gray-900">{resolveI18n(site, 'name_i18n', site.site_name, i18n)}</span>
                                   </div>
                                   <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
                                     {site.real_battery_count}{t('home.blockUnit')}
                                   </span>
                                 </div>
-                                <p className="text-[10px] text-gray-400 mt-1">{site.site_code} · {site.city}</p>
+                                <p className="text-[10px] text-gray-400 mt-1">{site.site_code} · {resolveI18n(site, 'city_i18n', site.city, i18n)}</p>
                               </button>
                             ))}
                           </div>
@@ -1226,7 +1275,7 @@ function CabinetDiagram({ site, onBack, SensorCard, onTrackBattery }) {
       {/* 站点信息 */}
       <div className="flex items-center gap-2">
         <Zap className="h-4 w-4 text-orange-500" />
-        <span className="font-semibold text-gray-900">{site.site_name}</span>
+        <span className="font-semibold text-gray-900">{resolveI18n(site, 'name_i18n', site.site_name, i18n)}</span>
         <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{site.site_code}</span>
       </div>
 
@@ -1717,7 +1766,7 @@ const getScenes = (t) => [
 export default function HomePage() {
   const { t, i18n } = useTranslation();
   const loggedIn = isLoggedIn();
-  const amapReady = useAmap();
+  const amapReady = useAmap(i18n.language);
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroFade, setHeroFade] = useState(true);
 

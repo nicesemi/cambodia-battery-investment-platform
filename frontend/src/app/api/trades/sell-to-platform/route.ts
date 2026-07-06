@@ -34,13 +34,19 @@ export async function GET(request: Request) {
           .single()
         const { data: asset } = await supabase
           .from('battery_assets')
-          .select('name, unit_price')
+          .select('name, name_i18n, unit_price')
           .eq('id', ibu.battery_asset_id)
           .single()
+        // 兼容 JSONB 可能返回字符串的情况
+        let nameI18n = asset?.name_i18n;
+        if (typeof nameI18n === 'string') {
+          try { nameI18n = JSON.parse(nameI18n); } catch {}
+        }
         units.push({
           id: ibu.battery_unit_id,
           unit_code: unit?.unit_code || '-',
           asset_name: asset?.name || '-',
+          asset_name_i18n: nameI18n || null,
           unit_price: ibu.purchase_price,
           purchased_at: ibu.purchased_at,
           status: unit?.status,

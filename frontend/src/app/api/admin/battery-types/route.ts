@@ -43,18 +43,27 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const { name, voltage, capacity, chemistry, description, is_active, sort_order } = body
-    if (!name) return badRequest('电池类型名称不能为空')
+    // 多语言字段：优先使用 i18n JSON，向后兼容旧 name/description/scenario 字段
+    const nameI18n = body.name_i18n || (typeof name === 'string' && name.trim() ? { 'zh-CN': name.trim() } : null)
+    const descriptionI18n = body.description_i18n || (typeof description === 'string' && description.trim() ? { 'zh-CN': description } : null)
+
+    // 验证：至少需要 name 或 name_i18n
+    if (!nameI18n && !name) return badRequest('电池类型名称不能为空')
 
     const { image_url, scenario, dimensions, net_weight, power_kwh, unit_price, monthly_rent } = body
+    const scenarioI18n = body.scenario_i18n || (typeof scenario === 'string' && scenario.trim() ? { 'zh-CN': scenario } : null)
 
     const { data: type, error } = await supabase.from('battery_types').insert({
-      name: name.trim(),
+      name: nameI18n ? (nameI18n['zh-CN'] || name || '') : (name || '').trim(),
+      name_i18n: nameI18n,
       voltage: voltage || null,
       capacity: capacity || null,
       chemistry: chemistry || null,
-      description: description || null,
+      description: descriptionI18n ? (descriptionI18n['zh-CN'] || description || '') : (description || null),
+      description_i18n: descriptionI18n,
       image_url: image_url || null,
-      scenario: scenario || null,
+      scenario: scenarioI18n ? (scenarioI18n['zh-CN'] || scenario || '') : (scenario || null),
+      scenario_i18n: scenarioI18n,
       dimensions: dimensions || null,
       net_weight: net_weight || null,
       power_kwh: power_kwh || null,

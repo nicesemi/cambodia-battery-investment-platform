@@ -31,7 +31,7 @@ export const authAPI = {
 
 // 资产API
 export const assetAPI = {
-  getAssets: () => request('/assets'),
+  getAssets: (locale) => request('/assets?locale=' + (locale || 'zh-CN')),
   getUserAssets: () => request('/assets/my'),
   purchaseAsset: (data) => request('/assets/purchase', { method: 'POST', body: JSON.stringify(data) }),
 };
@@ -135,6 +135,17 @@ export const adminAPI = {
   createWarehouse: (data) => request('/admin/warehouses', { method: 'POST', body: JSON.stringify(data) }),
   updateWarehouse: (id, data) => request(`/admin/warehouses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteWarehouse: (id) => request(`/admin/warehouses/${id}`, { method: 'DELETE' }),
+
+  // 站点类型管理
+  getSiteTypes: () => request('/admin/site-types'),
+  createSiteType: (data) => request('/admin/site-types', { method: 'POST', body: JSON.stringify(data) }),
+  updateSiteType: (typeId, data) => request(`/admin/site-types/${typeId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSiteType: (typeId) => request(`/admin/site-types/${typeId}`, { method: 'DELETE' }),
+  // 运营站点管理
+  getOperationSites: () => request('/admin/operation-sites'),
+  createOperationSite: (data) => request('/admin/operation-sites', { method: 'POST', body: JSON.stringify(data) }),
+  updateOperationSite: (siteId, data) => request(`/admin/operation-sites/${siteId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteOperationSite: (siteId) => request(`/admin/operation-sites/${siteId}`, { method: 'DELETE' }),
   // 派工单
   dispatchBatteries: (data) => request('/admin/dispatch', { method: 'POST', body: JSON.stringify(data) }),
   getWorkOrders: (status) => request(`/admin/dispatch${status ? '?status=' + encodeURIComponent(status) : ''}`),

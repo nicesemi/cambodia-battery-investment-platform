@@ -239,7 +239,7 @@ async function getManagedFranchisees(agent: any, search: string) {
 
     // 收集所有 owner_id 后一次查询
     const allOwnerIds = new Set<string>()
-    for (const ids of agentOwnerMap.values()) {
+    for (const ids of Array.from(agentOwnerMap.values())) {
       for (const oid of ids) allOwnerIds.add(oid)
     }
 

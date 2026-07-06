@@ -577,6 +577,61 @@ const reviewFranchiseeApplication = async (req, res) => {
   }
 };
 
+// 站点类型管理
+const getSiteTypes = async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM site_types ORDER BY created_at ASC');
+    res.json({ site_types: result.rows });
+  } catch (error) {
+    console.error('Get site types error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const createSiteType = async (req, res) => {
+  try {
+    const { name, name_i18n } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: '编码名称不能为空' });
+    const result = await db.query(
+      'INSERT INTO site_types (name, name_i18n) VALUES ($1, $2) RETURNING *',
+      [name.trim(), name_i18n || {}]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: '编码名称已存在' });
+    console.error('Create site type error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const updateSiteType = async (req, res) => {
+  try {
+    const { typeId } = req.params;
+    const { name, name_i18n } = req.body;
+    const result = await db.query(
+      'UPDATE site_types SET name_i18n = COALESCE($1, name_i18n), updated_at = now() WHERE id = $2 RETURNING *',
+      [name_i18n || null, typeId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: '站点类型不存在' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Update site type error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const deleteSiteType = async (req, res) => {
+  try {
+    const { typeId } = req.params;
+    const result = await db.query('DELETE FROM site_types WHERE id = $1 RETURNING *', [typeId]);
+    if (result.rows.length === 0) return res.status(404).json({ error: '站点类型不存在' });
+    res.json({ message: '删除成功' });
+  } catch (error) {
+    console.error('Delete site type error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getAllUsers,
@@ -595,4 +650,9 @@ module.exports = {
   reviewAgentApplication,
   getFranchiseeApplications,
   reviewFranchiseeApplication,
+  // 站点类型
+  getSiteTypes,
+  createSiteType,
+  updateSiteType,
+  deleteSiteType,
 };
