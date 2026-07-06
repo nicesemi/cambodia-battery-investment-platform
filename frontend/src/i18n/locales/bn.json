@@ -1536,5 +1536,7 @@
   "wallet.typeWithdraw": "উত্তোলন",
   "wallet.typeDividend": "লভ্যাংশ",
   "wallet.typeTrade": "লেনদেন",
-  "wallet.typeFee": "ফি"
+  "wallet.typeFee": "ফি",
+  "franchisee.wallet.pendingEarnings": "মুলতুবি আয়",
+  "franchisee.wallet.pendingEarningsHint": "পরের মাসের ১ তারিখে উপলব্ধ"
 }

@@ -22,7 +22,17 @@ export async function GET(request: Request) {
     const { data: dividends, error } = await query
     if (error) return serverError(error.message)
 
-    const formatted = dividends?.map((d: any) => ({
+    // 过滤掉已回购的电池：检查 investor_battery_units 中是否仍持有
+    const eligibleDividends: any[] = []
+    for (const d of (dividends || [])) {
+      const { data: holding } = await supabase.from('investor_battery_units')
+        .select('id').eq('investor_id', user.id).eq('battery_id', d.asset_id).limit(1)
+      if (holding && holding.length > 0) {
+        eligibleDividends.push(d)
+      }
+    }
+
+    const formatted = eligibleDividends.map((d: any) => ({
       ...d, asset_name: d.battery_assets?.name, asset_name_i18n: d.battery_assets?.name_i18n, asset_code: d.battery_assets?.asset_code, battery_assets: undefined
     }))
 

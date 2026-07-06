@@ -1460,5 +1460,7 @@
   "wallet.typeWithdraw": "提現",
   "wallet.typeDividend": "分紅",
   "wallet.typeTrade": "交易",
-  "wallet.typeFee": "手續費"
+  "wallet.typeFee": "手續費",
+  "franchisee.wallet.pendingEarnings": "待結算收益",
+  "franchisee.wallet.pendingEarningsHint": "次月1日到帳"
 }

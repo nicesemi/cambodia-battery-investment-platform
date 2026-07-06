@@ -1536,5 +1536,7 @@
   "wallet.typeWithdraw": "ដកប្រាក់",
   "wallet.typeDividend": "ភាគលាភ",
   "wallet.typeTrade": "ជួញដូរ",
-  "wallet.typeFee": "ថ្លៃសេវា"
+  "wallet.typeFee": "ថ្លៃសេវា",
+  "franchisee.wallet.pendingEarnings": "ប្រាក់ចំណូលកំពុងរង់ចាំ",
+  "franchisee.wallet.pendingEarningsHint": "អាចប្រើបាននៅថ្ងៃទី១ ខែក្រោយ"
 }

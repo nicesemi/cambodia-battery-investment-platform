@@ -1503,5 +1503,7 @@
   "wallet.typeWithdraw": "提现",
   "wallet.typeDividend": "分红",
   "wallet.typeTrade": "交易",
-  "wallet.typeFee": "手续费"
+  "wallet.typeFee": "手续费",
+  "franchisee.wallet.pendingEarnings": "待结算收益",
+  "franchisee.wallet.pendingEarningsHint": "次月1日到账"
 }

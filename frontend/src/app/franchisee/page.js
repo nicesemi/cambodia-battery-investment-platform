@@ -303,8 +303,6 @@ export default function Franchisee() {
   const [walletData, setWalletData] = useState({ franchiseFee: 0, depositAmount: 0, performanceTarget: 0, cumulativePerformance: 0, cumulativeEarnings: 0, pendingEarnings: 0, monthlyRevenue: 0, totalBalance: 0, withdrawableBalance: 0, preTargetWithdrawable: 0, postTargetWithdrawable: 0 });
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletSubTab, setWalletSubTab] = useState('total'); // 'total' | 'preTarget' | 'postTarget'
-  const [walletTransactions, setWalletTransactions] = useState([]);
-  const [walletBalanceFromApi, setWalletBalanceFromApi] = useState(0);
   // === 提现模态框 ===
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawModalForm, setWithdrawModalForm] = useState({ amount: '', bank_name: '', bank_account: '', bank_holder: '', business_license_url: '', invoice_info_url: '', vat_invoice_url: '' });
@@ -315,10 +313,6 @@ export default function Franchisee() {
   const [depositRefundForm, setDepositRefundForm] = useState({ bank_name: '', bank_account: '', bank_holder: '', business_license_url: '' });
   const [depositRefundSubmitting, setDepositRefundSubmitting] = useState(false);
   const [depositRefundUploading, setDepositRefundUploading] = useState({});
-  // === 充值模态框 ===
-  const [showRechargeModal, setShowRechargeModal] = useState(false);
-  const [rechargeAmount, setRechargeAmount] = useState('');
-  const [rechargeSubmitting, setRechargeSubmitting] = useState(false);
   const [selectedStore, setSelectedStore] = useState(null);
   const [overviewPerformance, setOverviewPerformance] = useState(null);
   // === 概览信息卡片 ===
@@ -587,28 +581,9 @@ export default function Franchisee() {
         if (wData.breakdown) setWithdrawBreakdown(wData.breakdown);
       } catch (_) {}
 
-      // 从 API 获取真实钱包余额和交易明细（充值/分红/回购/提现后的实际余额）
-      let apiBalance = 0;
-      try {
-        const [profileRes, txRes] = await Promise.all([
-          fetch('/api/auth/profile', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-          fetch('/api/wallet/transactions', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-        ]);
-        if (profileRes.ok) {
-          const profileData = await profileRes.json();
-          apiBalance = Number(profileData?.wallet?.balance || 0);
-          setWalletBalanceFromApi(apiBalance);
-        }
-        if (txRes.ok) {
-          const txData = await txRes.json();
-          setWalletTransactions(txData.transactions || []);
-        }
-      } catch (_) {}
-
-      // {t('franchisee.wallet.balanceLabel')} = 保证金 + 收益 - 已提现（收益={t('franchisee.earnings.totalLabel')}来自“{t('franchisee.earnings.pageTitle')}”）
+      // 加盟商余额 = 保证金 + 已结算收益 - 已提现
       const bizBalance = depositAmount + cumulativeEarnings - totalWithdrawn;
-      // 使用 API 返回的实际余额（包含充值/分红/回购）；仅当 API 有真实余额时使用，否则兜底用业务公式
-      const totalBalance = apiBalance > 0 ? apiBalance : Math.max(0, bizBalance);
+      const totalBalance = Math.max(0, bizBalance);
       // 业绩是否达标（用业绩判断，不用收益）
       const isTargetMet = perfTarget > 0 && cumulativePerf >= perfTarget;
       // 达标前：{t('franchisee.wallet.withdrawableLabel')} = 收益 - 待处理提现
@@ -825,21 +800,6 @@ export default function Franchisee() {
     finally { setDepositRefundUploading({}); }
   };
 
-  const handleRechargeSubmit = async (e) => {
-    e.preventDefault();
-    const amount = parseFloat(rechargeAmount);
-    if (!amount || amount <= 0) { alert(t('franchisee.alert.invalidAmount') || '请输入有效金额'); return; }
-    setRechargeSubmitting(true);
-    try {
-      await authAPI.rechargeWallet(amount);
-      alert(t('franchisee.alert.depositSuccess'));
-      setShowRechargeModal(false);
-      setRechargeAmount('');
-      await loadWalletData();
-    } catch (err) { alert(t('franchisee.alert.depositFailed') + ': ' + (err.message || '')); }
-    finally { setRechargeSubmitting(false); }
-  };
-
   const handleWithdrawModalSubmit = async (e) => {
     e.preventDefault();
     if (!withdrawModalForm.amount || !withdrawModalForm.bank_name || !withdrawModalForm.bank_account || !withdrawModalForm.bank_holder) {
@@ -858,7 +818,7 @@ export default function Franchisee() {
       if (!res.ok) throw new Error(data.error || t('franchisee.alert.submitFailed'));
       alert('提现申请已提交，等待 admin 审批');
       setShowWithdrawModal(false);
-      loadWalletData();
+      await loadWalletData();
     } catch (err) { alert(err.message); }
     finally { setWithdrawModalSubmitting(false); }
   };
@@ -2297,7 +2257,7 @@ export default function Franchisee() {
                 {/* 预计收益（当月，次月1日到账） */}
                 <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-xl p-6">
                   <div className="text-blue-200 text-sm">{t('franchisee.earnings.pendingLabel')}</div>
-                  <div className="text-4xl font-bold mt-1">{formatCurrency(earningsData.grand_total || 0, i18n.language)}</div>
+                  <div className="text-4xl font-bold mt-1">{formatCurrency(earningsData.pending_total || 0, i18n.language)}</div>
                   <div className="text-blue-200 text-xs mt-2">{t('franchisee.earnings.settlementDate')}</div>
                 </div>
 
@@ -2306,6 +2266,12 @@ export default function Franchisee() {
                   <div className="text-green-200 text-sm">{t('franchisee.earnings.settledLabel')}</div>
                   <div className="text-4xl font-bold mt-1">{formatCurrency(walletData.cumulativeEarnings || 0, i18n.language)}</div>
                   <div className="text-green-200 text-xs mt-2">{t('franchisee.earnings.settledDesc')}</div>
+                </div>
+
+                {/* 合计 */}
+                <div className="bg-white rounded-xl border p-4 text-center">
+                  <span className="text-gray-500 text-sm">{t('franchisee.earnings.totalLabel')}: </span>
+                  <span className="text-xl font-bold text-gray-800">{formatCurrency(earningsData.grand_total || 0, i18n.language)}</span>
                 </div>
 
                 {/* {t('franchisee.earnings.ownStoreTitle')} */}
@@ -2492,15 +2458,11 @@ export default function Franchisee() {
                   </div>
                 </div>
 
-                {/* 充值 & 提现按钮 */}
+                {/* 提现按钮 */}
                 <div className="flex justify-end gap-3">
-                  <button onClick={() => { setRechargeAmount(''); setShowRechargeModal(true); }}
-                    className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition shadow-md">
-                    <Wallet className="h-4 w-4" /> {t('franchisee.wallet.recharge') || '充值'}
-                  </button>
                   <button onClick={() => {
                     setWithdrawModalForm({
-                      amount: walletData.withdrawableBalance || 0,
+                      amount: '',
                       bank_name: '',
                       bank_account: '',
                       bank_holder: '',
@@ -2562,47 +2524,6 @@ export default function Franchisee() {
                   <p>· {t('franchisee.wallet.cityTargetNote')}</p>
                   <p>· {t('franchisee.wallet.districtTargetNote')}</p>
                 </div>
-
-                {/* 交易明细（充值/分红/回购/提现） */}
-                {walletTransactions.length > 0 && (
-                  <div className="bg-white rounded-xl border">
-                    <div className="px-5 py-4 border-b">
-                      <h3 className="font-bold text-lg flex items-center gap-2">
-                        <Wallet className="h-5 w-5 text-green-600" /> {t('franchisee.wallet.transactionHistory') || '交易明细'}
-                      </h3>
-                    </div>
-                    <div className="divide-y">
-                      {walletTransactions.slice(0, 20).map((tx, i) => (
-                        <div key={tx.txNo || i} className="p-4 flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`font-semibold ${tx.type === 'deposit' || tx.type === 'dividend' || (tx.type === 'trade' && tx.amount > 0) ? 'text-green-700' : 'text-red-600'}`}>
-                                {tx.type === 'deposit' || tx.type === 'dividend' || (tx.type === 'trade' && tx.amount > 0) ? '+' : ''}{formatCurrency(Number(tx.amount) || 0, i18n.language)}
-                              </span>
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                tx.type === 'deposit' ? 'bg-green-100 text-green-700' :
-                                tx.type === 'dividend' ? 'bg-blue-100 text-blue-700' :
-                                tx.type === 'trade' ? 'bg-purple-100 text-purple-700' :
-                                tx.type === 'withdraw' ? 'bg-orange-100 text-orange-700' :
-                                'bg-gray-100 text-gray-600'}`}>
-                                {t(`invest.wallet.tx${tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}`) || tx.typeLabel || tx.type}
-                              </span>
-                              {tx.status && (
-                                <span className={`text-xs ${tx.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
-                                  {tx.status === 'completed' ? '✓' : '⏳'}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {tx.remark && <span>{tx.remark}</span>}
-                              {tx.createdAt && <span className="ml-3">{new Date(tx.createdAt).toLocaleString('zh-CN')}</span>}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* {t('franchisee.wallet.withdrawDetails')} */}
                 <div className="bg-white rounded-xl border">
@@ -3413,34 +3334,6 @@ export default function Franchisee() {
                 {appealSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{t('franchisee.modal.submitAppeal')}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== 充值模态框 ===== */}
-      {showRechargeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">{t('franchisee.wallet.recharge') || '充值'}</h3>
-              <button onClick={() => setShowRechargeModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
-            </div>
-            <form onSubmit={handleRechargeSubmit} className="space-y-4">
-              <div>
-                <label className="label">{t('franchisee.wallet.rechargeAmount') || '充值金额'}</label>
-                <input type="number" min="0" step="0.01" value={rechargeAmount}
-                  onChange={e => setRechargeAmount(e.target.value)}
-                  className="input-field" placeholder="0.00" required />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowRechargeModal(false)}
-                  className="flex-1 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition">{t('common.cancel')}</button>
-                <button type="submit" disabled={rechargeSubmitting}
-                  className="flex-1 py-2.5 rounded-lg bg-green-600 text-white font-medium text-sm hover:bg-green-700 transition flex items-center justify-center gap-2 disabled:opacity-50">
-                  {rechargeSubmitting ? t('franchisee.modal.submitting') : (t('franchisee.wallet.recharge') || '充值')}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

@@ -518,7 +518,7 @@ const getPenaltyTierDisplay = (tier, t) => {
         alert(t('invest.alert.rechargeSuccess'));
         setShowRechargeModal(false);
         setRechargeAmount('');
-        loadWallet();
+        await loadWallet();
       } else {
         const err = await res.json();
         alert(err.error || t('invest.alert.rechargeFailed'));
@@ -550,7 +550,7 @@ const getPenaltyTierDisplay = (tier, t) => {
         alert(t('invest.alert.withdrawSuccess'));
         setShowWithdrawModal(false);
         setWithdrawForm({ amount: '', bank_account: '', bank_name: '', account_holder: '' });
-        loadWallet();
+        await loadWallet();
       } else {
         const err = await res.json();
         alert(err.error || t('invest.alert.withdrawFailed'));

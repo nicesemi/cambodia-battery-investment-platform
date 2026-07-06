@@ -1503,5 +1503,7 @@
   "wallet.typeWithdraw": "Withdraw",
   "wallet.typeDividend": "Dividend",
   "wallet.typeTrade": "Trade",
-  "wallet.typeFee": "Fee"
+  "wallet.typeFee": "Fee",
+  "franchisee.wallet.pendingEarnings": "Pending Earnings",
+  "franchisee.wallet.pendingEarningsHint": "Available next month 1st"
 }
