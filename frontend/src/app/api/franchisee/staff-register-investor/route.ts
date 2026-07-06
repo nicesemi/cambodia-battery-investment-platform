@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 import { supabase } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { badRequest, forbidden, ok, serverError, unauthorized } from '@/lib/response'

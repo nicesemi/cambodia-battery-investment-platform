@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { supabase } from '@/lib/supabase'
 import { badRequest, ok, unauthorized, serverError } from '@/lib/response'
