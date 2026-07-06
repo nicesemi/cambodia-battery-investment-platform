@@ -118,8 +118,6 @@ export async function GET(request: Request) {
 
     // 5. 计算自营门店收益：staff_registration → investor → online 购买订单 → 5% commission + 5% rent
     let selfCommission = 0
-    let selfCommissionCurrentMonth = 0
-    let selfCommissionSettled = 0
     let selfRentShare = 0
     let selfPurchaseAmount = 0
     const selfStoreMap: Record<string, { store_id: string; store_name: string; purchase_commission: number; rental_share: number; purchase_amount: number; rent_start_date: string | null }> = {}
@@ -154,14 +152,10 @@ export async function GET(request: Request) {
         // 自营门店购买佣金：所有 online 购买订单 × 5%
         const { data: purchases } = await adminClient
           .from('investor_orders')
-          .select('total_amount, units, unit_price, user_id, created_at')
+          .select('total_amount, units, unit_price, user_id')
           .in('user_id', investorIds)
           .eq('order_source', 'online')
           .eq('status', 'completed')
-
-        const nowForCommission = new Date()
-        const currentYear = nowForCommission.getFullYear()
-        const currentMonth = nowForCommission.getMonth()
 
         if (purchases && purchases.length > 0) {
           for (const o of purchases) {
@@ -169,17 +163,6 @@ export async function GET(request: Request) {
             const commission = purchase * 0.05
             selfCommission += commission
             selfPurchaseAmount += purchase
-
-            // 按购买月份分离：当月佣金=预计收益，历史佣金=已到账
-            const purchaseDate = o.created_at ? new Date(o.created_at) : null
-            const isCurrentMonth = purchaseDate
-              && purchaseDate.getFullYear() === currentYear
-              && purchaseDate.getMonth() === currentMonth
-            if (isCurrentMonth) {
-              selfCommissionCurrentMonth += commission
-            } else {
-              selfCommissionSettled += commission
-            }
 
             const storeId = investorStoreMap.get(o.user_id) || o.user_id
             if (!selfStoreMap[storeId]) {
@@ -316,8 +299,6 @@ export async function GET(request: Request) {
       }
     }
     let cityCommission = 0
-    let cityCommissionCurrentMonth = 0
-    let cityCommissionSettled = 0
     let cityRentShare = 0
     let cityPurchaseAmount = 0
     let cityDetails: any[] = []
@@ -385,17 +366,6 @@ export async function GET(request: Request) {
             const commission = purchase * downstreamRate
             cityCommission += commission
             cityPurchaseAmount += purchase
-
-            // 按购买月份分离：当月佣金=预计收益，历史佣金=已到账
-            const subPurchaseDate = o.created_at ? new Date(o.created_at) : null
-            const isCurrentMonthCity = subPurchaseDate
-              && subPurchaseDate.getFullYear() === currentYear
-              && subPurchaseDate.getMonth() === currentMonth
-            if (isCurrentMonthCity) {
-              cityCommissionCurrentMonth += commission
-            } else {
-              cityCommissionSettled += commission
-            }
             const invId = o.user_id
             if (!investorDetailMap.has(invId)) {
               const sid = subInvestorStoreMap.get(invId) || ''
@@ -540,11 +510,6 @@ export async function GET(request: Request) {
     const grandTotal = selfTotal + cityTotal
     const hasCityEarnings = ((subStoreIds.length > 0 || subordinateUserIds.length > 0) && downstreamRate > 0)
 
-    // 当月预计收益 = 当月购买佣金 + 当月租金分成（次月1日可提现）
-    const currentMonthTotal = selfCommissionCurrentMonth + cityCommissionCurrentMonth + selfRentShare + cityRentShare
-    // 已到账收益 = 历史佣金分成（不含当月）
-    const settledTotal = selfCommissionSettled + cityCommissionSettled
-
     return ok({
       agent_type: agent.agent_type,
       territory: agent.city || agent.region,
@@ -563,8 +528,6 @@ export async function GET(request: Request) {
         details: cityDetails.slice(0, 50),
       } : null,
       grand_total: +grandTotal.toFixed(2),
-      current_month_total: +currentMonthTotal.toFixed(2),
-      settled_total: +settledTotal.toFixed(2),
     })
   } catch (e: any) {
     console.error('Agent earnings error:', e)
