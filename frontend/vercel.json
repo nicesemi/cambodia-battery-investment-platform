@@ -1,5 +1,8 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "next build",
-  "outputDirectory": ".next"
+  "crons": [
+    {
+      "path": "/api/cron/dividend-settlement",
+      "schedule": "0 0 1 * *"
+    }
+  ]
 }

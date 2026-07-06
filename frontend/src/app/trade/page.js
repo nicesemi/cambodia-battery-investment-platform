@@ -10,11 +10,11 @@ import { useTranslation } from 'react-i18next';
 export default function Trade() {
   const { t, i18n } = useTranslation();
 
-  const resolveI18n = (obj, i18nKey, fallback, i18nObj) => {
+  const resolveI18n = (obj, i18nKey, fallback) => {
     if (!obj) return fallback || '';
     const i18nData = obj[i18nKey];
     if (!i18nData || typeof i18nData !== 'object') return fallback || '';
-    return i18nData[i18nObj.language] || i18nData['zh-CN'] || fallback || '';
+    return i18nData[i18n.language] || i18nData['zh-CN'] || fallback || '';
   };
 
   // 拉取实时汇率
@@ -29,6 +29,8 @@ export default function Trade() {
   const [selling, setSelling] = useState(false);
   const [sellMsg, setSellMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [recentTx, setRecentTx] = useState(null);
 
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
@@ -89,6 +91,22 @@ export default function Trade() {
       setSelectedUnitIds([]);
       setPreviewMap({});
       loadMyUnits();
+      // 刷新钱包余额和交易明细
+      try {
+        const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+        const [profileRes, txRes] = await Promise.all([
+          fetch('/api/auth/profile', { headers }),
+          fetch('/api/wallet/transactions', { headers }),
+        ]);
+        if (profileRes.ok) {
+          const pData = await profileRes.json();
+          if (pData?.wallet) setWalletBalance(pData.wallet.balance);
+        }
+        if (txRes.ok) {
+          const txData = await txRes.json();
+          setRecentTx(txData.transactions?.[0] || null);
+        }
+      } catch (_) {}
     } catch (e) { setSellMsg(t('trade.sellFailed')); }
     finally { setSelling(false); }
   };
@@ -120,7 +138,7 @@ export default function Trade() {
                         <Package className="h-4 w-4 text-gray-400" />
                         <span className="font-medium text-sm">{unit.unit_code || unit.id?.slice(0, 8)}</span>
                       </div>
-                      <span className="text-xs text-gray-500">{resolveI18n(unit, 'asset_name_i18n', unit.asset_name, i18n)}</span>
+                      <span className="text-xs text-gray-500">{resolveI18n(unit, 'asset_name_i18n', unit.asset_name)}</span>
                     </div>
                     <div className="mt-1 text-xs text-gray-500">{t('trade.purchasePrice')}: {formatCurrency(Number(unit.unit_price || 1000), i18n.language)}</div>
                   </div>))}

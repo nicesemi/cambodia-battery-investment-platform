@@ -800,7 +800,7 @@ export default function Profile() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
             <Building2 className="h-5 w-5 text-indigo-500" />
-            t('profile.storeHierarchy')
+            {t('profile.storeHierarchy')}
           </h3>
           {hierarchy.map((binding, idx) => (
             <div key={idx} className={`${idx > 0 ? 'mt-3 pt-3 border-t border-gray-100' : ''}`}>

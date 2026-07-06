@@ -303,6 +303,8 @@ export default function Franchisee() {
   const [walletData, setWalletData] = useState({ franchiseFee: 0, depositAmount: 0, performanceTarget: 0, cumulativePerformance: 0, cumulativeEarnings: 0, monthlyRevenue: 0, totalBalance: 0, withdrawableBalance: 0, preTargetWithdrawable: 0, postTargetWithdrawable: 0 });
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletSubTab, setWalletSubTab] = useState('total'); // 'total' | 'preTarget' | 'postTarget'
+  const [walletTransactions, setWalletTransactions] = useState([]);
+  const [walletBalanceFromApi, setWalletBalanceFromApi] = useState(0);
   // === 提现模态框 ===
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawModalForm, setWithdrawModalForm] = useState({ amount: '', bank_name: '', bank_account: '', bank_holder: '', business_license_url: '', invoice_info_url: '', vat_invoice_url: '' });
@@ -584,8 +586,28 @@ export default function Franchisee() {
         if (wData.breakdown) setWithdrawBreakdown(wData.breakdown);
       } catch (_) {}
 
+      // 从 API 获取真实钱包余额和交易明细（充值/分红/回购/提现后的实际余额）
+      let apiBalance = 0;
+      try {
+        const [profileRes, txRes] = await Promise.all([
+          fetch('/api/auth/profile', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
+          fetch('/api/wallet/transactions', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
+        ]);
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          apiBalance = Number(profileData?.wallet?.balance || 0);
+          setWalletBalanceFromApi(apiBalance);
+        }
+        if (txRes.ok) {
+          const txData = await txRes.json();
+          setWalletTransactions(txData.transactions || []);
+        }
+      } catch (_) {}
+
       // {t('franchisee.wallet.balanceLabel')} = 保证金 + 收益 - 已提现（收益={t('franchisee.earnings.totalLabel')}来自“{t('franchisee.earnings.pageTitle')}”）
-      const totalBalance = depositAmount + cumulativeEarnings - totalWithdrawn;
+      const bizBalance = depositAmount + cumulativeEarnings - totalWithdrawn;
+      // 使用 API 返回的实际余额（包含充值/分红/回购），兜底用业务公式计算
+      const totalBalance = apiBalance > 0 ? apiBalance : Math.max(0, bizBalance);
       // 业绩是否达标（用业绩判断，不用收益）
       const isTargetMet = perfTarget > 0 && cumulativePerf >= perfTarget;
       // 达标前：{t('franchisee.wallet.withdrawableLabel')} = 收益 - 待处理提现
@@ -2525,6 +2547,47 @@ export default function Franchisee() {
                   <p>· {t('franchisee.wallet.cityTargetNote')}</p>
                   <p>· {t('franchisee.wallet.districtTargetNote')}</p>
                 </div>
+
+                {/* 交易明细（充值/分红/回购/提现） */}
+                {walletTransactions.length > 0 && (
+                  <div className="bg-white rounded-xl border">
+                    <div className="px-5 py-4 border-b">
+                      <h3 className="font-bold text-lg flex items-center gap-2">
+                        <Wallet className="h-5 w-5 text-green-600" /> {t('franchisee.wallet.transactionHistory') || '交易明细'}
+                      </h3>
+                    </div>
+                    <div className="divide-y">
+                      {walletTransactions.slice(0, 20).map((tx, i) => (
+                        <div key={tx.txNo || i} className="p-4 flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`font-semibold ${tx.type === 'deposit' || tx.type === 'dividend' || (tx.type === 'trade' && tx.amount > 0) ? 'text-green-700' : 'text-red-600'}`}>
+                                {tx.type === 'deposit' || tx.type === 'dividend' || (tx.type === 'trade' && tx.amount > 0) ? '+' : ''}{formatCurrency(Number(tx.amount) || 0, i18n.language)}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                tx.type === 'deposit' ? 'bg-green-100 text-green-700' :
+                                tx.type === 'dividend' ? 'bg-blue-100 text-blue-700' :
+                                tx.type === 'trade' ? 'bg-purple-100 text-purple-700' :
+                                tx.type === 'withdraw' ? 'bg-orange-100 text-orange-700' :
+                                'bg-gray-100 text-gray-600'}`}>
+                                {tx.typeLabel || tx.type}
+                              </span>
+                              {tx.status && (
+                                <span className={`text-xs ${tx.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                                  {tx.status === 'completed' ? '✓' : '⏳'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {tx.remark && <span>{tx.remark}</span>}
+                              {tx.createdAt && <span className="ml-3">{new Date(tx.createdAt).toLocaleString('zh-CN')}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* {t('franchisee.wallet.withdrawDetails')} */}
                 <div className="bg-white rounded-xl border">
