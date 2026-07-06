@@ -1,0 +1,118 @@
+{
+  "nav": {
+    "home": "首页",
+    "invest": "投资",
+    "trade": "交易",
+    "dividends": "分红",
+    "dashboard": "管理面板",
+    "profile": "个人中心",
+    "login": "登录",
+    "register": "注册",
+    "logout": "退出"
+  },
+  "auth": {
+    "login": "登录",
+    "register": "注册",
+    "email": "邮箱",
+    "password": "密码",
+    "username": "用户名",
+    "fullName": "姓名",
+    "phone": "手机号",
+    "loginBtn": "立即登录",
+    "registerBtn": "立即注册",
+    "noAccount": "还没有账号？",
+    "hasAccount": "已有账号？",
+    "loginSuccess": "登录成功",
+    "registerSuccess": "注册成功"
+  },
+  "home": {
+    "title": "柬埔寨电池银行投资平台",
+    "subtitle": "投资柬埔寨换电市场，享受70%利润分红",
+    "totalInvestors": "总投资者",
+    "totalInvestment": "总投资额",
+    "totalDividends": "总分红",
+    "avgROI": "平均年化收益",
+    "features": {
+      "title": "核心优势",
+      "profitShare": "70%利润分红",
+      "profitShareDesc": "平台每月净利润70%自动分配给投资者",
+      "tradable": "资产可交易",
+      "tradableDesc": "虚拟资产可随时在平台交易，灵活变现",
+      "stable": "稳定收益",
+      "stableDesc": "柬埔寨电摩市场快速增长，收益稳定可预期",
+      "secure": "安全可靠",
+      "secureDesc": "JWT认证，数据加密，银行级安全保障"
+    },
+    "market": {
+      "title": "柬埔寨市场概览",
+      "motorcycles": "电摩保有量",
+      "dailyDemand": "日换电需求",
+      "growthRate": "年增长率"
+    }
+  },
+  "assets": {
+    "title": "电池资产",
+    "purchase": "购买",
+    "unitPrice": "单价",
+    "available": "可购数量",
+    "expectedROI": "预期年化",
+    "location": "所在地区",
+    "units": "份数",
+    "totalCost": "总金额",
+    "purchaseSuccess": "购买成功",
+    "myAssets": "我的资产",
+    "holdUnits": "持有份数",
+    "avgCost": "平均成本",
+    "totalDividends": "累计分红"
+  },
+  "trade": {
+    "title": "资产交易",
+    "buy": "买入",
+    "sell": "卖出",
+    "price": "价格",
+    "quantity": "数量",
+    "orderBook": "订单簿",
+    "myOrders": "我的订单",
+    "createOrder": "下单",
+    "cancel": "取消",
+    "pending": "待成交",
+    "filled": "已成交",
+    "cancelled": "已取消",
+    "buyOrders": "买单",
+    "sellOrders": "卖单"
+  },
+  "dividends": {
+    "title": "分红记录",
+    "period": "分红周期",
+    "unitsHeld": "持有份数",
+    "dividendAmount": "分红金额",
+    "total": "累计分红",
+    "forecast": "收益测算",
+    "monthlyDividend": "预期月分红",
+    "yearlyDividend": "预期年分红",
+    "paybackPeriod": "回本周期"
+  },
+  "admin": {
+    "dashboard": "数据看板",
+    "users": "用户管理",
+    "trades": "交易记录",
+    "configs": "系统配置",
+    "totalUsers": "总用户数",
+    "newUsers": "新增用户(30天)",
+    "totalVolume": "总交易额",
+    "recentTrades": "最近交易",
+    "recentUsers": "最近注册"
+  },
+  "common": {
+    "loading": "加载中...",
+    "submit": "提交",
+    "cancel": "取消",
+    "confirm": "确认",
+    "success": "成功",
+    "error": "错误",
+    "noData": "暂无数据",
+    "search": "搜索",
+    "total": "共",
+    "items": "条"
+  }
+}

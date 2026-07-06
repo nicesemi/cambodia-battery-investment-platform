@@ -1,0 +1,32 @@
+
+> battery-investment-frontend@1.0.0 dev
+> next dev
+
+   ▲ Next.js 14.0.4
+   - Local:        http://localhost:3000
+   - Environments: .env.local
+
+ ✓ Ready in 1492ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 2.2s (532 modules)
+ ✓ Compiled in 489ms (270 modules)
+ ○ Compiling /api/auth/profile ...
+ ✓ Compiled /api/auth/profile in 566ms (637 modules)
+ ✓ Compiled /stores in 129ms (651 modules)
+ ✓ Compiled /api/stores/approved in 60ms (389 modules)
+ ✓ Compiled / in 275ms (683 modules)
+ ✓ Compiled /api/battery-types in 133ms (407 modules)
+ ✓ Compiled /admin/battery-types in 294ms (697 modules)
+ ✓ Compiled /api/admin/battery-types in 62ms (416 modules)
+ ✓ Compiled /api/admin/assets in 77ms (418 modules)
+ ✓ Compiled in 616ms (567 modules)
+ ✓ Compiled in 721ms (585 modules)
+ ✓ Compiled in 315ms (585 modules)
+ ✓ Compiled /api/admin/battery-types in 119ms (406 modules)
+ ✓ Compiled in 457ms (705 modules)
+ ✓ Compiled in 501ms (705 modules)
+ ✓ Compiled in 360ms (705 modules)
+ ✓ Compiled in 468ms (703 modules)
+ ○ Compiling /not-found ...
+ ✓ Compiled /not-found in 718ms (574 modules)
+[?25h
