@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
     // 记录交易
     const txNo = `PLT${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-    await supabase.from('transactions').insert({
+    const { error: txError } = await supabase.from('transactions').insert({
       tx_no: txNo,
       user_id: user.id,
       type: 'trade',
@@ -119,6 +119,7 @@ export async function POST(request: Request) {
       remark: `平台回购 ${unitIds.length} 个电池单元`,
       completed_at: new Date().toISOString(),
     })
+    if (txError) console.error('Buyback transaction insert error:', txError)
 
     return ok({
       message: `成功回购 ${unitIds.length} 个电池单元`,
@@ -202,6 +203,35 @@ async function computeBuybackForUnit(
           .eq('id', ua.id)
       }
     }
+
+    // 回购后检查：若投资者不再持有该资产的任何电池单元，清理分红记录
+    const { data: remainingHoldings } = await supabase
+      .from('investor_battery_units')
+      .select('id')
+      .eq('investor_id', userId)
+      .eq('battery_asset_id', ibu.battery_asset_id)
+      .limit(1)
+
+    if (!remainingHoldings || remainingHoldings.length === 0) {
+      await supabase
+        .from('dividend_records')
+        .delete()
+        .eq('user_id', userId)
+        .eq('asset_id', ibu.battery_asset_id)
+    }
+
+    // 插入回购交易订单记录（与购买订单并列展示）
+    const { error: orderErr } = await supabase.from('investor_orders').insert({
+      user_id: userId,
+      asset_id: ibu.battery_asset_id,
+      units: 1,
+      unit_price: valuation.buybackPrice,
+      total_amount: valuation.buybackPrice,
+      status: 'completed',
+      store_id: null,
+      order_source: 'platform',
+    })
+    if (orderErr) console.error('Buyback order insert error:', orderErr)
   }
 
   return {

@@ -91,9 +91,10 @@ export async function POST(request: Request) {
     await adminClient.from('users').update({ total_investment: newTotal }).eq('id', user.id)
 
     // Record transaction
-    await adminClient.from('transactions').insert({
+    const { error: txError } = await adminClient.from('transactions').insert({
       tx_no: `TX${Date.now()}`, user_id: user.id, type: 'trade', amount: total, status: 'completed'
     })
+    if (txError) console.error('Order transaction insert error:', txError)
 
     // Assign battery_units: 优先分配已部署到站点但未售的电池（运营中无主），再回退到仓库 available
     // Step 1: 查找已部署运营但 investor_id 为空的电池单元 (status='sold' + site_name IS NOT NULL + investor_id IS NULL)

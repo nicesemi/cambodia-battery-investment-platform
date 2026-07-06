@@ -1053,7 +1053,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                                 <Battery className="h-4 w-4 text-gray-400" />
                                 <span className="font-medium text-sm">{unit.unit_code || unit.id?.slice(0, 8)}</span>
                               </div>
-                              <span className="text-xs text-gray-500">{unit.asset_name}</span>
+                              <span className="text-xs text-gray-500">{resolveI18n(unit, 'asset_name_i18n', unit.asset_name, i18n)}</span>
                             </div>
                             <div className="mt-1 text-xs text-gray-500">{t('trade.purchasePrice')}: {formatCurrency(Number(unit.unit_price || 1000), i18n.language)}</div>
                           </div>))}
@@ -1152,7 +1152,9 @@ const getPenaltyTierDisplay = (tier, t) => {
                         <td className="p-4 text-right">{formatCurrency(o.unit_price || 0, i18n.language)}</td>
                         <td className="p-4 text-right font-semibold">{formatCurrency(o.total_amount || 0, i18n.language)}</td>
                         <td className="p-4 text-right">
-                          {o.order_source === 'store' ? (
+                          {o.order_source === 'platform' ? (
+                            <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">{t('invest.orders.platform')}</span>
+                          ) : o.order_source === 'store' ? (
                             <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">{o.store?.name || t('invest.orders.store')}</span>
                           ) : <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">{t('invest.orders.online')}</span>}
                         </td>

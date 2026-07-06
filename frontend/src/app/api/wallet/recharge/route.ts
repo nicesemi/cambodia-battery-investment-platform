@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, badRequest, unauthorized, serverError } from '@/lib/response'
 
@@ -44,9 +44,9 @@ export async function POST(request: Request) {
       return serverError('充值失败，请重试')
     }
 
-    // 记录充值交易
+    // 记录充值交易（使用 admin client 绕过 RLS）
     const txNo = `DEP${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-    await supabase.from('transactions').insert({
+    const { error: txError } = await getSupabaseAdmin().from('transactions').insert({
       tx_no: txNo,
       user_id: user.id,
       type: 'deposit',
@@ -56,6 +56,10 @@ export async function POST(request: Request) {
       remark: '钱包充值',
       completed_at: new Date().toISOString(),
     })
+
+    if (txError) {
+      console.error('Transaction insert error:', txError)
+    }
 
     return ok({
       message: '充值成功',

@@ -1186,6 +1186,7 @@
   "invest.orders.asset": "ব্যাটারি সম্পদ",
   "invest.orders.empty": "কোন অর্ডার রেকর্ড নেই",
   "invest.orders.online": "অনলাইন অর্ডার",
+  "invest.orders.platform": "প্ল্যাটফর্ম বাইব্যাক",
   "invest.orders.source": "অর্ডারের উৎস",
   "invest.orders.store": "দোকান থেকে ক্রয়",
   "invest.orders.time": "সময়",

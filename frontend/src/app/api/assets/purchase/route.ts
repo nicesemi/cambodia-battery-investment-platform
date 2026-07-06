@@ -53,7 +53,8 @@ export async function POST(request: Request) {
     await supabase.from('users').update({ total_investment: newTotal }).eq('id', user.id)
 
     // Record transaction
-    await supabase.from('transactions').insert({ tx_no: `TX${Date.now()}`, user_id: user.id, type: 'trade', amount: totalCost, status: 'completed' })
+    const { error: txError } = await supabase.from('transactions').insert({ tx_no: `TX${Date.now()}`, user_id: user.id, type: 'trade', amount: totalCost, status: 'completed' })
+    if (txError) console.error('Purchase transaction insert error:', txError)
 
     return ok({ message: 'Asset purchased successfully', purchased: { assetId, units, unitPrice: asset.unit_price, totalCost } })
   } catch (e: any) {

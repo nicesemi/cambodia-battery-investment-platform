@@ -1153,6 +1153,7 @@
   "invest.orders.asset": "Battery Asset",
   "invest.orders.empty": "No order records",
   "invest.orders.online": "Online Order",
+  "invest.orders.platform": "Platform Buyback",
   "invest.orders.source": "Order Source",
   "invest.orders.store": "Store Purchase",
   "invest.orders.time": "Time",
