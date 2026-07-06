@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { formatDate } from '../../lib/date-format';
-import { franchiseeAPI, orderAPI, agentAPI, adminAPI, chatbotAPI } from '../../services/api';
+import { franchiseeAPI, orderAPI, agentAPI, adminAPI, chatbotAPI, authAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
 import {
   Store, Battery, MapPin, Zap, Shield, TrendingUp, Send, Plus, QrCode, ClipboardList, BarChart3, Calculator, MessageCircle, Star, Globe, Users, DollarSign, Wallet, Phone, Mail, ChevronRight, X, Loader2, Search, Home, Building2, BadgeCheck, AlertTriangle, Clock, Award, Target, Lightbulb, UserPlus, Eye, ArrowLeft, CheckCircle, Edit2, Image, Upload, Lock
@@ -313,6 +313,10 @@ export default function Franchisee() {
   const [depositRefundForm, setDepositRefundForm] = useState({ bank_name: '', bank_account: '', bank_holder: '', business_license_url: '' });
   const [depositRefundSubmitting, setDepositRefundSubmitting] = useState(false);
   const [depositRefundUploading, setDepositRefundUploading] = useState({});
+  // === 充值模态框 ===
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [rechargeAmount, setRechargeAmount] = useState('');
+  const [rechargeSubmitting, setRechargeSubmitting] = useState(false);
   const [selectedStore, setSelectedStore] = useState(null);
   const [overviewPerformance, setOverviewPerformance] = useState(null);
   // === 概览信息卡片 ===
@@ -795,6 +799,21 @@ export default function Franchisee() {
       setDepositRefundForm(prev => ({ ...prev, business_license_url: data.url }));
     } catch { alert('上传失败'); }
     finally { setDepositRefundUploading({}); }
+  };
+
+  const handleRechargeSubmit = async (e) => {
+    e.preventDefault();
+    const amount = parseFloat(rechargeAmount);
+    if (!amount || amount <= 0) { alert(t('franchisee.alert.invalidAmount') || '请输入有效金额'); return; }
+    setRechargeSubmitting(true);
+    try {
+      await authAPI.rechargeWallet(amount);
+      alert(t('franchisee.alert.depositSuccess'));
+      setShowRechargeModal(false);
+      setRechargeAmount('');
+      loadWalletData();
+    } catch (err) { alert(t('franchisee.alert.depositFailed') + ': ' + (err.message || '')); }
+    finally { setRechargeSubmitting(false); }
   };
 
   const handleWithdrawModalSubmit = async (e) => {
@@ -2436,8 +2455,12 @@ export default function Franchisee() {
                   </div>
                 </div>
 
-                {/* 立即提现按钮 */}
-                <div className="flex justify-end">
+                {/* 充值 & 提现按钮 */}
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => { setRechargeAmount(''); setShowRechargeModal(true); }}
+                    className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition shadow-md">
+                    <Wallet className="h-4 w-4" /> {t('franchisee.wallet.recharge') || '充值'}
+                  </button>
                   <button onClick={() => {
                     setWithdrawModalForm({
                       amount: walletData.withdrawableBalance || 0,
@@ -3312,6 +3335,34 @@ export default function Franchisee() {
                 {appealSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{t('franchisee.modal.submitAppeal')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== 充值模态框 ===== */}
+      {showRechargeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">{t('franchisee.wallet.recharge') || '充值'}</h3>
+              <button onClick={() => setShowRechargeModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
+            <form onSubmit={handleRechargeSubmit} className="space-y-4">
+              <div>
+                <label className="label">{t('franchisee.wallet.rechargeAmount') || '充值金额'}</label>
+                <input type="number" min="0" step="0.01" value={rechargeAmount}
+                  onChange={e => setRechargeAmount(e.target.value)}
+                  className="input-field" placeholder="0.00" required />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowRechargeModal(false)}
+                  className="flex-1 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition">{t('common.cancel')}</button>
+                <button type="submit" disabled={rechargeSubmitting}
+                  className="flex-1 py-2.5 rounded-lg bg-green-600 text-white font-medium text-sm hover:bg-green-700 transition flex items-center justify-center gap-2 disabled:opacity-50">
+                  {rechargeSubmitting ? t('franchisee.modal.submitting') : (t('franchisee.wallet.recharge') || '充值')}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
