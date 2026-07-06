@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { badRequest, ok, unauthorized, serverError } from '@/lib/response'
 import { calculateBuybackPrice } from '@/lib/battery-valuation'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -102,14 +103,14 @@ export async function POST(request: Request) {
     if (!wallet) return serverError('钱包信息获取失败')
 
     const newBalance = Number(wallet.balance) + totalBuyback
-    await supabase
+    await getSupabaseAdmin()
       .from('user_wallets')
       .update({ balance: Math.round(newBalance * 100) / 100, updated_at: new Date().toISOString() })
       .eq('user_id', user.id)
 
     // 记录交易
     const txNo = `PLT${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-    const { error: txError } = await supabase.from('transactions').insert({
+    const { error: txError } = await getSupabaseAdmin().from('transactions').insert({
       tx_no: txNo,
       user_id: user.id,
       type: 'trade',
@@ -171,16 +172,16 @@ async function computeBuybackForUnit(
     monthsHeld,
   })
 
-  // 4. 执行回购
+  // 4. 执行回购（所有写操作必须使用 getSupabaseAdmin() 绕过 RLS）
   if (execute && valuation.buybackPrice >= 0) {
     // 标记电池单元为 available
-    await supabase
+    await getSupabaseAdmin()
       .from('battery_units')
       .update({ status: 'available', investor_id: null, updated_at: new Date().toISOString() })
       .eq('id', unitId)
 
     // 删除投资者持有记录
-    await supabase
+    await getSupabaseAdmin()
       .from('investor_battery_units')
       .delete()
       .eq('id', ibu.id)
@@ -195,9 +196,9 @@ async function computeBuybackForUnit(
 
     if (ua && ua.units > 0) {
       if (ua.units <= 1) {
-        await supabase.from('user_assets').delete().eq('id', ua.id)
+        await getSupabaseAdmin().from('user_assets').delete().eq('id', ua.id)
       } else {
-        await supabase
+        await getSupabaseAdmin()
           .from('user_assets')
           .update({ units: ua.units - 1 })
           .eq('id', ua.id)
@@ -213,7 +214,7 @@ async function computeBuybackForUnit(
       .limit(1)
 
     if (!remainingHoldings || remainingHoldings.length === 0) {
-      await supabase
+      await getSupabaseAdmin()
         .from('dividend_records')
         .delete()
         .eq('user_id', userId)
@@ -221,7 +222,7 @@ async function computeBuybackForUnit(
     }
 
     // 插入回购交易订单记录（与购买订单并列展示）
-    const { error: orderErr } = await supabase.from('investor_orders').insert({
+    const { error: orderErr } = await getSupabaseAdmin().from('investor_orders').insert({
       user_id: userId,
       asset_id: ibu.battery_asset_id,
       units: 1,

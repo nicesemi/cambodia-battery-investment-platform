@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, notFound, badRequest, serverError } from '@/lib/response'
 
@@ -21,7 +21,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ o
     if (order.order_type === 'buy') {
       const refund = order.price * remaining
       const { data: w } = await supabase.from('user_wallets').select('balance, frozen_balance').eq('user_id', user.id).single()
-      if (w) await supabase.from('user_wallets').update({
+      if (w) await getSupabaseAdmin().from('user_wallets').update({
         balance: Number(w.balance) + refund,
         frozen_balance: Math.max(0, Number(w.frozen_balance) - refund)
       }).eq('user_id', user.id)

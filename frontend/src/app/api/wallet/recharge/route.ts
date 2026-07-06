@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const newBalance = Number(wallet.balance) + rechargeAmount
 
     // Update balance
-    const { error: updateError } = await supabase
+    const { error: updateError } = await getSupabaseAdmin()
       .from('user_wallets')
       .update({
         balance: newBalance,

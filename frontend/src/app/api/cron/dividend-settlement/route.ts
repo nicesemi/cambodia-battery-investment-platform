@@ -66,7 +66,7 @@ export async function GET(request: Request) {
         .single()
 
       const newBalance = Number(wallet?.balance || 0) + dividendAmount
-      await supabase
+      await getSupabaseAdmin()
         .from('user_wallets')
         .update({ balance: Math.round(newBalance * 100) / 100, updated_at: now.toISOString() })
         .eq('user_id', record.user_id)

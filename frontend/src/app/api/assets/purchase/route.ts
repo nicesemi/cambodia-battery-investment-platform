@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     if (!wallet || Number(wallet.balance) < totalCost) return badRequest('余额不足，请先去我的钱包充值！')
 
     // Execute: deduct balance
-    const { error: deductErr } = await supabase.from('user_wallets').update({ balance: Number(wallet.balance) - totalCost }).eq('user_id', user.id)
+    const { error: deductErr } = await getSupabaseAdmin().from('user_wallets').update({ balance: Number(wallet.balance) - totalCost }).eq('user_id', user.id)
     if (deductErr) return serverError(deductErr.message)
 
     // Update asset available

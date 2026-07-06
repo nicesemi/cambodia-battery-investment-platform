@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       })
 
       const { data: w } = await supabase.from('user_wallets').select('balance').eq('user_id', ua.user_id).single()
-      await supabase.from('user_wallets').update({ balance: Number(w?.balance || 0) + dividend }).eq('user_id', ua.user_id)
+      await getSupabaseAdmin().from('user_wallets').update({ balance: Number(w?.balance || 0) + dividend }).eq('user_id', ua.user_id)
 
       const { data: cu } = await supabase.from('users').select('total_dividends').eq('id', ua.user_id).single()
       await supabase.from('users').update({ total_dividends: Number(cu?.total_dividends || 0) + dividend }).eq('id', ua.user_id)
