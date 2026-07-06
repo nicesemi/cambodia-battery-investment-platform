@@ -47,13 +47,14 @@ export async function POST(request: Request) {
     if (!userAssets?.length) return ok({ message: 'No users to distribute', period, totalDividendPool: 0 })
 
     // Cross-check: filter out assets where user has no active investor_battery_units
-    const activeHolderIds = new Set<number>()
+    // Use composite key (user_id, asset_id) to exclude buyback batteries per-asset
+    const activeHolderKeys = new Set<string>()
     for (const ua of userAssets) {
       const { data: holdings } = await supabase.from('investor_battery_units')
         .select('id').eq('investor_id', ua.user_id).eq('battery_id', ua.asset_id).limit(1)
-      if (holdings && holdings.length > 0) activeHolderIds.add(ua.user_id)
+      if (holdings && holdings.length > 0) activeHolderKeys.add(`${ua.user_id}_${ua.asset_id}`)
     }
-    const eligibleAssets = userAssets.filter(ua => activeHolderIds.has(ua.user_id))
+    const eligibleAssets = userAssets.filter(ua => activeHolderKeys.has(`${ua.user_id}_${ua.asset_id}`))
 
     const totalUnits = eligibleAssets.reduce((s: number, ua: any) => s + ua.units, 0)
     const dividendPerUnit = investorShare / totalUnits

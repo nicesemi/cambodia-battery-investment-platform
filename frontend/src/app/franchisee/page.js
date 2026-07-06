@@ -300,7 +300,7 @@ export default function Franchisee() {
   const [earningsData, setEarningsData] = useState(null);
   const [earningsLoading, setEarningsLoading] = useState(false);
   // === {t('franchisee.wallet.title')} ===
-  const [walletData, setWalletData] = useState({ franchiseFee: 0, depositAmount: 0, performanceTarget: 0, cumulativePerformance: 0, cumulativeEarnings: 0, monthlyRevenue: 0, totalBalance: 0, withdrawableBalance: 0, preTargetWithdrawable: 0, postTargetWithdrawable: 0 });
+  const [walletData, setWalletData] = useState({ franchiseFee: 0, depositAmount: 0, performanceTarget: 0, cumulativePerformance: 0, cumulativeEarnings: 0, pendingEarnings: 0, monthlyRevenue: 0, totalBalance: 0, withdrawableBalance: 0, preTargetWithdrawable: 0, postTargetWithdrawable: 0 });
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletSubTab, setWalletSubTab] = useState('total'); // 'total' | 'preTarget' | 'postTarget'
   const [walletTransactions, setWalletTransactions] = useState([]);
@@ -563,7 +563,8 @@ export default function Franchisee() {
       const cityPurchaseAmount = (earnings?.city_earnings?.total_purchase_amount || 0);
       const cumulativePerf = selfPurchaseAmount + cityPurchaseAmount;
       // 累计收益 = 来自“{t('franchisee.earnings.pageTitle')}”页面的{t('franchisee.earnings.totalLabel')}（{t('franchisee.earnings.commission')}+租金{t('franchisee.earnings.share')}），用于余额计算
-      const cumulativeEarnings = (earnings?.grand_total || 0);
+      const cumulativeEarnings = (earnings?.settled_total || 0);
+      const pendingEarnings = (earnings?.pending_total || 0);
 
       // 拉取提现记录，用于计算余额
       let totalWithdrawn = 0;
@@ -606,8 +607,8 @@ export default function Franchisee() {
 
       // {t('franchisee.wallet.balanceLabel')} = 保证金 + 收益 - 已提现（收益={t('franchisee.earnings.totalLabel')}来自“{t('franchisee.earnings.pageTitle')}”）
       const bizBalance = depositAmount + cumulativeEarnings - totalWithdrawn;
-      // 使用 API 返回的实际余额（包含充值/分红/回购），兜底用业务公式计算
-      const totalBalance = apiBalance >= 0 ? apiBalance : Math.max(0, bizBalance);
+      // 使用 API 返回的实际余额（包含充值/分红/回购）；仅当 API 有真实余额时使用，否则兜底用业务公式
+      const totalBalance = apiBalance > 0 ? apiBalance : Math.max(0, bizBalance);
       // 业绩是否达标（用业绩判断，不用收益）
       const isTargetMet = perfTarget > 0 && cumulativePerf >= perfTarget;
       // 达标前：{t('franchisee.wallet.withdrawableLabel')} = 收益 - 待处理提现
@@ -623,6 +624,7 @@ export default function Franchisee() {
         performanceTarget: perfTarget,
         cumulativePerformance: cumulativePerf,
         cumulativeEarnings: cumulativeEarnings,
+        pendingEarnings: pendingEarnings,
         monthlyRevenue,
         totalBalance: Math.max(0, totalBalance),
         withdrawableBalance: Math.max(0, withdrawableBalance),
@@ -833,7 +835,7 @@ export default function Franchisee() {
       alert(t('franchisee.alert.depositSuccess'));
       setShowRechargeModal(false);
       setRechargeAmount('');
-      loadWalletData();
+      await loadWalletData();
     } catch (err) { alert(t('franchisee.alert.depositFailed') + ': ' + (err.message || '')); }
     finally { setRechargeSubmitting(false); }
   };
@@ -2463,6 +2465,11 @@ export default function Franchisee() {
                       <div className="mt-3 bg-blue-500/30 rounded-lg px-3 py-2 text-xs">
                         {t('franchisee.wallet.balanceBreakdownDetail', { deposit: formatCurrency(walletData.depositAmount || 0, i18n.language), earnings: formatCurrency(walletData.cumulativeEarnings || 0, i18n.language) })}
                       </div>
+                      {walletData.pendingEarnings > 0 && (
+                        <div className="mt-2 bg-blue-500/20 rounded-lg px-3 py-2 text-xs text-blue-100">
+                          {t('franchisee.wallet.pendingEarnings') || '待结算收益'}: {formatCurrency(walletData.pendingEarnings || 0, i18n.language)} ({t('franchisee.wallet.pendingEarningsHint') || '次月1日到账'})
+                        </div>
+                      )}
                     </div>
                   </div>
 

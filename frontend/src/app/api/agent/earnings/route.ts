@@ -119,6 +119,8 @@ export async function GET(request: Request) {
     // 5. 计算自营门店收益：staff_registration → investor → online 购买订单 → 5% commission + 5% rent
     let selfCommission = 0
     let selfRentShare = 0
+    let selfRentShareSettled = 0   // 已过次月1日 → 可提现
+    let selfRentSharePending = 0   // 未过次月1日 → 锁定中
     let selfPurchaseAmount = 0
     const selfStoreMap: Record<string, { store_id: string; store_name: string; purchase_commission: number; rental_share: number; purchase_amount: number; rent_start_date: string | null }> = {}
     // 每个门店的 ren_start 记录（用于后续取最早值）
@@ -252,6 +254,14 @@ export async function GET(request: Request) {
             const rentShare = proratedRent * 0.05
             selfRentShare += rentShare
 
+            // 判断是否已结算：rentStart 所在月的次月1日 ≤ 今天 → 可提现
+            const settlementDate = new Date(rentStart.getFullYear(), rentStart.getMonth() + 1, 1)
+            if (now >= settlementDate) {
+              selfRentShareSettled += rentShare
+            } else {
+              selfRentSharePending += rentShare
+            }
+
             selfStoreMap[storeId].rental_share += rentShare
           }
         }
@@ -300,6 +310,8 @@ export async function GET(request: Request) {
     }
     let cityCommission = 0
     let cityRentShare = 0
+    let cityRentShareSettled = 0
+    let cityRentSharePending = 0
     let cityPurchaseAmount = 0
     let cityDetails: any[] = []
 
@@ -476,6 +488,15 @@ export async function GET(request: Request) {
 
             const rentShare = proratedRent * downstreamRate
             cityRentShare += rentShare
+
+            // 判断是否已结算
+            const settlementDate = new Date(rentStart.getFullYear(), rentStart.getMonth() + 1, 1)
+            if (now >= settlementDate) {
+              cityRentShareSettled += rentShare
+            } else {
+              cityRentSharePending += rentShare
+            }
+
             d.rent_share += rentShare
           }
         }
@@ -508,6 +529,9 @@ export async function GET(request: Request) {
 
     const cityTotal = cityCommission + cityRentShare
     const grandTotal = selfTotal + cityTotal
+    // 已结算 = 佣金(立即可用) + 已过次月1日的租金分成
+    const settledTotal = selfCommission + selfRentShareSettled + cityCommission + cityRentShareSettled
+    const pendingTotal = selfRentSharePending + cityRentSharePending
     const hasCityEarnings = ((subStoreIds.length > 0 || subordinateUserIds.length > 0) && downstreamRate > 0)
 
     return ok({
@@ -516,6 +540,8 @@ export async function GET(request: Request) {
       self_earnings: {
         purchase_commission: +selfCommission.toFixed(2),
         rental_share: +selfRentShare.toFixed(2),
+        rental_share_settled: +selfRentShareSettled.toFixed(2),
+        rental_share_pending: +selfRentSharePending.toFixed(2),
         total: +selfTotal.toFixed(2),
         total_purchase_amount: +selfPurchaseAmount.toFixed(2),
         stores: selfStores,
@@ -523,11 +549,15 @@ export async function GET(request: Request) {
       city_earnings: hasCityEarnings ? {
         purchase_commission: +cityCommission.toFixed(2),
         rental_share: +cityRentShare.toFixed(2),
+        rental_share_settled: +cityRentShareSettled.toFixed(2),
+        rental_share_pending: +cityRentSharePending.toFixed(2),
         total: +cityTotal.toFixed(2),
         total_purchase_amount: +cityPurchaseAmount.toFixed(2),
         details: cityDetails.slice(0, 50),
       } : null,
       grand_total: +grandTotal.toFixed(2),
+      settled_total: +settledTotal.toFixed(2),
+      pending_total: +pendingTotal.toFixed(2),
     })
   } catch (e: any) {
     console.error('Agent earnings error:', e)
