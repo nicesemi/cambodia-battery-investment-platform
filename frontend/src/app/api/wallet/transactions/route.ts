@@ -51,12 +51,5 @@ export async function GET(request: Request) {
 }
 
 function getTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    deposit: '充值',
-    withdraw: '提现',
-    dividend: '分红',
-    trade: '交易',
-    fee: '手续费',
-  }
-  return labels[type] || type
+  return type
 }

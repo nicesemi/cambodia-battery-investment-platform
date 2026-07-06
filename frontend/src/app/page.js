@@ -163,7 +163,7 @@ function useBatteryAssets() {
             size: t.dimensions || '—',
             weight: t.net_weight || '—',
             energy: t.power_kwh || '—',
-            img: t.thumbnail_url || t.image_url || '/design-images/image15.webp',
+            img: t.thumbnail_url || t.image_url || '/design-images/image15.jpeg',
           });
         });
         _batteryAssetsCache = grouped;
@@ -317,7 +317,7 @@ function BatteryAssetsSection() {
             >
               <div className="h-48 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
                 <img src={item.img} alt={item.model} loading="lazy" decoding="async"
-                  onError={(e) => { e.target.src = '/design-images/image15.webp'; }}
+                  onError={(e) => { e.target.src = '/design-images/image15.jpeg'; }}
                   className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500" />
               </div>
               <div className="p-5">
@@ -1749,15 +1749,15 @@ function FranchiseStoresSection({ amapReady }) {
 
 // ─── 运营场景自动轮播 ──────────────────────────────────
 const getScenes = (t) => [
-  { label: t('home.scene.deliverySwap'), img: '/design-images/image2.webp' },
-  { label: t('home.scene.motorSwap'), img: '/design-images/image3.webp' },
-  { label: t('home.scene.busFleetBattery'), img: '/design-images/image7.webp' },
-  { label: t('home.scene.busRental'), img: '/design-images/image8.webp' },
-  { label: t('home.scene.shopPeakValley'), img: '/design-images/image9.webp' },
-  { label: t('home.scene.industrialParkStorage'), img: '/design-images/image10.webp' },
-  { label: t('home.scene.chargerStorage'), img: '/design-images/image11.webp' },
-  { label: t('home.scene.mallFactoryStorage'), img: '/design-images/image12.webp' },
-  { label: t('home.scene.tricycleSwap'), img: '/design-images/image14.webp' },
+  { label: t('home.scene.deliverySwap'), img: '/design-images/image2.jpg' },
+  { label: t('home.scene.motorSwap'), img: '/design-images/image3.jpg' },
+  { label: t('home.scene.busFleetBattery'), img: '/design-images/image7.png' },
+  { label: t('home.scene.busRental'), img: '/design-images/image8.png' },
+  { label: t('home.scene.shopPeakValley'), img: '/design-images/image9.png' },
+  { label: t('home.scene.industrialParkStorage'), img: '/design-images/image10.png' },
+  { label: t('home.scene.chargerStorage'), img: '/design-images/image11.png' },
+  { label: t('home.scene.mallFactoryStorage'), img: '/design-images/image12.png' },
+  { label: t('home.scene.tricycleSwap'), img: '/design-images/image14.png' },
 ];
 
 
@@ -1849,7 +1849,7 @@ export default function HomePage() {
             <div className="grid grid-cols-3 gap-6 mt-12">
               <StatCounter end={1000} label={t('home.activeUsers')} suffix="+" />
               <StatCounter end={50} label={t('home.operatingStations')} suffix="+" />
-              <StatCounter end={38} label={t('home.annualReturn')} suffix="%" />
+              <StatCounter end={27} label={`>27%`} suffix="" />
             </div>
           </div>
         </div>

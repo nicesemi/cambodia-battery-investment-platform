@@ -41,14 +41,24 @@ export async function POST(request: Request) {
       })
     }
 
-    // Get all user assets
+    // Get all user assets and cross-check with investor_battery_units
+    // to exclude batteries that have been sold back to platform (no active holding)
     const { data: userAssets } = await supabase.from('user_assets').select('user_id, asset_id, units, users(email, username)').gt('units', 0)
     if (!userAssets?.length) return ok({ message: 'No users to distribute', period, totalDividendPool: 0 })
 
-    const totalUnits = userAssets.reduce((s: number, ua: any) => s + ua.units, 0)
+    // Cross-check: filter out assets where user has no active investor_battery_units
+    const activeHolderIds = new Set<number>()
+    for (const ua of userAssets) {
+      const { data: holdings } = await supabase.from('investor_battery_units')
+        .select('id').eq('investor_id', ua.user_id).eq('battery_id', ua.asset_id).limit(1)
+      if (holdings && holdings.length > 0) activeHolderIds.add(ua.user_id)
+    }
+    const eligibleAssets = userAssets.filter(ua => activeHolderIds.has(ua.user_id))
+
+    const totalUnits = eligibleAssets.reduce((s: number, ua: any) => s + ua.units, 0)
     const dividendPerUnit = investorShare / totalUnits
 
-    for (const ua of userAssets) {
+    for (const ua of eligibleAssets) {
       const dividend = ua.units * dividendPerUnit
       const dividendNo = `DIV${period}${String(ua.user_id).substring(0, 8).toUpperCase()}`
 
@@ -73,7 +83,7 @@ export async function POST(request: Request) {
       })
     }
 
-    return ok({ message: 'Dividend calculation completed', period, totalDividendPool: investorShare, totalUnits, dividendPerUnit, userCount: userAssets.length })
+    return ok({ message: 'Dividend calculation completed', period, totalDividendPool: investorShare, totalUnits, dividendPerUnit, userCount: eligibleAssets.length })
   } catch (e: any) {
     console.error('Dividend calc error:', e)
     return serverError()

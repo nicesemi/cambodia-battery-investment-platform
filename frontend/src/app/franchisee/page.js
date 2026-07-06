@@ -607,7 +607,7 @@ export default function Franchisee() {
       // {t('franchisee.wallet.balanceLabel')} = 保证金 + 收益 - 已提现（收益={t('franchisee.earnings.totalLabel')}来自“{t('franchisee.earnings.pageTitle')}”）
       const bizBalance = depositAmount + cumulativeEarnings - totalWithdrawn;
       // 使用 API 返回的实际余额（包含充值/分红/回购），兜底用业务公式计算
-      const totalBalance = apiBalance > 0 ? apiBalance : Math.max(0, bizBalance);
+      const totalBalance = apiBalance >= 0 ? apiBalance : Math.max(0, bizBalance);
       // 业绩是否达标（用业绩判断，不用收益）
       const isTargetMet = perfTarget > 0 && cumulativePerf >= perfTarget;
       // 达标前：{t('franchisee.wallet.withdrawableLabel')} = 收益 - 待处理提现
@@ -1379,7 +1379,7 @@ export default function Franchisee() {
               ...(isAgent || hasApproved ? [{ key: 'earnings', label: t('franchisee.tab.revenue'), icon: TrendingUp }] : []),
               ...(isAgent || hasApproved ? [{ key: 'wallet', label: t('franchisee.tab.wallet'), icon: Wallet }] : []),
             ].map(t => (
-              <button key={t.key} onClick={() => { setActiveTab(t.key); setSelectedStoreId(null); if (t.key === 'cases') loadTopCases(); if (t.key === 'earnings') loadEarnings(); if (t.key === 'wallet') loadWalletData(); if (t.key === 'agent-apply') loadAgentStatus(); }}
+              <button key={t.key} onClick={() => { setActiveTab(t.key); setSelectedStoreId(null); if (t.key === 'cases') loadTopCases(); if (t.key === 'earnings') { loadEarnings(); loadWalletData(); } if (t.key === 'wallet') loadWalletData(); if (t.key === 'agent-apply') loadAgentStatus(); }}
                 className={`flex items-center gap-1.5 py-3.5 px-4 border-b-2 text-sm font-medium whitespace-nowrap transition ${
                   activeTab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                 <t.icon className="h-4 w-4" /><span>{t.label}</span>
@@ -2292,10 +2292,18 @@ export default function Franchisee() {
               <div className="bg-white rounded-xl border p-12 text-center text-gray-500"><Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />{t('franchisee.earnings.loading')}</div>
             ) : earningsData ? (
               <>
-                {/* 总收入概览 */}
+                {/* 预计收益（当月，次月1日到账） */}
                 <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-xl p-6">
-                  <div className="text-blue-200 text-sm">{t('franchisee.earnings.totalLabel')}</div>
+                  <div className="text-blue-200 text-sm">{t('franchisee.earnings.pendingLabel')}</div>
                   <div className="text-4xl font-bold mt-1">{formatCurrency(earningsData.grand_total || 0, i18n.language)}</div>
+                  <div className="text-blue-200 text-xs mt-2">{t('franchisee.earnings.settlementDate')}</div>
+                </div>
+
+                {/* 已到账收益 */}
+                <div className="bg-gradient-to-br from-green-600 to-green-800 text-white rounded-xl p-6">
+                  <div className="text-green-200 text-sm">{t('franchisee.earnings.settledLabel')}</div>
+                  <div className="text-4xl font-bold mt-1">{formatCurrency(walletData.cumulativeEarnings || 0, i18n.language)}</div>
+                  <div className="text-green-200 text-xs mt-2">{t('franchisee.earnings.settledDesc')}</div>
                 </div>
 
                 {/* {t('franchisee.earnings.ownStoreTitle')} */}
@@ -2570,7 +2578,7 @@ export default function Franchisee() {
                                 tx.type === 'trade' ? 'bg-purple-100 text-purple-700' :
                                 tx.type === 'withdraw' ? 'bg-orange-100 text-orange-700' :
                                 'bg-gray-100 text-gray-600'}`}>
-                                {tx.typeLabel || tx.type}
+                                {t(`invest.wallet.tx${tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}`) || tx.typeLabel || tx.type}
                               </span>
                               {tx.status && (
                                 <span className={`text-xs ${tx.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>

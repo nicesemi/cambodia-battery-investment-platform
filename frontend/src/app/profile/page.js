@@ -518,7 +518,12 @@ export default function Profile() {
 
   const loadProfile = useCallback(async () => {
     try {
-      const res = await authAPI.getProfile();
+      const results = await Promise.all([
+        authAPI.getProfile(),
+        authAPI.getStoreHierarchy().catch(() => null),
+      ]);
+      const res = results[0];
+      const hierRes = results[1];
       const u = res.user;
       setProfile(u);
       setForm({
@@ -527,11 +532,8 @@ export default function Profile() {
         country: u?.country || 'China',
         language: u?.language || 'zh',
         username: u?.username || ''});
-      if (u?.role === 'investor') {
-        try {
-          const hierRes = await authAPI.getStoreHierarchy();
-          setHierarchy(hierRes.bindings || []);
-        } catch (e) { /* ignore */ }
+      if (u?.role === 'investor' && hierRes) {
+        setHierarchy(hierRes.bindings || []);
       }
     } catch (error) {
       console.error('Load profile error:', error);
