@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 
     // Fetch operation_sites name_i18n for battery_units
     const siteIds = [...new Set(
-      (myUnits || []).map(ibu => (ibu.battery_units as any)?.[0]?.site_id || ibu.battery_units?.site_id).filter(Boolean)
+      (myUnits || []).map(ibu => (ibu.battery_units as any)?.[0]?.site_id || (ibu.battery_units as any)?.site_id).filter(Boolean)
     )]
     let siteI18nMap: Record<string, any> = {}
     let locationI18nMap: Record<string, any> = {}
