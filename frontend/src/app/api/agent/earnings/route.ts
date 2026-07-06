@@ -126,10 +126,6 @@ export async function GET(request: Request) {
     // 每个门店的 ren_start 记录（用于后续取最早值）
     const selfStoreRentStarts: Record<string, Date[]> = {}
 
-    // 当前月份（用于区分当月预计收益 vs 已到账收益）
-    const currentYear = new Date().getFullYear()
-    const currentMonth = new Date().getMonth()
-
     if (ownStoreIds.length > 0) {
       // [排查发现-断链点3a] 若 staff_registration 订单的 store_id 为 NULL，
       // .in('store_id', ownStoreIds) 会过滤掉这些订单（SQL IN 不匹配 NULL），
@@ -162,6 +158,10 @@ export async function GET(request: Request) {
           .in('user_id', investorIds)
           .eq('order_source', 'online')
           .eq('status', 'completed')
+
+        const nowForCommission = new Date()
+        const currentYear = nowForCommission.getFullYear()
+        const currentMonth = nowForCommission.getMonth()
 
         if (purchases && purchases.length > 0) {
           for (const o of purchases) {
