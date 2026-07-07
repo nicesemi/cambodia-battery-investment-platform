@@ -140,6 +140,15 @@ export async function POST(request: Request) {
       .maybeSingle()
     console.log('[SellToPlatform] verifyTx:', verifyTx ? `FOUND ${verifyTx.tx_no} amount=${verifyTx.amount}` : 'NOT FOUND')
 
+    // 诊断：查询该用户所有 trade 类型记录
+    const { data: allTradeTxs } = await getSupabaseAdmin()
+      .from('transactions')
+      .select('tx_no, amount, created_at')
+      .eq('user_id', user.id)
+      .eq('type', 'trade')
+      .order('created_at', { ascending: false })
+    console.log('[SellToPlatform] all trade txs for user:', allTradeTxs?.length || 0, allTradeTxs?.map(t => `${t.tx_no}=${t.amount}(created_at:${t.created_at})`).join(', '))
+
     return ok({
       message: `成功回购 ${unitIds.length} 个电池单元`,
       totalBuyback: Math.round(totalBuyback * 100) / 100,
@@ -215,7 +224,7 @@ async function computeBuybackForUnit(
       .eq('id', ibu.id)
 
     // 更新用户资产总表
-    const { data: ua } = await supabase
+    const { data: ua } = await getSupabaseAdmin()
       .from('user_assets')
       .select('id, units')
       .eq('user_id', userId)
@@ -234,7 +243,7 @@ async function computeBuybackForUnit(
     }
 
     // 回购后检查：若投资者不再持有该资产的任何电池单元，清理分红记录
-    const { data: remainingHoldings } = await supabase
+    const { data: remainingHoldings } = await getSupabaseAdmin()
       .from('investor_battery_units')
       .select('id')
       .eq('investor_id', userId)
