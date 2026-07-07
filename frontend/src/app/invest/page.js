@@ -516,6 +516,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       if (txRes.ok) {
         const txs = txData.transactions || txData.records || [];
         console.log('[loadWalletTransactions] setting', txs.length, 'transactions, first:', txs[0]?.txNo, txs[0]?.type, txs[0]?.amount);
+        console.log('[loadWalletTransactions] all amounts:', txs.map(t => t.amount || t.txAmount).slice(0, 5));
         setWalletTransactions(txs);
       } else {
         console.error('[loadWalletTransactions] API failed:', txRes.status, txData);
@@ -548,7 +549,7 @@ const getPenaltyTierDisplay = (tier, t) => {
           setWalletBalance(newBal);
           console.log('[Recharge] setWalletBalance called, checking after microtask...');
           setTimeout(() => {
-            console.log('[Recharge] DEBUG: current page version = 2026-07-07-v2');
+            console.log('[Recharge] DEBUG: current page version = 2026-07-07-v3');
             console.log('[Recharge] If you see this, the new code IS deployed. If not, Vercel is serving old code.');
           }, 100);
         } else {
