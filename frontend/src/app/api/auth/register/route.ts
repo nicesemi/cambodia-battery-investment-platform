@@ -44,8 +44,11 @@ export async function POST(request: Request) {
 
     if (error) return badRequest(error.message)
 
-    // Create wallet
-    await supabase.from('user_wallets').insert({ user_id: user.id })
+    // Create wallet (upsert to avoid duplicate rows)
+    await supabase.from('user_wallets').upsert(
+      { user_id: user.id, balance: 0, currency: 'USD' },
+      { onConflict: 'user_id, currency', ignoreDuplicates: true }
+    )
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'battery-investment-platform-jwt-secret-key-2024', { expiresIn: '7d' })
 

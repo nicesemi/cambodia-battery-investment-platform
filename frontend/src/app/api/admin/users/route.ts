@@ -64,6 +64,12 @@ export async function POST(request: Request) {
 
     if (error) return serverError(error.message)
 
+    // Create wallet for operator
+    await supabase.from('user_wallets').upsert(
+      { user_id: newUser.id, balance: 0, currency: 'USD' },
+      { onConflict: 'user_id, currency', ignoreDuplicates: true }
+    )
+
     return ok({ user: newUser })
   } catch (e: any) {
     return serverError()

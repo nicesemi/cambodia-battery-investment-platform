@@ -71,8 +71,11 @@ export async function POST(request: Request) {
 
     if (createErr) return serverError(createErr.message)
 
-    // 创建钱包
-    await supabase.from('user_wallets').insert({ user_id: investor.id })
+    // 创建钱包 (upsert to avoid duplicate rows)
+    await supabase.from('user_wallets').upsert(
+      { user_id: investor.id, balance: 0, currency: 'USD' },
+      { onConflict: 'user_id, currency', ignoreDuplicates: true }
+    )
 
     // 绑定投资者到门店（通过 investor_orders 记录建立关联）
     // 使用一个最小的假订单记录来建立 store_id 绑定
