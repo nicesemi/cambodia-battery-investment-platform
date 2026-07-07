@@ -198,6 +198,7 @@ function InvestPageContent() {
   const [txPage, setTxPage] = useState(1);
   const [txTotalPages, setTxTotalPages] = useState(1);
   const [txTotal, setTxTotal] = useState(0);
+  const [txDebug, setTxDebug] = useState(null);
 
   // Recharge
   const [showRechargeModal, setShowRechargeModal] = useState(false);
@@ -521,6 +522,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       const txData = await txRes.json();
       console.log('[loadWalletTransactions] response:', txRes.status, 'records:', txData.transactions?.length || 0, 'total:', txData.pagination?.total);
       console.log('[loadWalletTransactions] _debug:', txData._debug);
+      setTxDebug(txData._debug || null);
       if (txRes.ok) {
         const txs = txData.transactions || [];
         if (txs.length > 0) {
@@ -1403,6 +1405,17 @@ const getPenaltyTierDisplay = (tier, t) => {
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+                {/* 诊断面板 */}
+                {txDebug && (
+                  <div className="border-t mt-3 pt-3 px-4 pb-3">
+                    <details>
+                      <summary className="text-xs text-gray-400 cursor-pointer select-none">Debug Info</summary>
+                      <pre className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded overflow-auto max-h-64">
+                        {JSON.stringify(txDebug, null, 2)}
+                      </pre>
+                    </details>
                   </div>
                 )}
               </>
