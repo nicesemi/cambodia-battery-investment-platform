@@ -533,9 +533,21 @@ const getPenaltyTierDisplay = (tier, t) => {
       });
       if (res.ok) {
         const result = await res.json();
+        console.log('[Recharge] POST response:', result);
+        console.log('[Recharge] result.balance:', result.balance, 'type:', typeof result.balance);
         // 立即用 POST 响应中的最新余额更新 UI，不依赖后续 API 调用
         if (result.balance != null) {
-          setWalletBalance(Number(result.balance));
+          const newBal = Number(result.balance);
+          console.log('[Recharge] setting walletBalance to:', newBal);
+          setWalletBalance(newBal);
+          console.log('[Recharge] setWalletBalance called, checking after microtask...');
+          setTimeout(() => {
+            console.log('[Recharge] DEBUG: current page version = 2026-07-07-v2');
+            console.log('[Recharge] If you see this, the new code IS deployed. If not, Vercel is serving old code.');
+          }, 100);
+        } else {
+          console.warn('[Recharge] result.balance is null/undefined, falling back to GET profile');
+          loadWallet();
         }
         setShowRechargeModal(false);
         setRechargeAmount('');

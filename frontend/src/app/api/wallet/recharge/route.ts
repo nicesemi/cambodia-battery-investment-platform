@@ -20,8 +20,9 @@ export async function POST(request: Request) {
     const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
     console.log('[Recharge] SUPABASE_SERVICE_ROLE_KEY present:', hasServiceKey)
 
-    // Get current wallet
-    const { data: wallet, error: walletError } = await supabase
+    // Get current wallet (use admin to bypass RLS)
+    const adminClient = getSupabaseAdmin()
+    const { data: wallet, error: walletError } = await adminClient
       .from('user_wallets')
       .select('id, balance, currency')
       .eq('user_id', user.id)
@@ -37,7 +38,6 @@ export async function POST(request: Request) {
     const newBalance = Number(wallet.balance) + rechargeAmount
 
     // Update balance
-    const adminClient = getSupabaseAdmin()
     const { error: updateError } = await adminClient
       .from('user_wallets')
       .update({
