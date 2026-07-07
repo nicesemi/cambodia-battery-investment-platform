@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { ok, unauthorized, serverError } from '@/lib/response'
 
 export const dynamic = 'force-dynamic'

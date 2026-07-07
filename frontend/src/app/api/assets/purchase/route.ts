@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken, requireVerified } from '@/lib/auth'
 import { badRequest, ok, unauthorized, notFound, serverError } from '@/lib/response'
 
