@@ -80,6 +80,7 @@ export async function POST(request: Request) {
         message: '充值成功（交易记录写入失败）',
         balance: newBalance,
         amount: rechargeAmount,
+        tx_no: txNo,
         txError: JSON.stringify(txError),
       })
     }
@@ -88,6 +89,8 @@ export async function POST(request: Request) {
       message: '充值成功',
       balance: newBalance,
       amount: rechargeAmount,
+      tx_no: txNo,
+      _api_version: 'v2',
     })
   } catch (e: any) {
     console.error('Recharge error:', e)

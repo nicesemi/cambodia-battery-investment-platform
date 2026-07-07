@@ -542,6 +542,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       if (res.ok) {
         const result = await res.json();
         console.log('[Recharge] POST response:', result);
+        console.log('[Recharge] tx_no:', result.tx_no, '_api_version:', result._api_version);
         console.log('[Recharge] result.balance:', result.balance, 'type:', typeof result.balance);
         // 立即用 POST 响应中的最新余额更新 UI，不依赖后续 API 调用
         if (result.balance != null) {
