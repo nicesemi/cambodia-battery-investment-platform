@@ -489,6 +489,7 @@ const getPenaltyTierDisplay = (tier, t) => {
         fetch('/api/wallet/transactions', { headers }),
       ]);
       const profileData = await profileRes.json();
+      console.log('[loadWallet] profileRes.ok:', profileRes.ok, 'wallet.balance:', profileData.wallet?.balance, 'profileData:', profileData);
       if (profileRes.ok && profileData.wallet) {
         setWalletBalance(profileData.wallet.balance);
       } else if (!profileRes.ok) {
@@ -549,7 +550,7 @@ const getPenaltyTierDisplay = (tier, t) => {
           setWalletBalance(newBal);
           console.log('[Recharge] setWalletBalance called, checking after microtask...');
           setTimeout(() => {
-            console.log('[Recharge] DEBUG: current page version = 2026-07-07-v3');
+            console.log('[Recharge] DEBUG: current page version = 2026-07-07-v4');
             console.log('[Recharge] If you see this, the new code IS deployed. If not, Vercel is serving old code.');
           }, 100);
         } else {

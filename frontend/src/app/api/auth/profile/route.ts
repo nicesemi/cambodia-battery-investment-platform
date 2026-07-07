@@ -16,6 +16,8 @@ export async function GET(request: Request) {
     const { data: wallet } = await getSupabaseAdmin().from('user_wallets')
       .select('balance, frozen_balance, currency').eq('user_id', user.id).single()
 
+    console.log('[Profile] user_id:', user.id, 'wallet.balance:', wallet?.balance)
+
     return ok({ 
       user: profile ? { ...profile, agentType: profile.agent_type || null } : null,
       wallet 
