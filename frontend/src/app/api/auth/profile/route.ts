@@ -20,9 +20,11 @@ export async function GET(request: Request) {
 
     return ok({ 
       user: profile ? { ...profile, agentType: profile.agent_type || null } : null,
-      wallet 
+      wallet,
+      _serverTime: new Date().toISOString(),
+      _version: 'fix-cache-v2'
     }, {
-      headers: { 'Cache-Control': 'no-store, max-age=0' }
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' }
     })
   } catch (e: any) {
     console.error('Profile error:', e)
