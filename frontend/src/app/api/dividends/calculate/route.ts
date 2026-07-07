@@ -77,10 +77,11 @@ export async function POST(request: Request) {
 
       await supabase.from('user_assets').update({ total_dividends_received: 0 }).eq('user_id', ua.user_id).eq('asset_id', ua.asset_id)
 
+      const now = new Date().toISOString()
       const { error: txError } = await getSupabaseAdmin().from('transactions').insert({
         tx_no: `TX${Date.now()}${Math.random().toString(36).substring(2, 6)}`,
         user_id: ua.user_id, type: 'dividend', amount: dividend, status: 'completed',
-        remark: `${period} dividend for ${ua.units} units`
+        remark: `${period} dividend for ${ua.units} units`, created_at: now, completed_at: now
       })
       if (txError) console.error('Dividend transaction insert error:', txError)
     }

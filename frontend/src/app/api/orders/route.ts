@@ -91,8 +91,10 @@ export async function POST(request: Request) {
     await adminClient.from('users').update({ total_investment: newTotal }).eq('id', user.id)
 
     // Record transaction
+    const now = new Date().toISOString()
     const { error: txError } = await adminClient.from('transactions').insert({
-      tx_no: `TX${Date.now()}`, user_id: user.id, type: 'trade', amount: total, status: 'completed'
+      tx_no: `TX${Date.now()}`, user_id: user.id, type: 'trade', amount: total, status: 'completed',
+      created_at: now, completed_at: now
     })
     if (txError) console.error('Order transaction insert error:', txError)
 

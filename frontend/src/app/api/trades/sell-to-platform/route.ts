@@ -109,6 +109,7 @@ export async function POST(request: Request) {
 
     // 记录交易
     const txNo = `PLT${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+    const now = new Date().toISOString()
     const { error: txError } = await getSupabaseAdmin().from('transactions').insert({
       tx_no: txNo,
       user_id: user.id,
@@ -117,7 +118,8 @@ export async function POST(request: Request) {
       currency: 'USD',
       status: 'completed',
       remark: `平台回购 ${unitIds.length} 个电池单元`,
-      completed_at: new Date().toISOString(),
+      created_at: now,
+      completed_at: now,
     })
     if (txError) console.error('Buyback transaction insert error:', txError)
 
