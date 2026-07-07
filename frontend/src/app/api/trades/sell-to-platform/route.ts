@@ -83,14 +83,20 @@ export async function POST(request: Request) {
     const results = []
     let totalBuyback = 0
 
+    console.log('[SellToPlatform] unitIds:', unitIds, 'userId:', user.id)
+
     for (const unitId of unitIds) {
       const result: Record<string, unknown> = await computeBuybackForUnit(user.id, unitId, true)
       if ('error' in result) {
+        console.log('[SellToPlatform] unit failed:', unitId, result.error)
         return badRequest(`电池 ${unitId}: ${result.error}`)
       }
       results.push(result)
       totalBuyback += Number(result.buybackPrice)
+      console.log('[SellToPlatform] unit', unitId, 'buyback:', result.buybackPrice)
     }
+
+    console.log('[SellToPlatform] totalBuyback:', totalBuyback)
 
     // 平台扣款（从平台利润角度，实际是支出给投资者）
     const { data: wallet } = await supabase
@@ -100,12 +106,15 @@ export async function POST(request: Request) {
       .single()
 
     if (!wallet) return serverError('钱包信息获取失败')
+    console.log('[SellToPlatform] wallet before:', wallet.balance)
 
     const newBalance = Number(wallet.balance) + totalBuyback
     await getSupabaseAdmin()
       .from('user_wallets')
       .update({ balance: Math.round(newBalance * 100) / 100, updated_at: new Date().toISOString() })
       .eq('user_id', user.id)
+
+    console.log('[SellToPlatform] wallet after:', Math.round(newBalance * 100) / 100)
 
     // 记录交易
     const txNo = `PLT${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
@@ -121,7 +130,7 @@ export async function POST(request: Request) {
       created_at: now,
       completed_at: now,
     })
-    if (txError) console.error('Buyback transaction insert error:', txError)
+    console.log('[SellToPlatform] tx insert result - error:', txError ? JSON.stringify(txError) : 'null', 'txNo:', txNo)
 
     // 回查交易记录，绕过读副本延迟直接返回
     const { data: verifyTx } = await getSupabaseAdmin()
@@ -129,6 +138,7 @@ export async function POST(request: Request) {
       .select('tx_no, type, amount, currency, status, remark, created_at, completed_at')
       .eq('tx_no', txNo)
       .maybeSingle()
+    console.log('[SellToPlatform] verifyTx:', verifyTx ? `FOUND ${verifyTx.tx_no} amount=${verifyTx.amount}` : 'NOT FOUND')
 
     return ok({
       message: `成功回购 ${unitIds.length} 个电池单元`,

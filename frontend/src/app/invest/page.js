@@ -676,6 +676,7 @@ const getPenaltyTierDisplay = (tier, t) => {
         body: JSON.stringify({ unitIds: selectedUnitIds }),
       });
       const json = await res.json();
+      console.log('[SellToPlatform frontend] response:', { ok: res.ok, hasTx: !!json.transaction, txNo: json.transaction?.txNo, totalBuyback: json.totalBuyback });
       if (!res.ok) { setSellMsg(json.error || t('trade.sellFailed')); setSellSuccess(false); return; }
       setSellSuccess(true);
       setSellMsg(t('trade.sellSuccess', { total: json.totalBuyback.toFixed(2), totalCny: (json.totalBuyback * 7.25).toFixed(2), balance: json.newBalance.toFixed(2), balanceCny: (json.newBalance * 7.25).toFixed(2) }));
