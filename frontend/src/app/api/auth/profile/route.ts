@@ -19,6 +19,8 @@ export async function GET(request: Request) {
     return ok({ 
       user: profile ? { ...profile, agentType: profile.agent_type || null } : null,
       wallet 
+    }, {
+      headers: { 'Cache-Control': 'no-store, max-age=0' }
     })
   } catch (e: any) {
     console.error('Profile error:', e)

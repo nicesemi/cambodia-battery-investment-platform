@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 
-export function ok(data: unknown, status = 200) {
-  return NextResponse.json(data, { status })
+export function ok(data: unknown, options?: number | { status?: number; headers?: Record<string, string> }) {
+  if (typeof options === 'number') {
+    return NextResponse.json(data, { status: options })
+  }
+  const { status = 200, headers } = options || {}
+  return NextResponse.json(data, { status, headers })
 }
 
 export function badRequest(message: string) {
