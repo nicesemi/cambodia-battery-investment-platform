@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         platform_fee: 0, status: 'completed'
       })
 
-      const { data: w } = await supabase.from('user_wallets').select('balance').eq('user_id', ua.user_id).single()
+      const { data: w } = await getSupabaseAdmin().from('user_wallets').select('balance').eq('user_id', ua.user_id).single()
       await getSupabaseAdmin().from('user_wallets').update({ balance: Number(w?.balance || 0) + dividend }).eq('user_id', ua.user_id)
 
       const { data: cu } = await supabase.from('users').select('total_dividends').eq('id', ua.user_id).single()
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 
       await supabase.from('user_assets').update({ total_dividends_received: 0 }).eq('user_id', ua.user_id).eq('asset_id', ua.asset_id)
 
-      const { error: txError } = await supabase.from('transactions').insert({
+      const { error: txError } = await getSupabaseAdmin().from('transactions').insert({
         tx_no: `TX${Date.now()}${Math.random().toString(36).substring(2, 6)}`,
         user_id: ua.user_id, type: 'dividend', amount: dividend, status: 'completed',
         remark: `${period} dividend for ${ua.units} units`

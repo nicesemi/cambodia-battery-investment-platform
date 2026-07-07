@@ -73,7 +73,7 @@ export async function GET(request: Request) {
 
       // 写入交易记录
       const txNo = `DIV${period.replace('-', '')}${String(record.user_id).substring(0, 8).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-      const { error: txError } = await supabase.from('transactions').insert({
+      const { error: txError } = await getSupabaseAdmin().from('transactions').insert({
         tx_no: txNo,
         user_id: record.user_id,
         type: 'dividend',

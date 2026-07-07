@@ -20,7 +20,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ o
 
     if (order.order_type === 'buy') {
       const refund = order.price * remaining
-      const { data: w } = await supabase.from('user_wallets').select('balance, frozen_balance').eq('user_id', user.id).single()
+      const { data: w } = await getSupabaseAdmin().from('user_wallets').select('balance, frozen_balance').eq('user_id', user.id).single()
       if (w) await getSupabaseAdmin().from('user_wallets').update({
         balance: Number(w.balance) + refund,
         frozen_balance: Math.max(0, Number(w.frozen_balance) - refund)

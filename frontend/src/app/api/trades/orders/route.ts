@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       await supabase.from('user_assets').update({ units: ua.units - units }).eq('user_id', user.id).eq('asset_id', assetId)
     } else {
       const totalCost = price * units
-      const { data: w } = await supabase.from('user_wallets').select('balance').eq('user_id', user.id).single()
+      const { data: w } = await getSupabaseAdmin().from('user_wallets').select('balance').eq('user_id', user.id).single()
       if (!w || Number(w.balance) < totalCost) return badRequest('余额不足，请先去我的钱包充值！')
       await getSupabaseAdmin().from('user_wallets').update({ balance: Number(w.balance) - totalCost, frozen_balance: Number(w.balance) - totalCost }).eq('user_id', user.id)
     }
@@ -115,7 +115,7 @@ async function matchOrders(assetId: string) {
           await supabase.from('trade_orders').update({ filled_units: newSellFilled, status: sellStatus, filled_time: new Date().toISOString() }).eq('id', sell.id)
 
           // Unfreeze buyer funds
-          const { data: bw } = await supabase.from('user_wallets').select('frozen_balance').eq('user_id', buy.user_id).single()
+          const { data: bw } = await getSupabaseAdmin().from('user_wallets').select('frozen_balance').eq('user_id', buy.user_id).single()
           if (bw) await getSupabaseAdmin().from('user_wallets').update({ frozen_balance: Math.max(0, Number(bw.frozen_balance) - totalAmount) }).eq('user_id', buy.user_id)
 
           // Add asset to buyer
@@ -128,7 +128,7 @@ async function matchOrders(assetId: string) {
 
           // Pay seller
           const sellerReceive = totalAmount - fee
-          const { data: sw } = await supabase.from('user_wallets').select('balance').eq('user_id', sell.user_id).single()
+          const { data: sw } = await getSupabaseAdmin().from('user_wallets').select('balance').eq('user_id', sell.user_id).single()
           if (sw) await getSupabaseAdmin().from('user_wallets').update({ balance: Number(sw.balance) + sellerReceive }).eq('user_id', sell.user_id)
 
           buy.filled_units = newBuyFilled; buy.status = buyStatus

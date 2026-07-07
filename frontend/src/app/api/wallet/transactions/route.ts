@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, serverError } from '@/lib/response'
 
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100)
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseAdmin()
       .from('transactions')
       .select('tx_no, type, amount, currency, status, remark, created_at, completed_at')
       .eq('user_id', user.id)

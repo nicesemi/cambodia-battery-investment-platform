@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       .select('id, email, username, full_name, phone, country, language, role, agent_type, kyc_status, total_investment, total_dividends, created_at, email_verified, certification_status, rejection_reason, id_card_front_url, id_card_back_url, business_license_url')
       .eq('id', user.id).single()
 
-    const { data: wallet } = await supabase.from('user_wallets')
+    const { data: wallet } = await getSupabaseAdmin().from('user_wallets')
       .select('balance, frozen_balance, currency').eq('user_id', user.id).single()
 
     return ok({ 
