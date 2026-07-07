@@ -1,8 +1,7 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { badRequest, ok, unauthorized, serverError } from '@/lib/response'
 import { calculateBuybackPrice } from '@/lib/battery-valuation'
-import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
 
