@@ -491,13 +491,30 @@ const getPenaltyTierDisplay = (tier, t) => {
       const profileData = await profileRes.json();
       if (profileRes.ok && profileData.wallet) {
         setWalletBalance(profileData.wallet.balance);
+      } else if (!profileRes.ok) {
+        console.error('[loadWallet] profile API failed:', profileRes.status);
       }
       const txData = await txRes.json();
       if (txRes.ok) {
         setWalletTransactions(txData.transactions || txData.records || []);
+      } else {
+        console.error('[loadWallet] transactions API failed:', txRes.status);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('[loadWallet] error:', e); }
     finally { setWalletLoading(false); }
+  };
+
+  // 仅刷新交易明细（充值后调用，余额已由 POST 响应直接更新）
+  const loadWalletTransactions = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const txRes = await fetch('/api/wallet/transactions', { headers });
+      const txData = await txRes.json();
+      if (txRes.ok) {
+        setWalletTransactions(txData.transactions || txData.records || []);
+      }
+    } catch (e) { console.error('[loadWalletTransactions] error:', e); }
   };
 
   const handleRecharge = async () => {
@@ -515,10 +532,16 @@ const getPenaltyTierDisplay = (tier, t) => {
         body: JSON.stringify({ amount }),
       });
       if (res.ok) {
-        alert(t('invest.alert.rechargeSuccess'));
+        const result = await res.json();
+        // 立即用 POST 响应中的最新余额更新 UI，不依赖后续 API 调用
+        if (result.balance != null) {
+          setWalletBalance(Number(result.balance));
+        }
         setShowRechargeModal(false);
         setRechargeAmount('');
-        await loadWallet();
+        alert(t('invest.alert.rechargeSuccess'));
+        // 异步刷新交易明细（静默失败不影响余额已更新）
+        loadWalletTransactions();
       } else {
         const err = await res.json();
         alert(err.error || t('invest.alert.rechargeFailed'));
