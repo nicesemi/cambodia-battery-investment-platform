@@ -31,6 +31,24 @@ export async function GET(request: Request) {
       return serverError('获取交易记录失败')
     }
 
+    // 诊断：按类型统计
+    const { data: typeStats } = await getSupabaseAdmin()
+      .from('transactions')
+      .select('type')
+      .eq('user_id', user.id)
+    const typeCount: Record<string, number> = {}
+    for (const t of (typeStats || [])) { typeCount[t.type] = (typeCount[t.type] || 0) + 1 }
+    console.log('[Transactions] type stats for user', user.id, ':', JSON.stringify(typeCount), 'total:', typeStats?.length)
+
+    // 诊断：列出所有 trade 类型记录
+    const { data: tradeTxs } = await getSupabaseAdmin()
+      .from('transactions')
+      .select('tx_no, amount, created_at')
+      .eq('user_id', user.id)
+      .eq('type', 'trade')
+      .order('created_at', { ascending: false })
+    console.log('[Transactions] trade records for user', user.id, ':', tradeTxs?.length || 0, tradeTxs?.map(t => `${t.tx_no}=${t.amount}(c:${t.created_at})`).join(', '))
+
     const { data, error } = await getSupabaseAdmin()
       .from('transactions')
       .select('tx_no, type, amount, currency, status, remark, created_at, completed_at')
