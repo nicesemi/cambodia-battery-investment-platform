@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const eligibleDividends: any[] = []
     for (const d of (dividends || [])) {
       const { data: holding } = await supabase.from('investor_battery_units')
-        .select('id').eq('investor_id', user.id).eq('battery_id', d.asset_id).limit(1)
+        .select('id').eq('investor_id', user.id).eq('battery_asset_id', d.asset_id).limit(1)
       if (holding && holding.length > 0) {
         eligibleDividends.push(d)
       }

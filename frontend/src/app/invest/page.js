@@ -195,6 +195,9 @@ function InvestPageContent() {
   const [walletBalance, setWalletBalance] = useState(null);
   const [walletTransactions, setWalletTransactions] = useState([]);
   const [walletLoading, setWalletLoading] = useState(false);
+  const [txPage, setTxPage] = useState(1);
+  const [txTotalPages, setTxTotalPages] = useState(1);
+  const [txTotal, setTxTotal] = useState(0);
 
   // Recharge
   const [showRechargeModal, setShowRechargeModal] = useState(false);
@@ -486,7 +489,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const [profileRes, txRes] = await Promise.all([
         fetch('/api/auth/profile', { headers }),
-        fetch('/api/wallet/transactions', { headers }),
+        fetch('/api/wallet/transactions?page=1&limit=10', { headers }),
       ]);
       const profileData = await profileRes.json();
       console.log('[loadWallet] profileRes.ok:', profileRes.ok, 'wallet.balance:', profileData.wallet?.balance, '_serverTime:', profileData._serverTime, '_version:', profileData._version);
@@ -497,7 +500,10 @@ const getPenaltyTierDisplay = (tier, t) => {
       }
       const txData = await txRes.json();
       if (txRes.ok) {
-        setWalletTransactions(txData.transactions || txData.records || []);
+        setWalletTransactions(txData.transactions || []);
+        setTxPage(1);
+        setTxTotalPages(txData.pagination?.totalPages || 1);
+        setTxTotal(txData.pagination?.total || 0);
       } else {
         console.error('[loadWallet] transactions API failed:', txRes.status);
       }
@@ -505,29 +511,24 @@ const getPenaltyTierDisplay = (tier, t) => {
     finally { setWalletLoading(false); }
   };
 
-  // 仅刷新交易明细（充值后调用，余额已由 POST 响应直接更新）
-  const loadWalletTransactions = async () => {
+  // 仅刷新交易明细（充值/回购后调用，余额已由 POST 响应直接更新）
+  const loadWalletTransactions = async (page = 1) => {
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      console.log('[loadWalletTransactions] fetching...');
-      const txRes = await fetch('/api/wallet/transactions', { headers });
+      console.log('[loadWalletTransactions] fetching page:', page);
+      const txRes = await fetch(`/api/wallet/transactions?page=${page}&limit=10`, { headers });
       const txData = await txRes.json();
-      console.log('[loadWalletTransactions] response:', txRes.status, 'records:', txData.transactions?.length || txData.records?.length || 0);
+      console.log('[loadWalletTransactions] response:', txRes.status, 'records:', txData.transactions?.length || 0, 'total:', txData.pagination?.total);
       if (txRes.ok) {
-        const txs = txData.transactions || txData.records || [];
-        console.log('[loadWalletTransactions] setting', txs.length, 'transactions, first:', txs[0]?.txNo, txs[0]?.type, txs[0]?.amount);
-        console.log('[loadWalletTransactions] ALL amounts:', txs.map(t => t.amount).join(','));
-        // 合并去重：保留已有记录（充值响应已提前插入），新增未出现的记录
-        setWalletTransactions(prev => {
-          const existingSet = new Set(prev.map(t => t.txNo));
-          const newTxs = txs.filter(t => !existingSet.has(t.txNo));
-          return [...prev, ...newTxs].sort((a, b) => {
-            const da = a.createdAt || a.created_at || '';
-            const db = b.createdAt || b.created_at || '';
-            return db.localeCompare(da);
-          });
-        });
+        const txs = txData.transactions || [];
+        if (txs.length > 0) {
+          console.log('[loadWalletTransactions] first:', txs[0]?.txNo, txs[0]?.type, txs[0]?.amount);
+        }
+        setWalletTransactions(txs);
+        setTxPage(page);
+        setTxTotalPages(txData.pagination?.totalPages || 1);
+        setTxTotal(txData.pagination?.total || 0);
       } else {
         console.error('[loadWalletTransactions] API failed:', txRes.status, txData);
       }
@@ -566,8 +567,9 @@ const getPenaltyTierDisplay = (tier, t) => {
           setWalletTransactions(prev => {
             const existing = prev.find(t => t.txNo === result.transaction.txNo);
             if (existing) return prev;
-            return [result.transaction, ...prev];
+            return [result.transaction, ...prev].slice(0, 10);
           });
+          setTxTotal(t => t + 1);
         }
         setShowRechargeModal(false);
         setRechargeAmount('');
@@ -687,8 +689,9 @@ const getPenaltyTierDisplay = (tier, t) => {
       if (json.transaction) {
         setWalletTransactions(prev => {
           if (prev.find(t => t.txNo === json.transaction.txNo)) return prev;
-          return [json.transaction, ...prev];
+          return [json.transaction, ...prev].slice(0, 10);
         });
+        setTxTotal(t => t + 1);
       }
       loadMyUnits();
     } catch (e) { setSellSuccess(false); setSellMsg(t('trade.sellFailed')); }
@@ -1380,6 +1383,25 @@ const getPenaltyTierDisplay = (tier, t) => {
                         ))}
                       </tbody>
                     </table>
+                    {/* 分页控件 */}
+                    {txTotalPages > 1 && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t">
+                        <span className="text-sm text-gray-500">共 {txTotal} 条</span>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => loadWalletTransactions(txPage - 1)}
+                            disabled={txPage <= 1}
+                            className="px-3 py-1 text-sm rounded border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100"
+                          >上一页</button>
+                          <span className="text-sm text-gray-600">{txPage} / {txTotalPages}</span>
+                          <button
+                            onClick={() => loadWalletTransactions(txPage + 1)}
+                            disabled={txPage >= txTotalPages}
+                            className="px-3 py-1 text-sm rounded border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100"
+                          >下一页</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
