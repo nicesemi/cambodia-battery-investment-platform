@@ -83,6 +83,15 @@ export async function GET(request: Request) {
         total: count || 0,
         totalPages: Math.ceil((count || 0) / limit),
       },
+      _debug: {
+        typeStats: typeCount,
+        total: typeStats?.length || 0,
+        tradeRecords: (tradeTxs || []).map((t: any) => ({
+          txNo: t.tx_no,
+          amount: t.amount,
+          createdAt: t.created_at,
+        })),
+      },
     })
   } catch (e: any) {
     console.error('Wallet transactions error:', e)

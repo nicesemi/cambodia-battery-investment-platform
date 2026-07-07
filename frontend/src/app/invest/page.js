@@ -520,6 +520,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       const txRes = await fetch(`/api/wallet/transactions?page=${page}&limit=10`, { headers });
       const txData = await txRes.json();
       console.log('[loadWalletTransactions] response:', txRes.status, 'records:', txData.transactions?.length || 0, 'total:', txData.pagination?.total);
+      console.log('[loadWalletTransactions] _debug:', txData._debug);
       if (txRes.ok) {
         const txs = txData.transactions || [];
         if (txs.length > 0) {
