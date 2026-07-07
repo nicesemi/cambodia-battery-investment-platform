@@ -518,7 +518,16 @@ const getPenaltyTierDisplay = (tier, t) => {
         const txs = txData.transactions || txData.records || [];
         console.log('[loadWalletTransactions] setting', txs.length, 'transactions, first:', txs[0]?.txNo, txs[0]?.type, txs[0]?.amount);
         console.log('[loadWalletTransactions] ALL amounts:', txs.map(t => t.amount).join(','));
-        setWalletTransactions(txs);
+        // 合并去重：保留已有记录（充值响应已提前插入），新增未出现的记录
+        setWalletTransactions(prev => {
+          const existingSet = new Set(prev.map(t => t.txNo));
+          const newTxs = txs.filter(t => !existingSet.has(t.txNo));
+          return [...prev, ...newTxs].sort((a, b) => {
+            const da = a.createdAt || a.created_at || '';
+            const db = b.createdAt || b.created_at || '';
+            return db.localeCompare(da);
+          });
+        });
       } else {
         console.error('[loadWalletTransactions] API failed:', txRes.status, txData);
       }
@@ -542,22 +551,23 @@ const getPenaltyTierDisplay = (tier, t) => {
       if (res.ok) {
         const result = await res.json();
         console.log('[Recharge] POST response:', result);
-        console.log('[Recharge] tx_no:', result.tx_no, '_api_version:', result._api_version);
-        console.log('[Recharge] _verify_found:', result._verify_found, '_top_tx:', result._top_tx, '_top_amount:', result._top_amount);
+        console.log('[Recharge] _api_version:', result._api_version, '_verify_found:', result._verify_found);
         console.log('[Recharge] result.balance:', result.balance, 'type:', typeof result.balance);
-        // 立即用 POST 响应中的最新余额更新 UI，不依赖后续 API 调用
+        // 立即用 POST 响应中的最新余额更新 UI
         if (result.balance != null) {
-          const newBal = Number(result.balance);
-          console.log('[Recharge] setting walletBalance to:', newBal);
-          setWalletBalance(newBal);
-          console.log('[Recharge] setWalletBalance called, checking after microtask...');
-          setTimeout(() => {
-            console.log('[Recharge] DEBUG: current page version = 2026-07-07-v5');
-            console.log('[Recharge] If you see this, the new code IS deployed. If not, Vercel is serving old code.');
-          }, 100);
+          setWalletBalance(Number(result.balance));
         } else {
           console.warn('[Recharge] result.balance is null/undefined, falling back to GET profile');
           loadWallet();
+        }
+        // 立即用 POST 响应中的交易记录更新列表（绕过 Supabase 读副本延迟）
+        if (result.transaction) {
+          console.log('[Recharge] prepending transaction:', result.transaction.txNo);
+          setWalletTransactions(prev => {
+            const existing = prev.find(t => t.txNo === result.transaction.txNo);
+            if (existing) return prev;
+            return [result.transaction, ...prev];
+          });
         }
         setShowRechargeModal(false);
         setRechargeAmount('');
