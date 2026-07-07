@@ -123,11 +123,28 @@ export async function POST(request: Request) {
     })
     if (txError) console.error('Buyback transaction insert error:', txError)
 
+    // 回查交易记录，绕过读副本延迟直接返回
+    const { data: verifyTx } = await getSupabaseAdmin()
+      .from('transactions')
+      .select('tx_no, type, amount, currency, status, remark, created_at, completed_at')
+      .eq('tx_no', txNo)
+      .maybeSingle()
+
     return ok({
       message: `成功回购 ${unitIds.length} 个电池单元`,
       totalBuyback: Math.round(totalBuyback * 100) / 100,
       newBalance: Math.round(newBalance * 100) / 100,
       units: results,
+      transaction: verifyTx ? {
+        txNo: verifyTx.tx_no,
+        type: verifyTx.type,
+        amount: Number(verifyTx.amount),
+        currency: verifyTx.currency || 'USD',
+        status: verifyTx.status,
+        remark: verifyTx.remark || '',
+        createdAt: verifyTx.created_at,
+        completedAt: verifyTx.completed_at,
+      } : null,
     })
   } catch (e: any) {
     console.error('Sell-to-platform error:', e)

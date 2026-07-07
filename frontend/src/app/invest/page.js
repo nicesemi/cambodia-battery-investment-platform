@@ -681,6 +681,13 @@ const getPenaltyTierDisplay = (tier, t) => {
       setSellMsg(t('trade.sellSuccess', { total: json.totalBuyback.toFixed(2), totalCny: (json.totalBuyback * 7.25).toFixed(2), balance: json.newBalance.toFixed(2), balanceCny: (json.newBalance * 7.25).toFixed(2) }));
       setSelectedUnitIds([]);
       setPreviewMap({});
+      // 立即将回购交易 prepend 到本地列表，绕过读副本延迟
+      if (json.transaction) {
+        setWalletTransactions(prev => {
+          if (prev.find(t => t.txNo === json.transaction.txNo)) return prev;
+          return [json.transaction, ...prev];
+        });
+      }
       loadMyUnits();
     } catch (e) { setSellSuccess(false); setSellMsg(t('trade.sellFailed')); }
     finally { setSelling(false); }
