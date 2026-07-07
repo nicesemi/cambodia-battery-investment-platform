@@ -85,12 +85,32 @@ export async function POST(request: Request) {
       })
     }
 
+    // 立即回查验证 INSERT 是否对同一 admin 客户端可见
+    const { data: verifyTx } = await adminClient
+      .from('transactions')
+      .select('tx_no, created_at')
+      .eq('tx_no', txNo)
+      .maybeSingle()
+    console.log('[Recharge] verifyTx after insert:', verifyTx ? `FOUND: ${verifyTx.tx_no}` : 'NOT FOUND')
+
+    const { data: topTx } = await adminClient
+      .from('transactions')
+      .select('tx_no, amount, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    console.log('[Recharge] topTx after insert:', JSON.stringify(topTx))
+
     return ok({
       message: '充值成功',
       balance: newBalance,
       amount: rechargeAmount,
       tx_no: txNo,
-      _api_version: 'v2',
+      _api_version: 'v3',
+      _verify_found: !!verifyTx,
+      _top_tx: topTx?.tx_no,
+      _top_amount: topTx?.amount,
     })
   } catch (e: any) {
     console.error('Recharge error:', e)
