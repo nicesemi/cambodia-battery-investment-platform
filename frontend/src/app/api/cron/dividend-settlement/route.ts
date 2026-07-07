@@ -73,7 +73,6 @@ export async function GET(request: Request) {
 
       // 写入交易记录
       const txNo = `DIV${period.replace('-', '')}${String(record.user_id).substring(0, 8).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-      const now = new Date().toISOString()
       const { error: txError } = await getSupabaseAdmin().from('transactions').insert({
         tx_no: txNo,
         user_id: record.user_id,
@@ -82,8 +81,8 @@ export async function GET(request: Request) {
         currency: 'USD',
         status: 'completed',
         remark: `${period} 分红到账 (${record.units_held || 0} units)`,
-        created_at: now,
-        completed_at: now,
+        created_at: now.toISOString(),
+        completed_at: now.toISOString(),
       })
       if (txError) console.error('Dividend settlement transaction insert error:', txError)
 
