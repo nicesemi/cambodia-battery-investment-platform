@@ -517,7 +517,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       if (txRes.ok) {
         const txs = txData.transactions || txData.records || [];
         console.log('[loadWalletTransactions] setting', txs.length, 'transactions, first:', txs[0]?.txNo, txs[0]?.type, txs[0]?.amount);
-        console.log('[loadWalletTransactions] all amounts:', txs.map(t => t.amount || t.txAmount).slice(0, 5));
+        console.log('[loadWalletTransactions] ALL amounts:', txs.map(t => t.amount).join(','));
         setWalletTransactions(txs);
       } else {
         console.error('[loadWalletTransactions] API failed:', txRes.status, txData);
