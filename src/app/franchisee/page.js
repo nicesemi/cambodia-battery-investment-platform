@@ -607,7 +607,9 @@ export default function Franchisee() {
       // {t('franchisee.wallet.balanceLabel')} = 保证金 + 收益 - 已提现（收益={t('franchisee.earnings.totalLabel')}来自“{t('franchisee.earnings.pageTitle')}”）
       const bizBalance = depositAmount + cumulativeEarnings - totalWithdrawn;
       // 使用 API 返回的实际余额（包含充值/分红/回购），兜底用业务公式计算
-      const totalBalance = apiBalance >= 0 ? apiBalance : Math.max(0, bizBalance);
+      // 当 profile 返回有效 wallet.balance 时始终使用 API 值；仅当 wallet 不存在时才用 bizBalance
+      const hasApiWallet = profileData?.wallet && typeof profileData.wallet.balance === 'number';
+      const totalBalance = hasApiWallet ? Number(profileData.wallet.balance) : Math.max(0, bizBalance);
       // 业绩是否达标（用业绩判断，不用收益）
       const isTargetMet = perfTarget > 0 && cumulativePerf >= perfTarget;
       // 达标前：{t('franchisee.wallet.withdrawableLabel')} = 收益 - 待处理提现
@@ -833,7 +835,7 @@ export default function Franchisee() {
       alert(t('franchisee.alert.depositSuccess'));
       setShowRechargeModal(false);
       setRechargeAmount('');
-      loadWalletData();
+      await loadWalletData();
     } catch (err) { alert(t('franchisee.alert.depositFailed') + ': ' + (err.message || '')); }
     finally { setRechargeSubmitting(false); }
   };
@@ -2295,14 +2297,14 @@ export default function Franchisee() {
                 {/* 预计收益（当月，次月1日到账） */}
                 <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-xl p-6">
                   <div className="text-blue-200 text-sm">{t('franchisee.earnings.pendingLabel')}</div>
-                  <div className="text-4xl font-bold mt-1">{formatCurrency(earningsData.grand_total || 0, i18n.language)}</div>
+                  <div className="text-4xl font-bold mt-1">{formatCurrency(earningsData.current_month_total || 0, i18n.language)}</div>
                   <div className="text-blue-200 text-xs mt-2">{t('franchisee.earnings.settlementDate')}</div>
                 </div>
 
                 {/* 已到账收益 */}
                 <div className="bg-gradient-to-br from-green-600 to-green-800 text-white rounded-xl p-6">
                   <div className="text-green-200 text-sm">{t('franchisee.earnings.settledLabel')}</div>
-                  <div className="text-4xl font-bold mt-1">{formatCurrency(walletData.cumulativeEarnings || 0, i18n.language)}</div>
+                  <div className="text-4xl font-bold mt-1">{formatCurrency(earningsData.settled_total || 0, i18n.language)}</div>
                   <div className="text-green-200 text-xs mt-2">{t('franchisee.earnings.settledDesc')}</div>
                 </div>
 

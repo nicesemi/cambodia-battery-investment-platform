@@ -205,7 +205,7 @@ const getNetworkNodes = (t) => [
 ];
 
 // ─── 统计数字动画 ──────────────────────────────────────
-function StatCounter({ end, label, suffix = '' }) {
+function StatCounter({ end, label, suffix = '', prefix = '' }) {
   const [count, setCount] = useState(0);
   const ref = useRef(null);
   useEffect(() => {
@@ -227,7 +227,7 @@ function StatCounter({ end, label, suffix = '' }) {
   }, [end]);
   return (
     <div ref={ref} className="text-center">
-      <div className="text-3xl md:text-4xl font-bold text-yellow-400">{count.toLocaleString()}{suffix}</div>
+      <div className="text-3xl md:text-4xl font-bold text-yellow-400">{prefix}{count.toLocaleString()}{suffix}</div>
       <div className="text-sm text-yellow-400 mt-1">{label}</div>
     </div>
   );
@@ -1849,7 +1849,7 @@ export default function HomePage() {
             <div className="grid grid-cols-3 gap-6 mt-12">
               <StatCounter end={1000} label={t('home.activeUsers')} suffix="+" />
               <StatCounter end={50} label={t('home.operatingStations')} suffix="+" />
-              <StatCounter end={27} label={`>27%`} suffix="" />
+              <StatCounter end={27} label={t('home.annualReturn')} prefix=">" suffix="%" />
             </div>
           </div>
         </div>
