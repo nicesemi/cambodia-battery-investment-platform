@@ -76,6 +76,12 @@ export async function POST(request: Request) {
 
     if (txError) {
       console.error('[Recharge] transaction insert error:', JSON.stringify(txError))
+      return ok({
+        message: '充值成功（交易记录写入失败）',
+        balance: newBalance,
+        amount: rechargeAmount,
+        txError: JSON.stringify(txError),
+      })
     }
 
     return ok({
