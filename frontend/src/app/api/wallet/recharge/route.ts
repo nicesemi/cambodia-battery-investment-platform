@@ -16,6 +16,10 @@ export async function POST(request: Request) {
 
     const rechargeAmount = Number(amount)
 
+    // 诊断: 检查 SERVICE_ROLE_KEY 是否存在
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    console.log('[Recharge] SUPABASE_SERVICE_ROLE_KEY present:', hasServiceKey)
+
     // Get current wallet
     const { data: wallet, error: walletError } = await supabase
       .from('user_wallets')
@@ -28,10 +32,13 @@ export async function POST(request: Request) {
       return serverError('钱包信息获取失败')
     }
 
+    console.log('[Recharge] wallet before:', { id: wallet.id, balance: wallet.balance })
+
     const newBalance = Number(wallet.balance) + rechargeAmount
 
     // Update balance
-    const { error: updateError } = await getSupabaseAdmin()
+    const adminClient = getSupabaseAdmin()
+    const { error: updateError } = await adminClient
       .from('user_wallets')
       .update({
         balance: newBalance,
@@ -40,13 +47,21 @@ export async function POST(request: Request) {
       .eq('id', wallet.id)
 
     if (updateError) {
-      console.error('Recharge error:', updateError)
+      console.error('[Recharge] wallet update error:', JSON.stringify(updateError))
       return serverError('充值失败，请重试')
     }
 
+    // 验证写入: 用 admin client 回读确认
+    const { data: verifyWallet } = await adminClient
+      .from('user_wallets')
+      .select('balance')
+      .eq('id', wallet.id)
+      .single()
+    console.log('[Recharge] wallet after update:', verifyWallet?.balance)
+
     // 记录充值交易（使用 admin client 绕过 RLS）
     const txNo = `DEP${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-    const { error: txError } = await getSupabaseAdmin().from('transactions').insert({
+    const { error: txError } = await adminClient.from('transactions').insert({
       tx_no: txNo,
       user_id: user.id,
       type: 'deposit',
@@ -58,7 +73,7 @@ export async function POST(request: Request) {
     })
 
     if (txError) {
-      console.error('Transaction insert error:', txError)
+      console.error('[Recharge] transaction insert error:', JSON.stringify(txError))
     }
 
     return ok({
