@@ -61,6 +61,7 @@ export async function POST(request: Request) {
 
     // 记录充值交易（使用 admin client 绕过 RLS）
     const txNo = `DEP${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+    const now = new Date().toISOString()
     const { error: txError } = await adminClient.from('transactions').insert({
       tx_no: txNo,
       user_id: user.id,
@@ -69,7 +70,8 @@ export async function POST(request: Request) {
       currency: 'USD',
       status: 'completed',
       remark: '钱包充值',
-      completed_at: new Date().toISOString(),
+      created_at: now,
+      completed_at: now,
     })
 
     if (txError) {

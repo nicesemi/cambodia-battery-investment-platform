@@ -509,10 +509,16 @@ const getPenaltyTierDisplay = (tier, t) => {
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      console.log('[loadWalletTransactions] fetching...');
       const txRes = await fetch('/api/wallet/transactions', { headers });
       const txData = await txRes.json();
+      console.log('[loadWalletTransactions] response:', txRes.status, 'records:', txData.transactions?.length || txData.records?.length || 0);
       if (txRes.ok) {
-        setWalletTransactions(txData.transactions || txData.records || []);
+        const txs = txData.transactions || txData.records || [];
+        console.log('[loadWalletTransactions] setting', txs.length, 'transactions, first:', txs[0]?.txNo, txs[0]?.type, txs[0]?.amount);
+        setWalletTransactions(txs);
+      } else {
+        console.error('[loadWalletTransactions] API failed:', txRes.status, txData);
       }
     } catch (e) { console.error('[loadWalletTransactions] error:', e); }
   };
@@ -552,8 +558,18 @@ const getPenaltyTierDisplay = (tier, t) => {
         setShowRechargeModal(false);
         setRechargeAmount('');
         alert(t('invest.alert.rechargeSuccess'));
-        // 异步刷新交易明细（静默失败不影响余额已更新）
-        loadWalletTransactions();
+        console.log('[Recharge] POST done, scheduling loadWalletTransactions in 300ms...');
+        // 延迟 300ms 后重试 2 次，确保 Supabase 事务已提交
+        setTimeout(() => {
+          console.log('[Recharge] calling loadWalletTransactions (1st attempt)');
+          loadWalletTransactions().then(() => {
+            // 2 秒后再重试一次作为兜底
+            setTimeout(() => {
+              console.log('[Recharge] calling loadWalletTransactions (2nd attempt)');
+              loadWalletTransactions();
+            }, 2000);
+          });
+        }, 300);
       } else {
         const err = await res.json();
         alert(err.error || t('invest.alert.rechargeFailed'));
