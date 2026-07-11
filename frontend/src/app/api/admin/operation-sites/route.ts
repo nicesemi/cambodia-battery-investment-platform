@@ -190,6 +190,15 @@ export async function POST(request: Request) {
     const description = formData.get('description') as string || null
     const battery_type = formData.get('battery_type') as string || null
     const cabinet_slots = formData.get('cabinet_slots') as string || null
+    const name_i18n_raw = formData.get('name_i18n') as string
+    const country_i18n_raw = formData.get('country_i18n') as string
+    const city_i18n_raw = formData.get('city_i18n') as string
+
+    /** 安全解析 JSON 字符串，失败返回 null */
+    const safeJsonParse = (v: string | null) => {
+      if (!v) return null
+      try { return JSON.parse(v) } catch { return null }
+    }
 
     if (!name || !country || !city || !longitude || !latitude || !battery_count) {
       return badRequest('缺少必填字段: name, country, city, longitude, latitude, battery_count')
@@ -231,10 +240,14 @@ export async function POST(request: Request) {
         battery_type: battery_type || null,
         cabinet_slots: cabinet_slots && cabinet_slots !== '' ? parseInt(cabinet_slots) : null,
         image_url: image_url || null,
-        is_active: true
+        is_active: true,
+        name_i18n: safeJsonParse(name_i18n_raw),
+        country_i18n: safeJsonParse(country_i18n_raw),
+        city_i18n: safeJsonParse(city_i18n_raw),
       }
 
-      const { data: site, error } = await supabase
+      const adminClient = getSupabaseAdmin()
+      const { data: site, error } = await adminClient
         .from('operation_sites')
         .insert(insertData)
         .select('*')

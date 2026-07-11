@@ -78,6 +78,22 @@ export async function POST(request: Request) {
           .in('id', battery_ids)
         if (updateError) {
           console.error('[Dispatch] Failed to update battery site_name:', updateError.message)
+        } else {
+          // 重新计算该站点下已派工的电池总数，同步更新 operation_sites.battery_count
+          // 确保首页电池网络实时分布的 battery_count 与实际派工数量一致
+          const { count: siteBatteryCount, error: countError } = await adminClient
+            .from('battery_units')
+            .select('id', { count: 'exact', head: true })
+            .eq('site_id', site_id)
+          if (!countError && siteBatteryCount != null) {
+            const { error: bcError } = await adminClient
+              .from('operation_sites')
+              .update({ battery_count: siteBatteryCount })
+              .eq('id', site_id)
+            if (bcError) {
+              console.error('[Dispatch] Failed to sync operation_sites.battery_count:', bcError.message)
+            }
+          }
         }
       } else if (siteError) {
         console.error('[Dispatch] Failed to query operation_sites:', siteError.message)

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { badRequest, ok, unauthorized, notFound, serverError } from '@/lib/response'
 import { randomUUID } from 'crypto'
@@ -32,6 +32,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ site
     const battery_type = formData.get('battery_type') as string
     const cabinet_slots = formData.get('cabinet_slots') as string
     const keep_image_url = formData.get('keep_image_url') as string
+    const name_i18n = formData.get('name_i18n') as string
+    const country_i18n = formData.get('country_i18n') as string
+    const city_i18n = formData.get('city_i18n') as string
+
+    /** 安全解析 JSON 字符串，失败返回 null */
+    const safeJsonParse = (v: string | null) => {
+      if (!v) return null
+      try { return JSON.parse(v) } catch { return null }
+    }
 
     const updates: any = {}
     if (name !== undefined) updates.name = name
@@ -48,6 +57,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ site
     if (description !== undefined) updates.description = description || null
     if (battery_type !== undefined) updates.battery_type = battery_type || null
     if (cabinet_slots !== undefined) updates.cabinet_slots = cabinet_slots && cabinet_slots !== '' ? parseInt(cabinet_slots) : null
+    if (name_i18n !== undefined) updates.name_i18n = safeJsonParse(name_i18n)
+    if (country_i18n !== undefined) updates.country_i18n = safeJsonParse(country_i18n)
+    if (city_i18n !== undefined) updates.city_i18n = safeJsonParse(city_i18n)
 
     // 处理文件上传
     const image = formData.get('image') as File | null
@@ -66,7 +78,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ site
 
     if (Object.keys(updates).length === 0) return badRequest('No fields to update')
 
-    const { data: site, error } = await supabase
+    const adminClient = getSupabaseAdmin()
+    const { data: site, error } = await adminClient
       .from('operation_sites')
       .update(updates)
       .eq('id', id)
@@ -90,7 +103,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ s
     const { siteId } = await params
     const id = parseInt(siteId, 10)
     if (isNaN(id)) return badRequest('无效的站点ID')
-    const { data: site, error } = await supabase
+    const adminClient = getSupabaseAdmin()
+    const { data: site, error } = await adminClient
       .from('operation_sites')
       .delete()
       .eq('id', id)

@@ -412,7 +412,11 @@ function useBatteryLive() {
     const interval = setInterval(() => {
       fetch('/api/battery-units/live')
         .then(res => res.json())
-        .then(d => setData({ sites: d.sites || [], units: d.units || [], warehouses: d.warehouses || [], unsold_total: d.unsold_total || 0 }))
+        .then(d => {
+          const result = { sites: d.sites || [], units: d.units || [], warehouses: d.warehouses || [], unsold_total: d.unsold_total || 0 };
+          _batteryLiveCache = result;
+          setData(result);
+        })
         .catch(() => {});
     }, 10_000);
     return () => clearInterval(interval);
@@ -1254,7 +1258,7 @@ function CabinetDiagram({ site, onBack, SensorCard, onTrackBattery }) {
   else if (rawSlots && typeof rawSlots === 'object') { slots = Object.values(rawSlots); }
   if (!Array.isArray(slots)) slots = [];
   const totalSlots = slots.length;
-  const occupiedSlots = site.real_battery_count ?? slots.filter(s => s.status === 'occupied').length;
+  const occupiedSlots = slots.filter(s => s.status === 'occupied').length;
   const emptySlots = totalSlots - occupiedSlots;
 
   const slotStatusColor = (slot) => {
@@ -1283,7 +1287,7 @@ function CabinetDiagram({ site, onBack, SensorCard, onTrackBattery }) {
       <div className="flex items-center gap-4 text-xs">
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-yellow-400" />{t('home.occupied')} {occupiedSlots}</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300" />{t('home.empty')} {emptySlots}</span>
-        <span className="text-gray-400">{t('home.batteryAssets')} {site.real_battery_count ?? 0}{t('home.blockUnit')} · {t('home.totalPrefix')} {totalSlots}{t('home.slot')}</span>
+        <span className="text-gray-400">{t('home.batteryAssets')} {occupiedSlots}{t('home.blockUnit')} · {t('home.totalPrefix')} {totalSlots}{t('home.slot')}</span>
       </div>
 
       {/* 选中槽位传感器详情 — 显示在换电柜上方 */}
