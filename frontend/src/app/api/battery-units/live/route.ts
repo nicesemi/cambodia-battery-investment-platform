@@ -693,6 +693,11 @@ export async function GET(_request: Request) {
       total_batteries: allUnits.length,
       total_sites: Object.keys(siteGroups).length,
       unsold_total: unsoldUnits ? unsoldUnits.length : 0,
+      _serverTime: Date.now(),
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      },
     })
   } catch (e: any) {
     return serverError()

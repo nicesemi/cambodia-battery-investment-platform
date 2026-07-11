@@ -22,7 +22,7 @@ const DEFAULT_FORM = {
   city: '', city_i18n: { ...EMPTY_I18N },
   address: '', longitude: '', latitude: '',
   battery_count: '', status: '运营中', site_type: '', contact: '', description: '',
-  battery_type: '', cabinet_slots: '', image_url: ''
+  battery_type: '', cabinet_slots: '', template_id: '', image_url: ''
 };
 
 const DEFAULT_FILE = null;
@@ -46,6 +46,7 @@ export default function OperationSitesPage() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [batteryTypes, setBatteryTypes] = useState([]);
   const [siteTypes, setSiteTypes] = useState([]);
+  const [swapTemplates, setSwapTemplates] = useState([]);
   const [selectedLang, setSelectedLang] = useState('zh-CN');
 
   // 地理编码：优先通过后端代理调 Nominatim，失败则打开 Google Maps 手动查
@@ -79,6 +80,9 @@ export default function OperationSitesPage() {
     }).catch(() => {});
     fetch('/api/admin/site-types', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()).then(data => {
       setSiteTypes(data.site_types || []);
+    }).catch(() => {});
+    fetch('/api/admin/swap-stations', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()).then(data => {
+      setSwapTemplates(data.templates || []);
     }).catch(() => {});
   }, [user]);
 
@@ -117,6 +121,7 @@ export default function OperationSitesPage() {
       status: s.status || '运营中', site_type: s.site_type || '',
       site_code: s.site_code || '', contact: s.contact || '', description: s.description || '',
       battery_type: s.battery_type || '', cabinet_slots: s.cabinet_slots != null ? String(s.cabinet_slots) : '',
+      template_id: s.template_id || '',
       image_url: s.image_url || ''
     });
     setShowForm(true);
@@ -156,6 +161,9 @@ export default function OperationSitesPage() {
       fd.append('description', form.description);
       fd.append('battery_type', form.battery_type);
       fd.append('cabinet_slots', form.cabinet_slots);
+      if (form.template_id) {
+        fd.append('template_id', form.template_id);
+      }
       if (file) {
         fd.append('image', file);
       } else if (isEditing && !file && form.image_url) {
@@ -430,11 +438,32 @@ export default function OperationSitesPage() {
                       <p className="text-xs text-gray-400 mt-1.5">保存后自动生成</p>
                     )}
                   </div>
-                  {['4820', '6035', '7250', '72100'].some(p => form.battery_type?.startsWith(p)) && (
+                  {(['4820', '6035', '7250', '72100'].some(p => form.battery_type?.startsWith(p)) || form.site_type?.includes('swap') || form.site_type?.includes('换电')) && (
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">换电柜仓数</label>
-                    <input type="number" min="0" value={form.cabinet_slots} onChange={e => setForm({ ...form, cabinet_slots: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 12" />
+                    {swapTemplates.length > 0 && (form.site_type?.includes('swap') || form.site_type?.includes('换电')) ? (
+                      <select value={form.template_id}
+                        onChange={e => {
+                          const tid = e.target.value;
+                          const tmpl = swapTemplates.find(t => t.id === tid);
+                          setForm({
+                            ...form,
+                            template_id: tid,
+                            cabinet_slots: tmpl ? String(tmpl.cabinet_count) : form.cabinet_slots
+                          });
+                        }}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="">自定义</option>
+                        {swapTemplates.map(tmpl => (
+                          <option key={tmpl.id} value={tmpl.id}>
+                            {tmpl.name}（{tmpl.cabinet_count}仓）
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="number" min="0" value={form.cabinet_slots} onChange={e => setForm({ ...form, cabinet_slots: e.target.value })}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="如 12" />
+                    )}
                   </div>
                   )}
                   <div className="col-span-3">

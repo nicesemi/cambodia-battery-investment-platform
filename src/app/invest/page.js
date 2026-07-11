@@ -218,6 +218,15 @@ export default function Invest() {
   const [sellSuccess, setSellSuccess] = useState(false);
   const [tradeLoading, setTradeLoading] = useState(true);
 
+  // --- Franchise ---
+  const [swapTemplates, setSwapTemplates] = useState([]);
+  const [franchiseApplications, setFranchiseApplications] = useState([]);
+  const [franchiseForm, setFranchiseForm] = useState({ location: '', template_id: '' });
+  const [franchiseSubmitting, setFranchiseSubmitting] = useState(false);
+  const [franchiseMsg, setFranchiseMsg] = useState('');
+  const [myBatteryCounts, setMyBatteryCounts] = useState({ 4820: 0, 6035: 0, 7250: 0 });
+  const [franchiseStores, setFranchiseStores] = useState([]);
+
 const getTxRemark = (tx, t, i18n) => {
   // 优先使用 DB 中的 remark_i18n（多语言），其次 remark（纯文本），否则基于 type 做 i18n
   if (tx.remark_i18n) return resolveI18n(tx, 'remark_i18n', tx.remark, i18n);
@@ -326,6 +335,7 @@ const getPenaltyTierDisplay = (tier, t) => {
   useEffect(() => {
     if (activeTab === 'dividends') loadDividends();
     if (activeTab === 'wallet') loadWallet();
+    if (activeTab === 'franchise') loadFranchiseData();
   }, [activeTab]);
 
   useEffect(() => {
@@ -500,6 +510,81 @@ const getPenaltyTierDisplay = (tier, t) => {
     finally { setWalletLoading(false); }
   };
 
+  const loadFranchiseData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const [tmplRes, appRes, storeRes] = await Promise.all([
+        fetch('/api/admin/swap-stations', { headers }),
+        fetch('/api/franchise-applications', { headers }),
+        fetch('/api/operation-sites', { headers }),
+      ]);
+      if (tmplRes.ok) {
+        const d = await tmplRes.json();
+        setSwapTemplates(d.templates || []);
+      }
+      if (appRes.ok) {
+        const d = await appRes.json();
+        setFranchiseApplications(d.applications || []);
+      }
+      if (storeRes.ok) {
+        const d = await storeRes.json();
+        setFranchiseStores((d.sites || []).filter(s => s.site_type === 'swap_station' || s.site_type?.includes('换电')));
+      }
+      // Count user's swap batteries from loaded userAssets
+      const counts = { 4820: 0, 6035: 0, 7250: 0 };
+      (userAssets || []).forEach(u => {
+        const code = (u.asset_code || u.code || '').toUpperCase();
+        if (code.includes('4820')) counts['4820']++;
+        else if (code.includes('6035')) counts['6035']++;
+        else if (code.includes('7250')) counts['7250']++;
+      });
+      setMyBatteryCounts(counts);
+    } catch (e) { console.error(e); }
+  };
+
+  const selectedTemplate = swapTemplates.find(t => t.id === franchiseForm.template_id);
+  const requiredBatteries = selectedTemplate ? Math.max(0, (selectedTemplate.cabinet_count || 0) - 2) : 0;
+  const myTotalBatteries = myBatteryCounts['4820'] + myBatteryCounts['6035'] + myBatteryCounts['7250'];
+  const isFranchiseEligible = selectedTemplate && myTotalBatteries >= requiredBatteries;
+
+  const handleFranchiseSubmit = async (e) => {
+    e.preventDefault();
+    if (!franchiseForm.location.trim() || !franchiseForm.template_id) {
+      setFranchiseMsg('请填写加盟地点并选择模板');
+      return;
+    }
+    setFranchiseSubmitting(true);
+    setFranchiseMsg('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/franchise-applications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          location: franchiseForm.location.trim(),
+          template_id: franchiseForm.template_id,
+          matched_battery_4820: myBatteryCounts['4820'],
+          matched_battery_6035: myBatteryCounts['6035'],
+          matched_battery_7250: myBatteryCounts['7250'],
+          cabinet_count: selectedTemplate?.cabinet_count,
+        }),
+      });
+      if (res.ok) {
+        setFranchiseMsg(t('invest.franchise.submitSuccess'));
+        setFranchiseForm({ location: '', template_id: '' });
+        loadFranchiseData();
+      } else {
+        const err = await res.json();
+        setFranchiseMsg(err.error || '提交失败');
+      }
+    } catch (e) { setFranchiseMsg('网络错误'); }
+    finally { setFranchiseSubmitting(false); }
+  };
+
   const handleRecharge = async () => {
     const amount = parseFloat(rechargeAmount);
     if (!amount || amount <= 0) { alert(t('invest.alert.invalidAmount')); return; }
@@ -664,6 +749,7 @@ const getPenaltyTierDisplay = (tier, t) => {
               { key: 'orders', label: t('invest.tabs.orders'), icon: Clock },
               { key: 'dividends', label: t('invest.tabs.dividends'), icon: Gift },
               { key: 'wallet', label: t('invest.tabs.wallet'), icon: Wallet },
+              { key: 'franchise', label: t('invest.tabs.franchise'), icon: Network },
             ].map(t => (
               <button key={t.key} onClick={() => setActiveTab(t.key)}
                 className={`flex items-center space-x-2 py-4 border-b-2 text-sm font-medium transition ${
@@ -1230,6 +1316,119 @@ const getPenaltyTierDisplay = (tier, t) => {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* Tab: Franchise */}
+        {activeTab === 'franchise' && (
+          <div>
+            <h2 className="text-xl font-bold mb-2">{t('invest.franchise.title')}</h2>
+            <p className="text-gray-500 text-sm mb-6">{t('invest.franchise.subtitle')}</p>
+
+            {/* Map */}
+            <div className="bg-white rounded-xl border overflow-hidden mb-6" style={{ height: 400 }}>
+              <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
+                {t('invest.franchise.mapHint')}
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Application Form */}
+              <div className="bg-white rounded-xl border p-6">
+                <h3 className="font-bold text-lg mb-4">{t('invest.franchise.title')}</h3>
+                {franchiseMsg && (
+                  <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${franchiseMsg.includes('成功') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                    {franchiseMsg}
+                  </div>
+                )}
+                <form onSubmit={handleFranchiseSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('invest.franchise.locationLabel')}</label>
+                    <input type="text" value={franchiseForm.location}
+                      onChange={e => setFranchiseForm({ ...franchiseForm, location: e.target.value })}
+                      placeholder={t('invest.franchise.locationPlaceholder')}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('invest.franchise.selectTemplate')}</label>
+                    <select value={franchiseForm.template_id}
+                      onChange={e => setFranchiseForm({ ...franchiseForm, template_id: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                      <option value="">-- {t('invest.franchise.selectTemplate')} --</option>
+                      {swapTemplates.map(tmpl => (
+                        <option key={tmpl.id} value={tmpl.id}>
+                          {tmpl.name}（{tmpl.cabinet_count}{t('adminFa.cabinetsUnit')}）
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedTemplate && (
+                    <div className="bg-blue-50 rounded-lg p-4 text-sm space-y-1">
+                      <p className="text-blue-800 font-medium">{
+                        t('invest.franchise.templateDetail')
+                          .replace('{{price}}', formatCurrency(selectedTemplate.price, i18n.language))
+                          .replace('{{rent}}', formatCurrency(selectedTemplate.monthly_rent, i18n.language))
+                          .replace('{{roi}}', selectedTemplate.annual_roi)
+                      }</p>
+                    </div>
+                  )}
+                  {selectedTemplate && (
+                    <div className={`rounded-lg p-4 text-sm ${isFranchiseEligible ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                      <p className="font-medium">{t('invest.franchise.batteryCheck')}</p>
+                      {isFranchiseEligible ? (
+                        <p>{t('invest.franchise.eligible').replace('{{total}}', myTotalBatteries)}</p>
+                      ) : (
+                        <p>{t('invest.franchise.notEligible').replace('{{required}}', requiredBatteries).replace('{{current}}', myTotalBatteries)}</p>
+                      )}
+                      <div className="flex space-x-4 mt-2 text-xs">
+                        <span>4820: {myBatteryCounts['4820']}</span>
+                        <span>6035: {myBatteryCounts['6035']}</span>
+                        <span>7250: {myBatteryCounts['7250']}</span>
+                      </div>
+                    </div>
+                  )}
+                  <button type="submit" disabled={franchiseSubmitting || !isFranchiseEligible}
+                    className={`w-full py-2.5 rounded-lg text-sm font-medium transition ${isFranchiseEligible ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                    {franchiseSubmitting ? <Loader2 className="h-4 w-4 animate-spin inline mr-1" /> : null}
+                    {t('invest.franchise.submit')}
+                  </button>
+                </form>
+              </div>
+
+              {/* Application History */}
+              <div className="bg-white rounded-xl border p-6">
+                <h3 className="font-bold text-lg mb-4">{t('invest.franchise.applicationHistory')}</h3>
+                {franchiseApplications.length === 0 ? (
+                  <p className="text-gray-400 text-sm text-center py-8">{t('invest.franchise.noApplications')}</p>
+                ) : (
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                    {franchiseApplications.map(app => {
+                      const tmpl = swapTemplates.find(t => t.id === app.template_id);
+                      return (
+                        <div key={app.id} className="border rounded-lg p-4 text-sm">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium">{tmpl?.name || app.template_id}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              app.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {app.status === 'approved' ? t('adminFa.status.approved') :
+                               app.status === 'rejected' ? t('adminFa.status.rejected') : t('adminFa.status.pending')}
+                            </span>
+                          </div>
+                          <p className="text-gray-600">{t('adminFa.location')}: {app.location}</p>
+                          <p className="text-gray-600">{t('adminFa.cabinetCount')}: {app.cabinet_count}</p>
+                          <p className="text-gray-600">4820: {app.matched_battery_4820} | 6035: {app.matched_battery_6035} | 7250: {app.matched_battery_7250}</p>
+                          {app.admin_remark && <p className="text-gray-500 mt-1">{t('adminFa.remark')}: {app.admin_remark}</p>}
+                          <p className="text-gray-400 text-xs mt-2">{app.created_at ? new Date(app.created_at).toLocaleDateString() : ''}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

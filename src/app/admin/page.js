@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { adminAPI, batteryTypesAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
 
-import { Users, TrendingUp, DollarSign, BarChart3, Settings, Battery, Store, ClipboardList, Check, X, Eye, Shield, MapPin, Building2, Plus, Edit, Trash2, Loader2, Zap, BadgeCheck, Percent, Cpu, Camera, Phone, FileText, User, CheckSquare, Square, LayoutList } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, BarChart3, Settings, Battery, Store, ClipboardList, Check, X, Eye, Shield, MapPin, Building2, Plus, Edit, Trash2, Loader2, Zap, BadgeCheck, Percent, Cpu, Camera, Phone, FileText, User, CheckSquare, Square, LayoutList, BatteryCharging } from 'lucide-react';
 import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 
 const API_BASE = '/api';
@@ -904,6 +904,8 @@ export default function Admin() {
     { key: 'battery-types', label: '电池类型', icon: Zap, link: '/admin/battery-types' },
     { key: 'sold-batteries', label: '已售电池', icon: Cpu },
     { key: 'operation-sites', label: '运营站点', icon: MapPin, link: '/admin/operation-sites' },
+    { key: 'franchise-applications', label: '加盟审批', icon: FileText, link: '/admin/franchise-applications' },
+    { key: 'swap-stations', label: '换电站模板', icon: BatteryCharging, link: '/admin/swap-stations' },
     { key: 'stores', label: '门店管理', icon: Store },
     { key: 'applications', label: '加盟审核', icon: ClipboardList },
     { key: 'agent-applications', label: '省级代理审批', icon: Users },

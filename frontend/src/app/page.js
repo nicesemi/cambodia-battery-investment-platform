@@ -408,11 +408,15 @@ function useBatteryLive() {
         });
       _batteryLivePromise.then(d => setData(d));
     }
-    // 每 10 秒轮询，使大巴 GPS 标记实时移动
+    // 每 10 秒轮询，使大巴 GPS 标记实时移动，同时更新模块缓存避免 Vercel CDN 缓存导致数据不刷新
     const interval = setInterval(() => {
       fetch('/api/battery-units/live')
         .then(res => res.json())
-        .then(d => setData({ sites: d.sites || [], units: d.units || [], warehouses: d.warehouses || [], unsold_total: d.unsold_total || 0 }))
+        .then(d => {
+          const result = { sites: d.sites || [], units: d.units || [], warehouses: d.warehouses || [], unsold_total: d.unsold_total || 0 };
+          _batteryLiveCache = result;
+          setData(result);
+        })
         .catch(() => {});
     }, 10_000);
     return () => clearInterval(interval);

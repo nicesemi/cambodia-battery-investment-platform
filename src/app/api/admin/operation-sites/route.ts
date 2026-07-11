@@ -190,6 +190,7 @@ export async function POST(request: Request) {
     const description = formData.get('description') as string || null
     const battery_type = formData.get('battery_type') as string || null
     const cabinet_slots = formData.get('cabinet_slots') as string || null
+    const template_id = formData.get('template_id') as string || null
     const name_i18n_raw = formData.get('name_i18n') as string
     const country_i18n_raw = formData.get('country_i18n') as string
     const city_i18n_raw = formData.get('city_i18n') as string
@@ -239,6 +240,7 @@ export async function POST(request: Request) {
         description: description || null,
         battery_type: battery_type || null,
         cabinet_slots: cabinet_slots && cabinet_slots !== '' ? parseInt(cabinet_slots) : null,
+        template_id: template_id || null,
         image_url: image_url || null,
         is_active: true,
         name_i18n: safeJsonParse(name_i18n_raw),

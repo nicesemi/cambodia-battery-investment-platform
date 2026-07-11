@@ -31,6 +31,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ site
     const description = formData.get('description') as string
     const battery_type = formData.get('battery_type') as string
     const cabinet_slots = formData.get('cabinet_slots') as string
+    const template_id = formData.get('template_id') as string
     const keep_image_url = formData.get('keep_image_url') as string
     const name_i18n = formData.get('name_i18n') as string
     const country_i18n = formData.get('country_i18n') as string
@@ -57,6 +58,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ site
     if (description !== undefined) updates.description = description || null
     if (battery_type !== undefined) updates.battery_type = battery_type || null
     if (cabinet_slots !== undefined) updates.cabinet_slots = cabinet_slots && cabinet_slots !== '' ? parseInt(cabinet_slots) : null
+    if (template_id !== undefined) updates.template_id = template_id || null
     if (name_i18n !== undefined) updates.name_i18n = safeJsonParse(name_i18n)
     if (country_i18n !== undefined) updates.country_i18n = safeJsonParse(country_i18n)
     if (city_i18n !== undefined) updates.city_i18n = safeJsonParse(city_i18n)
