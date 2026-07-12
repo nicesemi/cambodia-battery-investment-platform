@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       const buffer = Buffer.from(await image.arrayBuffer())
 
       const { error: uploadErr } = await adminClient.storage
-        .from('public-assets')
+        .from('battery-images')
         .upload(`swap-stations/${filename}`, buffer, {
           contentType: image.type,
           upsert: false
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: '图片上传失败，请重试' }, { status: 500 });
       } else {
         const { data: urlData } = adminClient.storage
-          .from('public-assets')
+          .from('battery-images')
           .getPublicUrl(`swap-stations/${filename}`)
         image_url = urlData.publicUrl
       }

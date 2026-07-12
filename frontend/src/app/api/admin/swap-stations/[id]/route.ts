@@ -40,7 +40,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       const buffer = Buffer.from(await image.arrayBuffer())
 
       const { error: uploadErr } = await adminClient.storage
-        .from('public-assets')
+        .from('battery-images')
         .upload(`swap-stations/${filename}`, buffer, {
           contentType: image.type,
           upsert: false
@@ -51,7 +51,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         return NextResponse.json({ error: '图片上传失败，请重试' }, { status: 500 });
       } else {
         const { data: urlData } = adminClient.storage
-          .from('public-assets')
+          .from('battery-images')
           .getPublicUrl(`swap-stations/${filename}`)
         updates.image_url = urlData.publicUrl
       }
@@ -76,8 +76,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     return ok({ message: '模板已更新', template })
   } catch (err) {
-    console.error('Image upload error:', err);
-    return NextResponse.json({ error: '图片上传失败: ' + (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+    console.error('PUT swap-station error:', err);
+    return NextResponse.json({ error: '更新模板失败: ' + (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
