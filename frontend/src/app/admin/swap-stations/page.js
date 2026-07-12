@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit, Trash2, Loader2, ArrowLeft, AlertCircle, BatteryCharging } from 'lucide-react';
+import { formatCurrency, localeCurrency, fetchRates } from '../../../lib/currency';
 
 const DEFAULT_FORM = {
   name: '', cabinet_count: '6', price: '', monthly_rent: '', annual_roi: '',
@@ -12,7 +13,7 @@ const DEFAULT_FORM = {
 };
 
 export default function SwapStationsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, canAccessAdmin } = useAuth();
   const router = useRouter();
   const [templates, setTemplates] = useState([]);
@@ -29,6 +30,7 @@ export default function SwapStationsPage() {
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
     if (!canAccessAdmin()) { router.push('/'); return; }
+    fetchRates();
     loadTemplates();
   }, [user]);
 

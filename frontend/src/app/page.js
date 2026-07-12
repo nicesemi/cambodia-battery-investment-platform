@@ -384,30 +384,24 @@ let _batteryLiveLoaded = false;
 let _batteryLivePromise = null;
 
 function useBatteryLive() {
-  const [data, setData] = useState(() => _batteryLiveCache || { sites: [], units: [], warehouses: [], unsold_total: 0 });
+  const [data, setData] = useState(() => ({ sites: [], units: [], warehouses: [], unsold_total: 0 }));
   useEffect(() => {
-    if (_batteryLiveLoaded) { setData(_batteryLiveCache || { sites: [], units: [], warehouses: [], unsold_total: 0 }); }
-    if (_batteryLivePromise) {
-      _batteryLivePromise.then(d => setData(d));
-      _batteryLivePromise = null;
-    } else {
-      _batteryLivePromise = fetch(`/api/battery-units/live?_t=${Date.now()}`)
+    // 初始化时始终发起请求获取最新数据，不使用模块缓存
+    const doFetch = () => {
+      fetch(`/api/battery-units/live?_t=${Date.now()}`)
         .then(res => res.json())
         .then(d => {
           const result = { sites: d.sites || [], units: d.units || [], warehouses: d.warehouses || [], unsold_total: d.unsold_total || 0 };
           _batteryLiveCache = result;
           _batteryLiveLoaded = true;
-          _batteryLivePromise = null;
           return result;
         })
         .catch(() => {
-          _batteryLiveCache = _batteryLiveCache || { sites: [], units: [], warehouses: [], unsold_total: 0 };
-          _batteryLiveLoaded = true;
-          _batteryLivePromise = null;
-          return { sites: [], units: [], warehouses: [], unsold_total: 0 };
+          return _batteryLiveCache || { sites: [], units: [], warehouses: [], unsold_total: 0 };
         });
-      _batteryLivePromise.then(d => setData(d));
-    }
+    };
+    _batteryLivePromise = doFetch();
+    _batteryLivePromise.then(d => setData(d));
     // 每 10 秒轮询，使大巴 GPS 标记实时移动，同时更新模块缓存避免 Vercel CDN 缓存导致数据不刷新
     const interval = setInterval(() => {
       fetch(`/api/battery-units/live?_t=${Date.now()}`)

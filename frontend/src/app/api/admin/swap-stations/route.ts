@@ -73,15 +73,22 @@ export async function POST(request: Request) {
       }
     }
 
+    const priceVal = parseFloat(price)
+    const monthlyRentVal = monthly_rent ? parseFloat(monthly_rent) : 0
+    let annualRoiVal = annual_roi ? parseFloat(annual_roi) : 0
+    if (annualRoiVal === 0 && priceVal > 0 && monthlyRentVal > 0) {
+      annualRoiVal = parseFloat(((monthlyRentVal * 12 / priceVal) * 100).toFixed(1))
+    }
+
     const adminClient = getSupabaseAdmin()
     const { data, error } = await adminClient
       .from('swap_station_templates')
       .insert({
         name: name.trim(),
         cabinet_count: parseInt(cabinet_count),
-        price: parseFloat(price),
-        monthly_rent: monthly_rent ? parseFloat(monthly_rent) : 0,
-        annual_roi: annual_roi ? parseFloat(annual_roi) : 0,
+        price: priceVal,
+        monthly_rent: monthlyRentVal,
+        annual_roi: annualRoiVal,
         image_url,
         gps_lat: gps_lat ? parseFloat(gps_lat) : null,
         gps_lng: gps_lng ? parseFloat(gps_lng) : null,
@@ -92,6 +99,7 @@ export async function POST(request: Request) {
     if (error) return serverError(error.message)
     return ok({ message: '模板已创建', template: data }, 201)
   } catch (e: any) {
-    return serverError()
+    console.error('POST swap-station error:', e);
+    return NextResponse.json({ error: '创建模板失败: ' + (e instanceof Error ? e.message : String(e)) }, { status: 500 });
   }
 }

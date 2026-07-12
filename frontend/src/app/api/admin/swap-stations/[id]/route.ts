@@ -1,6 +1,7 @@
 import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { badRequest, ok, unauthorized, notFound, serverError } from '@/lib/response'
+import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'

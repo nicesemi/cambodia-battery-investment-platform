@@ -517,7 +517,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       const [tmplRes, appRes, storeRes] = await Promise.all([
         fetch('/api/admin/swap-stations', { headers }),
         fetch('/api/franchise-applications', { headers }),
-        fetch('/api/operation-sites', { headers }),
+        fetch('/api/admin/operation-sites', { headers }),
       ]);
       if (tmplRes.ok) {
         const d = await tmplRes.json();
@@ -529,7 +529,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       }
       if (storeRes.ok) {
         const d = await storeRes.json();
-        setFranchiseStores((d.sites || []).filter(s => s.site_type === 'swap_station' || s.site_type?.includes('换电')));
+        setFranchiseStores((d.sites || []).filter(s => s.site_type && (s.site_type === 'swap_station' || s.site_type.includes('换电') || s.site_type.includes('swap'))));
       }
       // Count user's swap batteries from loaded userAssets
       const counts = { 4820: 0, 6035: 0, 7250: 0 };
