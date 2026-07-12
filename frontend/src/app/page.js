@@ -819,7 +819,7 @@ function BatteryNetworkSection({ amapReady }) {
                                     <span className="font-medium text-sm text-gray-900">{resolveI18n(site, 'name_i18n', site.site_name, i18n)}</span>
                                   </div>
                                   <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                                    {(batteryLive.units || []).filter(u => u.site_name === site.site_name).length}{t('home.blockUnit')}
+                                    {site.real_battery_count ?? 0}{t('home.blockUnit')}
                                   </span>
                                 </div>
                                 <p className="text-[10px] text-gray-400 mt-1">{resolveI18n(site, 'city_i18n', site.city, i18n)} · {resolveI18n(site, 'country_i18n', site.country, i18n)}</p>
