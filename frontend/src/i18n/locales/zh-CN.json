@@ -1558,7 +1558,7 @@
   "invest.franchise.locationLabel": "加盟地点",
   "invest.franchise.locationPlaceholder": "如 金边市堆谷区",
   "invest.franchise.selectTemplate": "选择换电站仓数",
-  "invest.franchise.templateDetail": "售价: ${{price}} | 月租金: ${{rent}} | 年化: {{roi}}%",
+  "invest.franchise.templateDetail": "售价: {{price}} | 月租金: {{rent}} | 年化: {{roi}}%",
   "invest.franchise.batteryCheck": "电池匹配检测",
   "invest.franchise.eligible": "符合加盟条件，您已持有 {{total}} 颗电池",
   "invest.franchise.notEligible": "不满足加盟条件，需先购买至少 {{required}} 颗电池（当前已购：{{current}}颗）",

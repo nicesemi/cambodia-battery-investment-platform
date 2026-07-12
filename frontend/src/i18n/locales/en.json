@@ -1558,7 +1558,7 @@
   "invest.franchise.locationLabel": "Location",
   "invest.franchise.locationPlaceholder": "e.g. Phnom Penh Tuol Kork",
   "invest.franchise.selectTemplate": "Select Cabinet Count",
-  "invest.franchise.templateDetail": "Price: ${{price}} | Monthly Rent: ${{rent}} | ROI: {{roi}}%",
+  "invest.franchise.templateDetail": "Price: {{price}} | Monthly Rent: {{rent}} | ROI: {{roi}}%",
   "invest.franchise.batteryCheck": "Battery Matching",
   "invest.franchise.eligible": "Eligible! You currently own {{total}} batteries",
   "invest.franchise.notEligible": "Not eligible. You need at least {{required}} batteries (currently: {{current}})",

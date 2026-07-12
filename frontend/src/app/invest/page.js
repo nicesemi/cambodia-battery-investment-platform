@@ -335,6 +335,7 @@ const getPenaltyTierDisplay = (tier, t) => {
   }, [user]);
 
   useEffect(() => {
+    if (activeTab === 'portfolio') loadData();
     if (activeTab === 'dividends') loadDividends();
     if (activeTab === 'wallet') loadWallet();
     if (activeTab === 'franchise') loadFranchiseData();
@@ -575,7 +576,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       const [tmplRes, appRes, storeRes] = await Promise.all([
         fetch('/api/admin/swap-stations', { headers }),
         fetch('/api/franchise-applications', { headers }),
-        fetch('/api/admin/operation-sites', { headers }),
+        fetch('/api/operation-sites', { headers }),
       ]);
       if (tmplRes.ok) {
         const d = await tmplRes.json();
