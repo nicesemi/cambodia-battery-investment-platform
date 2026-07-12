@@ -368,19 +368,26 @@ const getPenaltyTierDisplay = (tier, t) => {
     ];
 
     try {
-      const [assetsRes, userAssetsRes, ordersRes, bindingRes] = await Promise.all([
+      const results = await Promise.allSettled([
         assetAPI.getAssets(i18n.language),
         assetAPI.getUserAssets(),
         orderAPI.getMyOrders(1, 50),
-        orderAPI.getMyBinding().catch(() => null),
+        orderAPI.getMyBinding(),
       ]);
-      const apiAssets = assetsRes.assets || [];
+      const [assetsResult, userAssetsResult, ordersResult, bindingResult] = results;
+
+      const apiAssets = assetsResult.status === 'fulfilled' ? (assetsResult.value.assets || []) : [];
       // 如果API返回为空，使用静态fallback数据
       setAssets(apiAssets.length > 0 ? apiAssets : FALLBACK_BATTERIES);
-      setUserAssets(userAssetsRes.userAssets || []);
-      setOrders(ordersRes.orders || []);
-      if (bindingRes?.binding?.store_id) {
-        setBoundStoreId(bindingRes.binding.store_id);
+
+      const userAssetsData = userAssetsResult.status === 'fulfilled' ? (userAssetsResult.value.userAssets || []) : [];
+      setUserAssets(userAssetsData);
+
+      const ordersData = ordersResult.status === 'fulfilled' ? (ordersResult.value.orders || []) : [];
+      setOrders(ordersData);
+
+      if (bindingResult.status === 'fulfilled' && bindingResult.value?.binding?.store_id) {
+        setBoundStoreId(bindingResult.value.binding.store_id);
       }
     } catch (e) {
       console.error(e);

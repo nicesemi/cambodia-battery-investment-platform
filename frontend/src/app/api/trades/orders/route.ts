@@ -1,4 +1,4 @@
-import { supabase, getSupabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { badRequest, ok, unauthorized, serverError } from '@/lib/response'
 
@@ -21,19 +21,20 @@ export async function POST(request: Request) {
 
     const orderNo = generateOrderNo()
 
+    const admin = getSupabaseAdmin()
     if (orderType === 'sell') {
-      const { data: ua } = await supabase.from('user_assets')
+      const { data: ua } = await admin.from('user_assets')
         .select('units').eq('user_id', user.id).eq('asset_id', assetId).single()
       if (!ua || ua.units < units) return badRequest('Insufficient assets to sell')
-      await supabase.from('user_assets').update({ units: ua.units - units }).eq('user_id', user.id).eq('asset_id', assetId)
+      await admin.from('user_assets').update({ units: ua.units - units }).eq('user_id', user.id).eq('asset_id', assetId)
     } else {
       const totalCost = price * units
-      const { data: w } = await getSupabaseAdmin().from('user_wallets').select('balance').eq('user_id', user.id).single()
+      const { data: w } = await admin.from('user_wallets').select('balance').eq('user_id', user.id).single()
       if (!w || Number(w.balance) < totalCost) return badRequest('余额不足，请先去我的钱包充值！')
-      await getSupabaseAdmin().from('user_wallets').update({ balance: Number(w.balance) - totalCost, frozen_balance: Number(w.balance) - totalCost }).eq('user_id', user.id)
+      await admin.from('user_wallets').update({ balance: Number(w.balance) - totalCost, frozen_balance: Number(w.balance) - totalCost }).eq('user_id', user.id)
     }
 
-    const { data: order, error } = await supabase.from('trade_orders').insert({
+    const { data: order, error } = await admin.from('trade_orders').insert({
       order_no: orderNo, user_id: user.id, asset_id: assetId, order_type: orderType, price, units
     }).select('*').single()
     if (error) return serverError(error.message)
@@ -53,10 +54,11 @@ export async function GET(request: Request) {
     const user = await authenticateToken(request)
     if (!user) return unauthorized()
 
+    const admin = getSupabaseAdmin()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
 
-    let query = supabase.from('trade_orders')
+    let query = admin.from('trade_orders')
       .select('*, battery_assets!inner(name, name_i18n, asset_code)')
       .eq('user_id', user.id)
       .order('order_time', { ascending: false })
@@ -76,10 +78,11 @@ export async function GET(request: Request) {
 // Internal match engine (simplified for serverless)
 async function matchOrders(assetId: string) {
   try {
-    const { data: buyOrders } = await supabase.from('trade_orders')
+    const admin = getSupabaseAdmin()
+    const { data: buyOrders } = await admin.from('trade_orders')
       .select('*').eq('asset_id', assetId).eq('order_type', 'buy').in('status', ['pending','partial'])
       .order('price', { ascending: false }).order('order_time', { ascending: true })
-    const { data: sellOrders } = await supabase.from('trade_orders')
+    const { data: sellOrders } = await admin.from('trade_orders')
       .select('*').eq('asset_id', assetId).eq('order_type', 'sell').in('status', ['pending','partial'])
       .order('price', { ascending: true }).order('order_time', { ascending: true })
 
@@ -98,7 +101,7 @@ async function matchOrders(assetId: string) {
           const fee = totalAmount * 0.005
           const tradeNo = `TRD${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
-          await supabase.from('trade_records').insert({
+          await admin.from('trade_records').insert({
             trade_no: tradeNo, buy_order_id: buy.id, sell_order_id: sell.id,
             asset_id: assetId, buyer_id: buy.user_id, seller_id: sell.user_id,
             price: matchPrice, units: matched, total_amount: totalAmount, fee
@@ -107,28 +110,27 @@ async function matchOrders(assetId: string) {
           // Update buy order
           const newBuyFilled = buy.filled_units + matched
           const buyStatus = newBuyFilled >= buy.units ? 'filled' : 'partial'
-          await supabase.from('trade_orders').update({ filled_units: newBuyFilled, status: buyStatus, filled_time: new Date().toISOString() }).eq('id', buy.id)
+          await admin.from('trade_orders').update({ filled_units: newBuyFilled, status: buyStatus, filled_time: new Date().toISOString() }).eq('id', buy.id)
 
           // Update sell order
           const newSellFilled = sell.filled_units + matched
           const sellStatus = newSellFilled >= sell.units ? 'filled' : 'partial'
-          await supabase.from('trade_orders').update({ filled_units: newSellFilled, status: sellStatus, filled_time: new Date().toISOString() }).eq('id', sell.id)
+          await admin.from('trade_orders').update({ filled_units: newSellFilled, status: sellStatus, filled_time: new Date().toISOString() }).eq('id', sell.id)
 
           // Unfreeze buyer funds
-          const { data: bw } = await getSupabaseAdmin().from('user_wallets').select('frozen_balance').eq('user_id', buy.user_id).single()
-          if (bw) await getSupabaseAdmin().from('user_wallets').update({ frozen_balance: Math.max(0, Number(bw.frozen_balance) - totalAmount) }).eq('user_id', buy.user_id)
+          const { data: bw } = await admin.from('user_wallets').select('frozen_balance').eq('user_id', buy.user_id).single()
+          if (bw) await admin.from('user_wallets').update({ frozen_balance: Math.max(0, Number(bw.frozen_balance) - totalAmount) }).eq('user_id', buy.user_id)
 
           // Add asset to buyer
-          const { data: baCur } = await supabase.from('user_assets').select('id, units').eq('user_id', buy.user_id).eq('asset_id', assetId).single()
+          const { data: baCur } = await admin.from('user_assets').select('id, units').eq('user_id', buy.user_id).eq('asset_id', assetId).single()
           if (baCur) {
-            await supabase.from('user_assets').update({ units: baCur.units + matched }).eq('id', baCur.id)
+            await admin.from('user_assets').update({ units: baCur.units + matched }).eq('id', baCur.id)
           } else {
-            await supabase.from('user_assets').insert({ user_id: buy.user_id, asset_id: assetId, units: matched, average_cost: matchPrice })
+            await admin.from('user_assets').insert({ user_id: buy.user_id, asset_id: assetId, units: matched, average_cost: matchPrice })
           }
 
           // Assign battery_units to buyer: 优先分配已存在但未分配的电池单元，不足时新建
           try {
-            const admin = getSupabaseAdmin()
             const purchasedAt = new Date().toISOString()
 
             // Step 1: 查找该资产下已部署但未售出的电池单元（status='sold' + investor_id IS NULL + site_name IS NOT NULL）
@@ -223,8 +225,8 @@ async function matchOrders(assetId: string) {
 
           // Pay seller
           const sellerReceive = totalAmount - fee
-          const { data: sw } = await getSupabaseAdmin().from('user_wallets').select('balance').eq('user_id', sell.user_id).single()
-          if (sw) await getSupabaseAdmin().from('user_wallets').update({ balance: Number(sw.balance) + sellerReceive }).eq('user_id', sell.user_id)
+          const { data: sw } = await admin.from('user_wallets').select('balance').eq('user_id', sell.user_id).single()
+          if (sw) await admin.from('user_wallets').update({ balance: Number(sw.balance) + sellerReceive }).eq('user_id', sell.user_id)
 
           buy.filled_units = newBuyFilled; buy.status = buyStatus
           sell.filled_units = newSellFilled; sell.status = sellStatus

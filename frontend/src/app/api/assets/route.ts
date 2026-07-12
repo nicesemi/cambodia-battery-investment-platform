@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     const locale = parseLocale(request)
     const admin = getSupabaseAdmin()
     const [{ data: assets, error }, { data: types }, { data: sites }] = await Promise.all([
-      supabase.from('battery_assets')
+      admin.from('battery_assets')
         .select('id, asset_code, name, description, name_i18n, description_i18n, battery_type, battery_type_id, total_units, available_units, unit_price, unit_price_rmb, expected_roi, monthly_rent, thumbnail_url, location, status, created_at')
         .order('created_at', { ascending: false }),
       admin.from('battery_types').select('id, name, name_i18n, image_url, unit_price, monthly_rent').eq('is_active', true),
