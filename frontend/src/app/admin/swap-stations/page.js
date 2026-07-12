@@ -227,7 +227,14 @@ export default function SwapStationsPage() {
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">{t('adminSw.price')} (USD) *</label>
                     <input type="number" min="0" step="0.01" value={form.price}
-                      onChange={e => setForm({ ...form, price: e.target.value })}
+                      onChange={e => {
+                        const p = e.target.value;
+                        const mr = form.monthly_rent;
+                        const priceVal = parseFloat(p) || 0;
+                        const rentVal = parseFloat(mr) || 0;
+                        const roi = priceVal > 0 && rentVal > 0 ? ((rentVal * 12 / priceVal) * 100).toFixed(1) : form.annual_roi;
+                        setForm({ ...form, price: p, annual_roi: roi });
+                      }}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
                   </div>
                   <div>

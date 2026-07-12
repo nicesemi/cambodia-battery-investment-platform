@@ -80,8 +80,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (!template) return notFound('模板不存在')
 
     return ok({ message: '模板已更新', template })
-  } catch (e: any) {
-    return serverError()
+  } catch (err) {
+    console.error('Image upload error:', err);
+    return NextResponse.json({ error: '图片上传失败: ' + (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
