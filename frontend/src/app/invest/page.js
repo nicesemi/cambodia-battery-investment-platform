@@ -1411,7 +1411,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                       <option value="">-- {t('invest.franchise.selectTemplate')} --</option>
                       {swapTemplates.map(tmpl => (
                         <option key={tmpl.id} value={tmpl.id}>
-                          {tmpl.name}（{tmpl.cabinet_count}{t('adminFa.cabinetsUnit')}）
+                          {tmpl.name_i18n?.[i18n.language] || tmpl.name_i18n?.['zh-CN'] || tmpl.name}（{tmpl.cabinet_count}{t('adminFa.cabinetsUnit')}）
                         </option>
                       ))}
                     </select>
@@ -1419,7 +1419,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                   {selectedTemplate && (
                     <div className="bg-blue-50 rounded-lg p-4 text-sm space-y-3">
                       {selectedTemplate.image_url && (
-                        <img src={selectedTemplate.image_url} alt={selectedTemplate.name}
+                        <img src={selectedTemplate.image_url} alt={selectedTemplate.name_i18n?.[i18n.language] || selectedTemplate.name_i18n?.['zh-CN'] || selectedTemplate.name}
                           onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           className="w-full object-contain rounded-lg border border-blue-100" />
                       )}
@@ -1466,7 +1466,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                       return (
                         <div key={app.id} className="border rounded-lg p-4 text-sm">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{tmpl?.name || app.template_id}</span>
+                            <span className="font-medium">{tmpl?.name_i18n?.[i18n.language] || tmpl?.name_i18n?.['zh-CN'] || tmpl?.name || app.template_id}</span>
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                               app.status === 'approved' ? 'bg-green-100 text-green-700' :
                               app.status === 'rejected' ? 'bg-red-100 text-red-700' :

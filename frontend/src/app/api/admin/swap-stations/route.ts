@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   try {
     const user = await authenticateToken(request)
-    if (!user || (user.role !== 'admin' && user.role !== 'operator')) return unauthorized('Admin only')
+    if (!user) return unauthorized('Authentication required')
 
     const adminClient = getSupabaseAdmin()
     const { data, error } = await adminClient

@@ -1,0 +1,1 @@
+ALTER TABLE swap_station_templates ADD COLUMN IF NOT EXISTS name_i18n JSONB DEFAULT NULL;

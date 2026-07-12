@@ -191,8 +191,8 @@ export default function SwapStationsPage() {
                     <td className="p-3 text-gray-400 text-xs">{idx + 1}</td>
                     <td className="p-3 font-medium text-gray-900 text-sm">{tmpl.name_i18n?.[i18n.language] || tmpl.name_i18n?.['zh-CN'] || tmpl.name}</td>
                     <td className="p-3 text-center font-semibold text-sm">{tmpl.cabinet_count}</td>
-                    <td className="p-3 text-right font-mono text-sm">${Number(tmpl.price).toLocaleString()}</td>
-                    <td className="p-3 text-right font-mono text-sm">${Number(tmpl.monthly_rent).toLocaleString()}</td>
+                    <td className="p-3 text-right font-mono text-sm">{formatCurrency(Number(tmpl.price), i18n.language)}</td>
+                    <td className="p-3 text-right font-mono text-sm">{formatCurrency(Number(tmpl.monthly_rent), i18n.language)}</td>
                     <td className="p-3 text-right font-mono text-sm">{Number(tmpl.annual_roi)}%</td>
                     <td className="p-3 text-center">
                       {tmpl.image_url ? (
