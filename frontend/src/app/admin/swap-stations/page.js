@@ -249,7 +249,7 @@ export default function SwapStationsPage() {
                   <input type="text" value={form.name_i18n?.[selectedLang] || ''}
                     onChange={e => {
                       const updated = { ...form.name_i18n, [selectedLang]: e.target.value };
-                      setForm({ ...form, name_i18n: updated, name: e.target.value });
+                      setForm({ ...form, name_i18n: updated, name: selectedLang === 'zh-CN' ? e.target.value : form.name });
                     }}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`${t('adminSw.name')}（${LANGUAGES.find(l=>l.code===selectedLang)?.label}）`} />
                 </div>
