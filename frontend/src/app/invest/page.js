@@ -494,6 +494,9 @@ const getPenaltyTierDisplay = (tier, t) => {
 
       franchiseStores.forEach(store => {
         if (store.latitude == null || store.longitude == null) return;
+        const imgTag = store.image_url
+          ? `<div style="width:200px;margin-bottom:6px;"><img src="${store.image_url}" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;" onerror="this.style.display='none'" /></div>`
+          : '';
         const marker = new window.AMap.Marker({
           position: [store.longitude, store.latitude],
           content: `<div style="width:28px;height:28px;background:#3b82f6;border-radius:8px;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center" title="${store.name || ''}">
@@ -501,8 +504,19 @@ const getPenaltyTierDisplay = (tier, t) => {
           </div>`,
           offset: new window.AMap.Pixel(-14, -14),
         });
+        const infoWindow = new window.AMap.InfoWindow({
+          content: `<div style="padding:4px;min-width:160px;">
+            ${imgTag}
+            <div style="font-weight:600;font-size:14px;margin-bottom:2px;">${store.name || ''}</div>
+            <div style="font-size:12px;color:#666;">${store.site_code || ''}</div>
+            <div style="font-size:12px;color:#666;">${store.city || ''} ${store.address || ''}</div>
+            ${store.battery_count != null ? `<div style="font-size:12px;color:#3b82f6;">${store.battery_count} 仓</div>` : ''}
+          </div>`,
+          offset: new window.AMap.Pixel(0, -36),
+        });
         marker.on('click', () => {
           map.setZoomAndCenter(14, [store.longitude, store.latitude]);
+          infoWindow.open(map, marker.getPosition());
         });
         map.add(marker);
       });

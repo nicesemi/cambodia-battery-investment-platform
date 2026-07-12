@@ -85,6 +85,7 @@ export const adminAPI = {
   // 代理/加盟商审批
   getApplications: () => request('/admin/applications'),
   reviewApplication: (applicationId, data) => request(`/admin/applications?id=${applicationId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getFranchiseSwapApplications: () => request('/admin/franchise-applications'),
   getAgentApplications: (status) => {
     const params = new URLSearchParams();
     if (status) params.set('status', status);

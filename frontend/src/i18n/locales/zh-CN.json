@@ -1564,7 +1564,7 @@
   "invest.franchise.notEligible": "不满足加盟条件，需先购买至少 {{required}} 颗电池（当前已购：{{current}}颗）",
   "invest.franchise.submit": "提交加盟申请",
   "invest.franchise.submitSuccess": "加盟申请已提交，等待平台审核",
-  "invest.franchise.applicationHistory": "我的加盟申请",
+  "invest.franchise.applicationHistory": "我的换电站",
   "invest.franchise.noApplications": "暂无加盟申请",
   "invest.franchise.mapHint": "运营中的加盟换电站分布"
 }

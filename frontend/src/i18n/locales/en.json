@@ -1564,7 +1564,7 @@
   "invest.franchise.notEligible": "Not eligible. You need at least {{required}} batteries (currently: {{current}})",
   "invest.franchise.submit": "Submit Application",
   "invest.franchise.submitSuccess": "Application submitted! Pending platform review.",
-  "invest.franchise.applicationHistory": "My Applications",
+  "invest.franchise.applicationHistory": "My Swap Stations",
   "invest.franchise.noApplications": "No franchise applications yet",
   "invest.franchise.mapHint": "Active franchise swap station locations"
 }

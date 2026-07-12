@@ -62,6 +62,7 @@ export default function Admin() {
   const [batteryTypes, setBatteryTypes] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [kycUsers, setKycUsers] = useState([]);
+  const [pendingCounts, setPendingCounts] = useState({});
   const [rejectingKycUser, setRejectingKycUser] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [loading, setLoading] = useState(true);
@@ -482,7 +483,47 @@ export default function Admin() {
     if (!canAccessAdmin()) { router.push('/'); return; }
     loadData();
     loadBatteryTypes();
+    loadPendingCounts();
   }, [user, activeTab]);
+
+  const loadPendingCounts = async () => {
+    try {
+      const results = await Promise.allSettled([
+        adminAPI.getApplications(),
+        adminAPI.getAgentApplications(),
+        adminAPI.getWithdrawals(),
+        adminAPI.getKycList(),
+        adminAPI.getFranchiseSwapApplications(),
+      ]);
+      const counts = {};
+      // applications: franchisee store applications (加盟店审核)
+      if (results[0].status === 'fulfilled') {
+        const apps = results[0].value.applications || [];
+        counts['applications'] = apps.filter(a => a.status === 'pending').length;
+      }
+      // agent-applications: 省级代理审批
+      if (results[1].status === 'fulfilled') {
+        const agentApps = results[1].value.applications || [];
+        counts['agent-applications'] = agentApps.filter(a => a.status === 'pending').length;
+      }
+      // withdrawals: 提现审批
+      if (results[2].status === 'fulfilled') {
+        const ws = results[2].value.withdrawals || [];
+        counts['withdrawals'] = ws.filter(w => w.status === 'pending').length;
+      }
+      // kyc: 实名审核
+      if (results[3].status === 'fulfilled') {
+        const kyc = results[3].value.users || [];
+        counts['kyc'] = kyc.filter(u => u.kyc_status === 'pending').length;
+      }
+      // franchise-applications: 换电站加盟审批
+      if (results[4].status === 'fulfilled') {
+        const fApps = results[4].value.applications || [];
+        counts['franchise-applications'] = fApps.filter(a => a.status === 'pending').length;
+      }
+      setPendingCounts(counts);
+    } catch (e) { /* silent */ }
+  };
 
   const loadBatteryTypes = async () => {
     try {
@@ -904,10 +945,10 @@ export default function Admin() {
     { key: 'battery-types', label: '电池类型', icon: Zap, link: '/admin/battery-types' },
     { key: 'sold-batteries', label: '已售电池', icon: Cpu },
     { key: 'operation-sites', label: '运营站点', icon: MapPin, link: '/admin/operation-sites' },
-    { key: 'franchise-applications', label: '加盟审批', icon: FileText, link: '/admin/franchise-applications' },
+    { key: 'franchise-applications', label: '换电站加盟审批', icon: FileText, link: '/admin/franchise-applications' },
     { key: 'swap-stations', label: '换电站模板', icon: BatteryCharging, link: '/admin/swap-stations' },
     { key: 'stores', label: '门店管理', icon: Store },
-    { key: 'applications', label: '加盟审核', icon: ClipboardList },
+    { key: 'applications', label: '加盟店审核', icon: ClipboardList },
     { key: 'agent-applications', label: '省级代理审批', icon: Users },
     { key: 'managed-agents', label: '我的代理', icon: BadgeCheck },
     { key: 'my-workers', label: '我的资产', icon: Users },
@@ -929,13 +970,21 @@ export default function Admin() {
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex space-x-1 overflow-x-auto">
-            {tabs.map(t => (
+            {tabs.map(t => {
+              const badgeCount = pendingCounts[t.key];
+              return (
               <button key={t.key} onClick={() => { if (t.link) { router.push(t.link); return; } setActiveTab(t.key); setLoading(true); }}
-                className={`flex items-center space-x-2 px-4 py-3 border-b-2 whitespace-nowrap text-xs 2xl:text-sm font-medium transition ${
+                className={`flex items-center space-x-2 px-4 py-3 border-b-2 whitespace-nowrap text-xs 2xl:text-sm font-medium transition relative ${
                   activeTab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                 <t.icon className="h-4 w-4" /><span>{t.label}</span>
+                {badgeCount > 0 && (
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                    {badgeCount}
+                  </span>
+                )}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

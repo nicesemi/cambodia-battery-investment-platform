@@ -269,20 +269,22 @@ export async function GET(_request: Request) {
     // 第 3 批：并行查询 — 站点（ID + Name）/ 资产
     // ═══════════════════════════════════════════════════════
     const [sitesResult, sitesByNameResult, assetsResult] = await Promise.all([
-      // 已分配电池所在站点（按 site_id）
+      // 已分配电池所在站点（按 site_id）- 仅 is_active 有效站点
       assignedSiteIds.length > 0
         ? supabase
             .from('operation_sites')
             .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n')
             .in('id', assignedSiteIds)
+            .eq('is_active', true)
         : Promise.resolve({ data: [], error: null }),
 
-      // 已售电池通过 site_name 匹配站点
+      // 已售电池通过 site_name 匹配站点 - 仅 is_active 有效站点
       soldSiteNames.length > 0
         ? supabase
             .from('operation_sites')
             .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n')
             .in('name', soldSiteNames)
+            .eq('is_active', true)
         : Promise.resolve({ data: [], error: null }),
 
       // 所有关联的 battery_assets
@@ -685,14 +687,47 @@ export async function GET(_request: Request) {
     }
 
     // ═══════════════════════════════════════════════════════
+    // 清洗：剔除 siteGroups 中 site_name 为空的幽灵条目
+    // 原因：battery_units.site_id 可能引用已删除的 operation_sites，
+    //   这些站点不在 cabSiteMap（is_active=true）中，siteMap 查询也为空，
+    //   但 siteGroup 仍被创建（site_name=''），导致 total_sites 虚高。
+    // ═══════════════════════════════════════════════════════
+    const validSiteGroups: Record<string, any> = {}
+    let orphanedSiteKeys = 0
+    let orphanedUnits = 0
+    Object.keys(siteGroups).forEach((key) => {
+      const sg = siteGroups[key]
+      // 有效站点判定：site_name 非空 且 site_id 在 cabSiteMap 中（is_active=true）
+      if (sg.site_name && sg.site_id != null && cabSiteMap[sg.site_id]) {
+        validSiteGroups[key] = sg
+      } else {
+        orphanedSiteKeys++
+        orphanedUnits += sg.units.length
+      }
+    })
+
+    // 计算有效电池数：仅统计属于有效站点的 battery units
+    const validTotalBatteries = Object.values(validSiteGroups).reduce(
+      (sum, sg: any) => sum + sg.units.length, 0
+    )
+
+    console.log('[battery-live DEBUG] total siteGroups before filter:', Object.keys(siteGroups).length,
+      '| after filter:', Object.keys(validSiteGroups).length,
+      '| orphaned groups:', orphanedSiteKeys,
+      '| orphaned units:', orphanedUnits,
+      '| allUnits:', allUnits.length,
+      '| validTotalBatteries:', validTotalBatteries,
+      '| cabSiteMap size:', Object.keys(cabSiteMap).length)
+
+    // ═══════════════════════════════════════════════════════
     // 返回增强响应（site_type 直接从 operation_sites 表取值，不做任何二次推断）
     // ═══════════════════════════════════════════════════════
     return ok({
-      sites: Object.values(siteGroups),
+      sites: Object.values(validSiteGroups),
       units: allUnits,
       warehouses: Object.values(unsoldWarehouseMap),
-      total_batteries: allUnits.length,
-      total_sites: Object.keys(siteGroups).length,
+      total_batteries: validTotalBatteries,
+      total_sites: Object.keys(validSiteGroups).length,
       unsold_total: unsoldUnits ? unsoldUnits.length : 0,
       _serverTime: Date.now(),
     }, {

@@ -3,8 +3,6 @@ import { authenticateToken } from '@/lib/auth'
 import { badRequest, ok, unauthorized, notFound, serverError } from '@/lib/response'
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,12 +47,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         })
 
       if (uploadErr) {
-        console.warn('Supabase storage upload failed, falling back to /tmp:', uploadErr.message)
-        const tmpDir = '/tmp/uploads/swap-stations'
-        await mkdir(tmpDir, { recursive: true })
-        const filePath = path.join(tmpDir, filename)
-        await writeFile(filePath, buffer)
-        updates.image_url = `/tmp/uploads/swap-stations/${filename}`
+        console.error('Supabase storage upload failed:', uploadErr.message);
+        return NextResponse.json({ error: '图片上传失败，请重试' }, { status: 500 });
       } else {
         const { data: urlData } = adminClient.storage
           .from('public-assets')

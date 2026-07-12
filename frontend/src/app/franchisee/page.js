@@ -218,6 +218,8 @@ export default function Franchisee() {
   const [addStoreForm, setAddStoreForm] = useState({ name: '', city: '', address: '', phone: '' });
   const [addStoreSubmitting, setAddStoreSubmitting] = useState(false);
   const [hasApproved, setHasApproved] = useState(false);
+  const [batterySites, setBatterySites] = useState([]); // battery-live sites for cabinet display
+  const [batterySitesLoaded, setBatterySitesLoaded] = useState(false);
 
   // 申请表单
   const [showApplyForm, setShowApplyForm] = useState(false);
@@ -411,6 +413,19 @@ export default function Franchisee() {
       const approved = [...(appsRes.applications || []), ...(agentRes.applications || [])]
         .some(a => a.status === 'approved');
       setHasApproved(!!approved);
+      
+      // 加载电池实时数据用于展示换电柜详情
+      if (appsRes.applications?.some(a => a.status === 'approved')) {
+        try {
+          const batteryRes = await fetch('/api/battery-units/live').then(r => r.json());
+          if (batteryRes?.data?.siteGroups) {
+            setBatterySites(batteryRes.data.siteGroups);
+          } else if (batteryRes?.siteGroups) {
+            setBatterySites(batteryRes.siteGroups);
+          }
+        } catch (_) {}
+        setBatterySitesLoaded(true);
+      }
       // 检查用户是否已审批通过的代理
       const approvedAgent = (agentRes.applications || []).find(
         a => a.status === 'approved' && (a.agent_type === 'province_agent' || a.agent_type === 'city_franchisee')
@@ -2581,12 +2596,34 @@ export default function Franchisee() {
             {applications.length > 0 && (
               <div className="mb-8">
                 <h3 className="font-semibold mb-3">{t('franchisee.applicationRecords')}</h3>
-                {applications.map(a => (
-                  <div key={a.id} className="bg-white rounded-lg border p-4 mb-2 flex justify-between items-center">
-                    <div><span className="font-medium">{a.store_name}</span><span className="text-sm text-gray-500 ml-2">{a.city}</span></div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${a.status === 'approved' ? 'bg-green-100 text-green-700' : a.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{a.status === 'pending' ? t('franchisee.status.reviewing') : a.status === 'approved' ? t('franchisee.wallet.approved') : t('franchisee.wallet.rejected')}</span>
-                  </div>
-                ))}
+                {applications.map(a => {
+                  // 为已审批的申请查找匹配的电池站点
+                  let matchedSite = null;
+                  if (a.status === 'approved' && batterySites.length > 0) {
+                    matchedSite = batterySites.find(s => {
+                      const sn = (s.site_name || '').toLowerCase();
+                      const an = (a.store_name || '').toLowerCase();
+                      return sn.includes(an) || an.includes(sn);
+                    });
+                  }
+                  return (
+                    <div key={a.id} className="bg-white rounded-lg border p-4 mb-3">
+                      <div className="flex justify-between items-center">
+                        <div><span className="font-medium">{a.store_name}</span><span className="text-sm text-gray-500 ml-2">{a.city}</span></div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${a.status === 'approved' ? 'bg-green-100 text-green-700' : a.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{a.status === 'pending' ? t('franchisee.status.reviewing') : a.status === 'approved' ? t('franchisee.wallet.approved') : t('franchisee.wallet.rejected')}</span>
+                      </div>
+                      {/* 已审批：展示换电柜槽位图 */}
+                      {a.status === 'approved' && matchedSite && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <InlineCabinetGrid site={matchedSite} />
+                        </div>
+                      )}
+                      {a.status === 'approved' && !matchedSite && batterySitesLoaded && (
+                        <div className="mt-2 text-xs text-gray-400 italic">{t('franchisee.noSiteData') || 'No live battery data available yet'}</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -3547,3 +3584,55 @@ export default function Franchisee() {
     </div>
   );
 }
+
+// 换电柜槽位网格组件（用于加盟商查看已审批的换电站电池状态）
+function InlineCabinetGrid({ site }) {
+  const rawSlots = site.cabinet_slots || site.cabinetSlots || site.slots || [];
+  let slots = [];
+  if (Array.isArray(rawSlots)) { slots = rawSlots; }
+  else if (typeof rawSlots === 'string') { try { slots = JSON.parse(rawSlots); } catch { slots = []; } }
+  else if (rawSlots && typeof rawSlots === 'object') { slots = Object.values(rawSlots); }
+  if (!Array.isArray(slots)) slots = [];
+
+  const totalSlots = slots.length;
+  const occupiedSlots = site.real_battery_count ?? slots.filter(s => s.status === 'occupied').length;
+  const emptySlots = totalSlots - occupiedSlots;
+
+  const slotStatusColor = (slot) => {
+    if (slot.status === 'empty') return 'bg-gray-200 text-gray-400 border-gray-300';
+    const level = slot.sensor_battery_level;
+    const temp = slot.sensor_temperature;
+    if (level === undefined && temp === undefined) return 'bg-green-200 border-green-400 text-green-800';
+    let warn = false;
+    if (level !== undefined && (level < 20 || level > 95)) warn = true;
+    if (temp !== undefined && (temp < 5 || temp > 45)) warn = true;
+    if (warn) return 'bg-red-200 border-red-400 text-red-800';
+    if (level !== undefined && (level < 40 || level > 85)) return 'bg-yellow-200 border-yellow-400 text-yellow-800';
+    return 'bg-green-200 border-green-400 text-green-800';
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3 text-xs">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-400" />{occupiedSlots}</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-gray-300" />{emptySlots}</span>
+        <span className="text-gray-400">{totalSlots} slots</span>
+      </div>
+      <div className="bg-gray-100 rounded-lg p-2 border border-gray-200">
+        <div className="grid grid-cols-4 gap-2">
+          {slots.map((slot, idx) => (
+            <div
+              key={idx}
+              className={`h-10 rounded-md border flex items-center justify-center text-xs font-semibold ${slotStatusColor(slot)}`}
+            >
+              {slot.slot_number || idx + 1}
+            </div>
+          ))}
+        </div>
+        <div className="mt-1.5 h-2 bg-gray-300 rounded-b-sm" />
+      </div>
+    </div>
+  );
+}
+
+export default FranchiseePage;
