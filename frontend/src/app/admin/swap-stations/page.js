@@ -5,10 +5,21 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit, Trash2, Loader2, ArrowLeft, AlertCircle, BatteryCharging } from 'lucide-react';
-import { formatCurrency, localeCurrency, fetchRates } from '../../../lib/currency';
+import { formatCurrency, localeCurrency, fetchRates } from '../../../lib/currency';;
+
+const LANGUAGES = [
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'en', label: 'English' },
+  { code: 'bn', label: 'বাংলা' },
+  { code: 'km', label: 'ខ្មែរ' },
+];
+const EMPTY_I18N = { 'zh-CN': '', 'zh-TW': '', 'en': '', 'bn': '', 'km': '' };
+
 
 const DEFAULT_FORM = {
-  name: '', cabinet_count: '6', price: '', monthly_rent: '', annual_roi: '',
+  name: '', name_i18n: { ...EMPTY_I18N },
+  cabinet_count: '6', price: '', monthly_rent: '', annual_roi: '',
   gps_lat: '', gps_lng: '', image_url: ''
 };
 
@@ -26,6 +37,7 @@ export default function SwapStationsPage() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [selectedLang, setSelectedLang] = useState('zh-CN');
 
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
@@ -58,8 +70,14 @@ export default function SwapStationsPage() {
   const openEdit = (tmpl) => {
     setIsEditing(true); setEditingId(tmpl.id);
     setFile(null); setPreviewUrl(tmpl.image_url || '');
+    const parseI18n = (v, fallback) => {
+      if (v && typeof v === 'object') { const f = { ...EMPTY_I18N }; for (const l of LANGUAGES) { if (v[l.code]) f[l.code] = v[l.code]; } return f; }
+      const e = { ...EMPTY_I18N }; if (fallback) e['zh-CN'] = fallback; return e;
+    };
+    setSelectedLang('zh-CN');
     setForm({
       name: tmpl.name || '',
+      name_i18n: parseI18n(tmpl.name_i18n, tmpl.name),
       cabinet_count: String(tmpl.cabinet_count || ''),
       price: tmpl.price != null ? String(tmpl.price) : '',
       monthly_rent: tmpl.monthly_rent != null ? String(tmpl.monthly_rent) : '',
@@ -84,7 +102,9 @@ export default function SwapStationsPage() {
       const method = isEditing ? 'PUT' : 'POST';
 
       const fd = new FormData();
+      const buildI18n = (obj) => { const r = {}; let h = false; for (const l of LANGUAGES) { if (obj[l.code]?.trim()) { r[l.code] = obj[l.code].trim(); h = true; } } return h ? r : null; };
       fd.append('name', form.name.trim());
+      fd.append('name_i18n', JSON.stringify(buildI18n(form.name_i18n || {}) || {}));
       fd.append('cabinet_count', form.cabinet_count);
       fd.append('price', form.price);
       fd.append('monthly_rent', form.monthly_rent || '0');
@@ -169,14 +189,14 @@ export default function SwapStationsPage() {
                 {templates.map((tmpl, idx) => (
                   <tr key={tmpl.id} className="border-t hover:bg-gray-50 transition">
                     <td className="p-3 text-gray-400 text-xs">{idx + 1}</td>
-                    <td className="p-3 font-medium text-gray-900 text-sm">{tmpl.name}</td>
+                    <td className="p-3 font-medium text-gray-900 text-sm">{tmpl.name_i18n?.[i18n.language] || tmpl.name_i18n?.['zh-CN'] || tmpl.name}</td>
                     <td className="p-3 text-center font-semibold text-sm">{tmpl.cabinet_count}</td>
                     <td className="p-3 text-right font-mono text-sm">${Number(tmpl.price).toLocaleString()}</td>
                     <td className="p-3 text-right font-mono text-sm">${Number(tmpl.monthly_rent).toLocaleString()}</td>
                     <td className="p-3 text-right font-mono text-sm">{Number(tmpl.annual_roi)}%</td>
                     <td className="p-3 text-center">
                       {tmpl.image_url ? (
-                        <img src={tmpl.image_url} alt={tmpl.name}
+                        <img src={tmpl.image_url} alt={tmpl.name_i18n?.[i18n.language] || tmpl.name_i18n?.['zh-CN'] || tmpl.name}
                           onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement.querySelector('.img-fallback')?.classList.remove('hidden'); }}
                           className="h-8 w-8 object-cover rounded border mx-auto" />
                       ) : null}
@@ -217,8 +237,21 @@ export default function SwapStationsPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">{t('adminSw.name')} *</label>
-                  <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={t('adminSw.namePlaceholder')} />
+                  <div className="flex gap-1 mb-2">
+                    {LANGUAGES.map(lang => (
+                      <button type="button" key={lang.code}
+                        onClick={() => setSelectedLang(lang.code)}
+                        className={`px-2 py-0.5 text-xs rounded-full transition ${selectedLang === lang.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input type="text" value={form.name_i18n?.[selectedLang] || ''}
+                    onChange={e => {
+                      const updated = { ...form.name_i18n, [selectedLang]: e.target.value };
+                      setForm({ ...form, name_i18n: updated, name: e.target.value });
+                    }}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder={`${t('adminSw.name')}（${LANGUAGES.find(l=>l.code===selectedLang)?.label}）`} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -306,7 +339,7 @@ export default function SwapStationsPage() {
               <div className="bg-red-100 p-2 rounded-full"><AlertCircle className="h-5 w-5 text-red-600" /></div>
               <div><h3 className="text-lg font-bold">{t('adminSw.confirmDelete')}</h3><p className="text-sm text-gray-500">{t('adminSw.irreversible')}</p></div>
             </div>
-            <p className="text-sm text-gray-600 mb-2">{t('adminSw.confirmDeleteMsg', { name: deleteConfirm.name })}</p>
+            <p className="text-sm text-gray-600 mb-2">{t('adminSw.confirmDeleteMsg', { name: deleteConfirm.name_i18n?.[i18n.language] || deleteConfirm.name_i18n?.['zh-CN'] || deleteConfirm.name })}</p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">{t('common.cancel')}</button>
               <button onClick={() => handleDelete(deleteConfirm.id)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition">{t('adminSw.confirmDelete')}</button>

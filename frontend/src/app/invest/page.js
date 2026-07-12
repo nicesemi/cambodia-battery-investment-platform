@@ -1421,7 +1421,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                       {selectedTemplate.image_url && (
                         <img src={selectedTemplate.image_url} alt={selectedTemplate.name}
                           onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          className="w-full h-48 object-cover rounded-lg border border-blue-100" />
+                          className="w-full object-contain rounded-lg border border-blue-100" />
                       )}
                       <p className="text-blue-800 font-medium">{
                         t('invest.franchise.templateDetail')
