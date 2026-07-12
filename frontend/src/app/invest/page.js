@@ -573,10 +573,11 @@ const getPenaltyTierDisplay = (tier, t) => {
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const [tmplRes, appRes, storeRes] = await Promise.all([
+      const [tmplRes, appRes, storeRes, assetsRes] = await Promise.all([
         fetch('/api/admin/swap-stations', { headers }),
         fetch('/api/franchise-applications', { headers }),
         fetch('/api/operation-sites', { headers }),
+        fetch('/api/assets/my', { headers }),
       ]);
       if (tmplRes.ok) {
         const d = await tmplRes.json();
@@ -590,13 +591,22 @@ const getPenaltyTierDisplay = (tier, t) => {
         const d = await storeRes.json();
         setFranchiseStores((d.sites || []).filter(s => s.site_type && (s.site_type === 'swap_station' || s.site_type.includes('换电') || s.site_type.includes('swap'))));
       }
-      // Count user's swap batteries from loaded userAssets
+      // 直接从 API 获取最新用户资产数据（避免依赖可能过时的 React state）
+      let freshUserAssets = [];
+      if (assetsRes.ok) {
+        const d = await assetsRes.json();
+        freshUserAssets = d.userAssets || [];
+        setUserAssets(freshUserAssets);
+      }
+      // 按资产持有量（units）统计电池数量
       const counts = { 4820: 0, 6035: 0, 7250: 0 };
-      (userAssets || []).forEach(u => {
+      freshUserAssets.forEach(u => {
         const code = (u.asset_code || u.code || '').toUpperCase();
-        if (code.includes('4820')) counts['4820']++;
-        else if (code.includes('6035')) counts['6035']++;
-        else if (code.includes('7250')) counts['7250']++;
+        const units = Number(u.units) || 0;
+        if (units <= 0) return;
+        if (code.includes('4820')) counts['4820'] += units;
+        else if (code.includes('6035')) counts['6035'] += units;
+        else if (code.includes('7250')) counts['7250'] += units;
       });
       setMyBatteryCounts(counts);
     } catch (e) { console.error(e); }

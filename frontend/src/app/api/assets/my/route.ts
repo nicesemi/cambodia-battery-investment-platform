@@ -1,4 +1,4 @@
-import { supabase, getSupabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, serverError } from '@/lib/response'
 
@@ -9,13 +9,14 @@ export async function GET(request: Request) {
     const user = await authenticateToken(request)
     if (!user) return unauthorized()
 
-    const { data: userAssets, error } = await supabase.from('user_assets')
+    // 使用 adminClient 查询 user_assets，避免 RLS 策略导致的静默缺失
+    const adminClient = getSupabaseAdmin()
+    const { data: userAssets, error } = await adminClient.from('user_assets')
       .select('id, units, average_cost, total_dividends_received, asset_id, battery_assets!inner(id, asset_code, name, name_i18n, unit_price, expected_roi, location, battery_type, total_units, available_units, stock)')
       .eq('user_id', user.id)
     if (error) return serverError(error.message)
 
     // Fetch battery units for this user
-    const adminClient = getSupabaseAdmin()
     const { data: myUnits } = await adminClient.from('investor_battery_units')
       .select('battery_asset_id, battery_unit_id, purchase_price, purchased_at, battery_units!inner(id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude)')
       .eq('investor_id', user.id)
