@@ -6,12 +6,19 @@ import { useAuth } from '../../contexts/AuthContext';
 import { adminAPI, batteryTypesAPI } from '../../services/api';
 import { useRouter } from 'next/navigation';
 
-import { Users, TrendingUp, DollarSign, BarChart3, Settings, Battery, Store, ClipboardList, Check, X, Eye, Shield, MapPin, Building2, Plus, Edit, Trash2, Loader2, Zap, BadgeCheck, Percent, Cpu, Camera, Phone, FileText, User, CheckSquare, Square, LayoutList } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, BarChart3, Settings, Battery, Store, ClipboardList, Check, X, Eye, Shield, MapPin, Building2, Plus, Edit, Trash2, Loader2, Zap, BadgeCheck, Percent, Cpu, Camera, Phone, FileText, User, CheckSquare, Square, LayoutList, BatteryCharging } from 'lucide-react';
 import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 
-import { LANGUAGES, EMPTY_I18N } from './constants';
-
 const API_BASE = '/api';
+
+export const LANGUAGES = [
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'en', label: 'English' },
+  { code: 'bn', label: 'বাংলা' },
+  { code: 'km', label: 'ខ្មែរ' },
+];
+export const EMPTY_I18N = { 'zh-CN': '', 'zh-TW': '', 'en': '', 'bn': '', 'km': '' };
 
 function computeBatteryHealth(soc, temp, cycles) {
   function sensorHealth(val, g, y, o, gt) {
@@ -617,7 +624,7 @@ export default function Admin() {
       battery_type: asset.battery_type || 'swap',
       battery_type_id: asset.battery_type_id || matchedType?.id || '',
       total_units: String(asset.total_units || ''),
-      unit_price_rmb: matchedType?.unit_price != null ? String(matchedType.unit_price) : (asset.unit_price_rmb != null ? String((asset.unit_price_rmb / 7.25).toFixed(2)) : ''),
+      unit_price_rmb: asset.unit_price_rmb != null ? String((asset.unit_price_rmb / 7.25).toFixed(2)) : '',
       expected_roi: matchedType?.annualized_return != null ? String(matchedType.annualized_return) : String(asset.expected_roi || ''),
       monthly_rent: matchedType?.monthly_rent != null ? String(matchedType.monthly_rent) : (asset.monthly_rent != null ? String(asset.monthly_rent) : ''),
       location: asset.location || '',
@@ -897,6 +904,8 @@ export default function Admin() {
     { key: 'battery-types', label: '电池类型', icon: Zap, link: '/admin/battery-types' },
     { key: 'sold-batteries', label: '已售电池', icon: Cpu },
     { key: 'operation-sites', label: '运营站点', icon: MapPin, link: '/admin/operation-sites' },
+    { key: 'franchise-applications', label: '加盟审批', icon: FileText, link: '/admin/franchise-applications' },
+    { key: 'swap-stations', label: '换电站模板', icon: BatteryCharging, link: '/admin/swap-stations' },
     { key: 'stores', label: '门店管理', icon: Store },
     { key: 'applications', label: '加盟审核', icon: ClipboardList },
     { key: 'agent-applications', label: '省级代理审批', icon: Users },
@@ -964,7 +973,7 @@ export default function Admin() {
                 <h3 className="font-bold text-gray-900 mb-4">分红概览</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between"><span className="text-gray-500">分红期数</span><span className="font-semibold">{stats.dividends?.total_dividends || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500">累计分红金额</span><span className="font-semibold text-green-600">${(stats.dividends?.total_dividend_amount || 0).toFixed(0)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">累计分红金额</span><span className="font-semibold text-green-600">${(stats.dividends?.total_dividend_amount || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-2">≈ ¥{((stats.dividends?.total_dividend_amount || 0) * 7.25).toFixed(0)}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">已分配分红</span><span className="font-semibold">${(stats.users?.total_dividends_distributed || 0).toFixed(0)}</span></div>
                 </div>
               </div>
@@ -979,16 +988,16 @@ export default function Admin() {
                     <div className="flex justify-between"><span className="text-gray-500">投资者充值总额</span><span className="font-semibold text-green-600">${(stats.finance.total_recharge || 0).toFixed(0)}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">提现总额（已批准）</span><span className="font-semibold">${(stats.finance.total_withdrawal_approved || 0).toFixed(0)}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">提现待审批</span><span className="font-semibold text-orange-600">${(stats.finance.total_withdrawal_pending || 0).toFixed(0)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">上级佣金汇总（估算）</span><span className="font-semibold">${(stats.finance.total_agent_commission || 0).toFixed(0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">上级佣金汇总（估算）</span><span className="font-semibold">${(stats.finance.total_agent_commission || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-2">≈ ¥{((stats.finance.total_agent_commission || 0) * 7.25).toFixed(0)}</span></div>
                   </div>
                 </div>
                 <div className="bg-white rounded-xl border p-6">
                   <h3 className="font-bold text-gray-900 mb-4">平台分账 & 回购</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between"><span className="text-gray-500">平台分红留存</span><span className="font-semibold text-purple-600">${(stats.finance.total_platform_dividend_share || 0).toFixed(0)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">平台手续费</span><span className="font-semibold">${(stats.finance.total_platform_fees || 0).toFixed(0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">平台手续费</span><span className="font-semibold">${(stats.finance.total_platform_fees || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-2">≈ ¥{((stats.finance.total_platform_fees || 0) * 7.25).toFixed(0)}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">平台回购笔数</span><span className="font-semibold">{stats.finance.total_buyback_count || 0} 笔</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">平台回购金额</span><span className="font-semibold text-blue-600">${(stats.finance.total_buyback_amount || 0).toFixed(0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">平台回购金额</span><span className="font-semibold text-blue-600">${(stats.finance.total_buyback_amount || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-2">≈ ¥{((stats.finance.total_buyback_amount || 0) * 7.25).toFixed(0)}</span></div>
                   </div>
                 </div>
               </div>
@@ -999,7 +1008,7 @@ export default function Admin() {
                 <h3 className="font-bold text-gray-900 mb-4">电池资产销售分布</h3>
                 <table className="w-full text-sm"><thead className="bg-gray-50"><tr><th className="text-left p-3">电池名称</th><th className="text-right p-3">售出份数</th><th className="text-right p-3">销售金额</th></tr></thead>
                   <tbody>{(stats.finance.battery_type_sales || []).map(s => (
-                    <tr key={s.name} className="border-t"><td className="p-3 font-medium">{s.name}</td><td className="p-3 text-right">{s.units || 0}</td><td className="p-3 text-right"><span className="text-green-600 font-semibold">${(s.amount || 0).toFixed(0)}</span></td></tr>
+                    <tr key={s.name} className="border-t"><td className="p-3 font-medium">{s.name}</td><td className="p-3 text-right">{s.units || 0}</td><td className="p-3 text-right"><span className="text-green-600 font-semibold">${(s.amount || 0).toFixed(0)}</span><span className="text-xs text-gray-400 ml-1">≈ ¥{((s.amount || 0) * 7.25).toFixed(0)}</span></td></tr>
                   ))}</tbody></table>
               </div>
             )}
@@ -1060,7 +1069,7 @@ export default function Admin() {
                       <td className="p-4 text-right text-green-600 font-semibold">{a.available_units}</td>
                       <td className="p-4 text-right font-semibold">{a.stock ?? a.available_units}</td>
                       <td className="p-4 text-right text-gray-500">{a.sold_units ?? (a.total_units - a.available_units)}</td>
-                                            <td className="p-4 text-right"><div className="font-semibold">${a.battery_type_unit_price ?? a.unit_price}</div></td>
+                                            <td className="p-4 text-right"><div className="font-semibold">${a.battery_type_unit_price ?? a.unit_price}</div><div className="text-xs text-gray-400">{a.unit_price_rmb != null ? `≈ ¥${a.unit_price_rmb}` : '—'}</div></td>
                       <td className="p-4 text-right">{a.battery_type_annualized_return != null ? `${a.battery_type_annualized_return}%` : a.expected_roi != null ? `${a.expected_roi}%` : '—'}</td>
                       <td className="p-4 text-right">{(a.battery_type_monthly_rent ?? a.monthly_rent) != null ? (() => { const dc = localeCurrency(a.battery_type_monthly_rent ?? a.monthly_rent, i18n.language); return <><div className="text-gray-700 font-semibold">{dc.primary} /月</div></>; })() : '—'}</td>
                       <td className="p-4 text-xs text-gray-600 max-w-[180px] truncate" title={a.warehouse_name || a.location || '—'}>{a.warehouse_name || a.location || '—'}</td>
@@ -1492,7 +1501,7 @@ export default function Admin() {
                       </td>
                       <td className="p-3 text-right">
                         {b.battery_assets?.unit_price != null ? (
-                          <><div className="font-semibold">${b.battery_assets.unit_price.toLocaleString()}</div></>
+                          <><div className="font-semibold">${b.battery_assets.unit_price.toLocaleString()}</div><div className="text-xs text-gray-400">≈ ¥{Math.round(b.battery_assets.unit_price * 7.25).toLocaleString()}</div></>
                         ) : '-'}
                       </td>
                       <td className="p-3 text-right text-gray-400">{b.created_at ? new Date(b.created_at).toLocaleDateString('zh-CN') : '-'}</td>
@@ -2313,6 +2322,9 @@ export default function Admin() {
                     <label className="block text-xs font-medium text-gray-600 mb-1">单价 (USD) *</label>
                     <input type="number" min="0" step="0.01" value={assetForm.unit_price_rmb} readOnly disabled
                       className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 outline-none cursor-default" placeholder="选择电池类型后自动填充" />
+                    {assetForm.unit_price_rmb && parseFloat(assetForm.unit_price_rmb) > 0 && (
+                      <p className="text-xs text-gray-400 mt-1">≈ ¥{(parseFloat(assetForm.unit_price_rmb) * 7.25).toFixed(2)}（按当日汇率自动换算）</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">年化收益率 (%)</label>

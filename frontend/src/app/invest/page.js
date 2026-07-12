@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { assetAPI, orderAPI, dividendAPI } from '../../services/api';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -74,7 +74,7 @@ function resolveI18n(obj, i18nKey, fallback, i18n) {
   return i18nData[i18n.language] || i18nData['zh-CN'] || fallback;
 }
 
-function InvestPageContent() {
+export default function Invest() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
@@ -195,10 +195,6 @@ function InvestPageContent() {
   const [walletBalance, setWalletBalance] = useState(null);
   const [walletTransactions, setWalletTransactions] = useState([]);
   const [walletLoading, setWalletLoading] = useState(false);
-  const [txPage, setTxPage] = useState(1);
-  const [txTotalPages, setTxTotalPages] = useState(1);
-  const [txTotal, setTxTotal] = useState(0);
-  const [txDebug, setTxDebug] = useState(null);
 
   // Recharge
   const [showRechargeModal, setShowRechargeModal] = useState(false);
@@ -221,6 +217,15 @@ function InvestPageContent() {
   const [sellMsg, setSellMsg] = useState('');
   const [sellSuccess, setSellSuccess] = useState(false);
   const [tradeLoading, setTradeLoading] = useState(true);
+
+  // --- Franchise ---
+  const [swapTemplates, setSwapTemplates] = useState([]);
+  const [franchiseApplications, setFranchiseApplications] = useState([]);
+  const [franchiseForm, setFranchiseForm] = useState({ location: '', template_id: '' });
+  const [franchiseSubmitting, setFranchiseSubmitting] = useState(false);
+  const [franchiseMsg, setFranchiseMsg] = useState('');
+  const [myBatteryCounts, setMyBatteryCounts] = useState({ 4820: 0, 6035: 0, 7250: 0 });
+  const [franchiseStores, setFranchiseStores] = useState([]);
 
 const getTxRemark = (tx, t, i18n) => {
   // 优先使用 DB 中的 remark_i18n（多语言），其次 remark（纯文本），否则基于 type 做 i18n
@@ -330,6 +335,7 @@ const getPenaltyTierDisplay = (tier, t) => {
   useEffect(() => {
     if (activeTab === 'dividends') loadDividends();
     if (activeTab === 'wallet') loadWallet();
+    if (activeTab === 'franchise') loadFranchiseData();
   }, [activeTab]);
 
   useEffect(() => {
@@ -490,52 +496,93 @@ const getPenaltyTierDisplay = (tier, t) => {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const [profileRes, txRes] = await Promise.all([
         fetch('/api/auth/profile', { headers }),
-        fetch('/api/wallet/transactions?page=1&limit=10', { headers }),
+        fetch('/api/wallet/transactions', { headers }),
       ]);
       const profileData = await profileRes.json();
-      console.log('[loadWallet] profileRes.ok:', profileRes.ok, 'wallet.balance:', profileData.wallet?.balance, '_serverTime:', profileData._serverTime, '_version:', profileData._version);
       if (profileRes.ok && profileData.wallet) {
         setWalletBalance(profileData.wallet.balance);
-      } else if (!profileRes.ok) {
-        console.error('[loadWallet] profile API failed:', profileRes.status);
       }
       const txData = await txRes.json();
       if (txRes.ok) {
-        setWalletTransactions(txData.transactions || []);
-        setTxPage(1);
-        setTxTotalPages(txData.pagination?.totalPages || 1);
-        setTxTotal(txData.pagination?.total || 0);
-      } else {
-        console.error('[loadWallet] transactions API failed:', txRes.status);
+        setWalletTransactions(txData.transactions || txData.records || []);
       }
-    } catch (e) { console.error('[loadWallet] error:', e); }
+    } catch (e) { console.error(e); }
     finally { setWalletLoading(false); }
   };
 
-  // 仅刷新交易明细（充值/回购后调用，余额已由 POST 响应直接更新）
-  const loadWalletTransactions = async (page = 1) => {
+  const loadFranchiseData = async () => {
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      console.log('[loadWalletTransactions] fetching page:', page);
-      const txRes = await fetch(`/api/wallet/transactions?page=${page}&limit=10`, { headers });
-      const txData = await txRes.json();
-      console.log('[loadWalletTransactions] response:', txRes.status, 'records:', txData.transactions?.length || 0, 'total:', txData.pagination?.total);
-      console.log('[loadWalletTransactions] _debug:', txData._debug);
-      setTxDebug(txData._debug || null);
-      if (txRes.ok) {
-        const txs = txData.transactions || [];
-        if (txs.length > 0) {
-          console.log('[loadWalletTransactions] first:', txs[0]?.txNo, txs[0]?.type, txs[0]?.amount);
-        }
-        setWalletTransactions(txs);
-        setTxPage(page);
-        setTxTotalPages(txData.pagination?.totalPages || 1);
-        setTxTotal(txData.pagination?.total || 0);
-      } else {
-        console.error('[loadWalletTransactions] API failed:', txRes.status, txData);
+      const [tmplRes, appRes, storeRes] = await Promise.all([
+        fetch('/api/admin/swap-stations', { headers }),
+        fetch('/api/franchise-applications', { headers }),
+        fetch('/api/operation-sites', { headers }),
+      ]);
+      if (tmplRes.ok) {
+        const d = await tmplRes.json();
+        setSwapTemplates(d.templates || []);
       }
-    } catch (e) { console.error('[loadWalletTransactions] error:', e); }
+      if (appRes.ok) {
+        const d = await appRes.json();
+        setFranchiseApplications(d.applications || []);
+      }
+      if (storeRes.ok) {
+        const d = await storeRes.json();
+        setFranchiseStores((d.sites || []).filter(s => s.site_type === 'swap_station' || s.site_type?.includes('换电')));
+      }
+      // Count user's swap batteries from loaded userAssets
+      const counts = { 4820: 0, 6035: 0, 7250: 0 };
+      (userAssets || []).forEach(u => {
+        const code = (u.asset_code || u.code || '').toUpperCase();
+        if (code.includes('4820')) counts['4820']++;
+        else if (code.includes('6035')) counts['6035']++;
+        else if (code.includes('7250')) counts['7250']++;
+      });
+      setMyBatteryCounts(counts);
+    } catch (e) { console.error(e); }
+  };
+
+  const selectedTemplate = swapTemplates.find(t => t.id === franchiseForm.template_id);
+  const requiredBatteries = selectedTemplate ? Math.max(0, (selectedTemplate.cabinet_count || 0) - 2) : 0;
+  const myTotalBatteries = myBatteryCounts['4820'] + myBatteryCounts['6035'] + myBatteryCounts['7250'];
+  const isFranchiseEligible = selectedTemplate && myTotalBatteries >= requiredBatteries;
+
+  const handleFranchiseSubmit = async (e) => {
+    e.preventDefault();
+    if (!franchiseForm.location.trim() || !franchiseForm.template_id) {
+      setFranchiseMsg('请填写加盟地点并选择模板');
+      return;
+    }
+    setFranchiseSubmitting(true);
+    setFranchiseMsg('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/franchise-applications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          location: franchiseForm.location.trim(),
+          template_id: franchiseForm.template_id,
+          matched_battery_4820: myBatteryCounts['4820'],
+          matched_battery_6035: myBatteryCounts['6035'],
+          matched_battery_7250: myBatteryCounts['7250'],
+          cabinet_count: selectedTemplate?.cabinet_count,
+        }),
+      });
+      if (res.ok) {
+        setFranchiseMsg(t('invest.franchise.submitSuccess'));
+        setFranchiseForm({ location: '', template_id: '' });
+        loadFranchiseData();
+      } else {
+        const err = await res.json();
+        setFranchiseMsg(err.error || '提交失败');
+      }
+    } catch (e) { setFranchiseMsg('网络错误'); }
+    finally { setFranchiseSubmitting(false); }
   };
 
   const handleRecharge = async () => {
@@ -553,42 +600,10 @@ const getPenaltyTierDisplay = (tier, t) => {
         body: JSON.stringify({ amount }),
       });
       if (res.ok) {
-        const result = await res.json();
-        console.log('[Recharge] POST response:', result);
-        console.log('[Recharge] _api_version:', result._api_version, '_verify_found:', result._verify_found);
-        console.log('[Recharge] result.balance:', result.balance, 'type:', typeof result.balance);
-        // 立即用 POST 响应中的最新余额更新 UI
-        if (result.balance != null) {
-          setWalletBalance(Number(result.balance));
-        } else {
-          console.warn('[Recharge] result.balance is null/undefined, falling back to GET profile');
-          loadWallet();
-        }
-        // 立即用 POST 响应中的交易记录更新列表（绕过 Supabase 读副本延迟）
-        if (result.transaction) {
-          console.log('[Recharge] prepending transaction:', result.transaction.txNo);
-          setWalletTransactions(prev => {
-            const existing = prev.find(t => t.txNo === result.transaction.txNo);
-            if (existing) return prev;
-            return [result.transaction, ...prev].slice(0, 10);
-          });
-          setTxTotal(t => t + 1);
-        }
+        alert(t('invest.alert.rechargeSuccess'));
         setShowRechargeModal(false);
         setRechargeAmount('');
-        alert(t('invest.alert.rechargeSuccess'));
-        console.log('[Recharge] POST done, scheduling loadWalletTransactions in 300ms...');
-        // 延迟 300ms 后重试 2 次，确保 Supabase 事务已提交
-        setTimeout(() => {
-          console.log('[Recharge] calling loadWalletTransactions (1st attempt)');
-          loadWalletTransactions().then(() => {
-            // 2 秒后再重试一次作为兜底
-            setTimeout(() => {
-              console.log('[Recharge] calling loadWalletTransactions (2nd attempt)');
-              loadWalletTransactions();
-            }, 2000);
-          });
-        }, 300);
+        loadWallet();
       } else {
         const err = await res.json();
         alert(err.error || t('invest.alert.rechargeFailed'));
@@ -620,7 +635,7 @@ const getPenaltyTierDisplay = (tier, t) => {
         alert(t('invest.alert.withdrawSuccess'));
         setShowWithdrawModal(false);
         setWithdrawForm({ amount: '', bank_account: '', bank_name: '', account_holder: '' });
-        await loadWallet();
+        loadWallet();
       } else {
         const err = await res.json();
         alert(err.error || t('invest.alert.withdrawFailed'));
@@ -681,21 +696,11 @@ const getPenaltyTierDisplay = (tier, t) => {
         body: JSON.stringify({ unitIds: selectedUnitIds }),
       });
       const json = await res.json();
-      console.log('[SellToPlatform frontend] response:', { ok: res.ok, hasTx: !!json.transaction, txNo: json.transaction?.txNo, totalBuyback: json.totalBuyback });
       if (!res.ok) { setSellMsg(json.error || t('trade.sellFailed')); setSellSuccess(false); return; }
       setSellSuccess(true);
       setSellMsg(t('trade.sellSuccess', { total: json.totalBuyback.toFixed(2), totalCny: (json.totalBuyback * 7.25).toFixed(2), balance: json.newBalance.toFixed(2), balanceCny: (json.newBalance * 7.25).toFixed(2) }));
-      setWalletBalance(json.newBalance);
       setSelectedUnitIds([]);
       setPreviewMap({});
-      // 立即将回购交易 prepend 到本地列表，绕过读副本延迟
-      if (json.transaction) {
-        setWalletTransactions(prev => {
-          if (prev.find(t => t.txNo === json.transaction.txNo)) return prev;
-          return [json.transaction, ...prev].slice(0, 10);
-        });
-        setTxTotal(t => t + 1);
-      }
       loadMyUnits();
     } catch (e) { setSellSuccess(false); setSellMsg(t('trade.sellFailed')); }
     finally { setSelling(false); }
@@ -744,6 +749,7 @@ const getPenaltyTierDisplay = (tier, t) => {
               { key: 'orders', label: t('invest.tabs.orders'), icon: Clock },
               { key: 'dividends', label: t('invest.tabs.dividends'), icon: Gift },
               { key: 'wallet', label: t('invest.tabs.wallet'), icon: Wallet },
+              { key: 'franchise', label: t('invest.tabs.franchise'), icon: Network },
             ].map(t => (
               <button key={t.key} onClick={() => setActiveTab(t.key)}
                 className={`flex items-center space-x-2 py-4 border-b-2 text-sm font-medium transition ${
@@ -774,7 +780,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                   <div className="p-5">
                     <h3 className="font-bold text-lg text-gray-900">{asset.resolved_name || asset.name}</h3>
                     <p className="flex items-center text-sm text-gray-500 mt-1">
-                      <MapPin className="h-3 w-3 mr-1" />{resolveI18n(asset, 'location_i18n', asset.location, i18n)} · {asset.asset_code}
+                      <MapPin className="h-3 w-3 mr-1" />{asset.location} · {asset.asset_code}
                     </p>
                     <p className="text-sm text-gray-600 mt-3 line-clamp-2">{asset.resolved_description || asset.description}</p>
                     <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t text-sm">
@@ -822,7 +828,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <h3 className="font-bold text-lg text-gray-900">{resolveI18n(ua, 'name_i18n', ua.name, i18n)}</h3>
-                          <p className="text-sm text-gray-500">{ua.asset_code} · {ua.resolved_battery_type || getBatteryTypeDisplay(ua.battery_type)} · {resolveI18n(ua, 'location_i18n', ua.location, i18n)}</p>
+                          <p className="text-sm text-gray-500">{ua.asset_code} · {ua.resolved_battery_type || getBatteryTypeDisplay(ua.battery_type)} · {ua.location}</p>
                         </div>
                         <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">{t('invest.portfolio.holding')}</span>
                       </div>
@@ -1133,7 +1139,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                                 <Battery className="h-4 w-4 text-gray-400" />
                                 <span className="font-medium text-sm">{unit.unit_code || unit.id?.slice(0, 8)}</span>
                               </div>
-                              <span className="text-xs text-gray-500">{resolveI18n(unit, 'asset_name_i18n', unit.asset_name, i18n)}</span>
+                              <span className="text-xs text-gray-500">{unit.asset_name}</span>
                             </div>
                             <div className="mt-1 text-xs text-gray-500">{t('trade.purchasePrice')}: {formatCurrency(Number(unit.unit_price || 1000), i18n.language)}</div>
                           </div>))}
@@ -1232,9 +1238,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                         <td className="p-4 text-right">{formatCurrency(o.unit_price || 0, i18n.language)}</td>
                         <td className="p-4 text-right font-semibold">{formatCurrency(o.total_amount || 0, i18n.language)}</td>
                         <td className="p-4 text-right">
-                          {o.order_source === 'platform' ? (
-                            <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">{t('invest.orders.platform')}</span>
-                          ) : o.order_source === 'store' ? (
+                          {o.order_source === 'store' ? (
                             <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">{o.store?.name || t('invest.orders.store')}</span>
                           ) : <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">{t('invest.orders.online')}</span>}
                         </td>
@@ -1315,6 +1319,119 @@ const getPenaltyTierDisplay = (tier, t) => {
           </div>
         )}
 
+        {/* Tab: Franchise */}
+        {activeTab === 'franchise' && (
+          <div>
+            <h2 className="text-xl font-bold mb-2">{t('invest.franchise.title')}</h2>
+            <p className="text-gray-500 text-sm mb-6">{t('invest.franchise.subtitle')}</p>
+
+            {/* Map */}
+            <div className="bg-white rounded-xl border overflow-hidden mb-6" style={{ height: 400 }}>
+              <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
+                {t('invest.franchise.mapHint')}
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Application Form */}
+              <div className="bg-white rounded-xl border p-6">
+                <h3 className="font-bold text-lg mb-4">{t('invest.franchise.title')}</h3>
+                {franchiseMsg && (
+                  <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${franchiseMsg.includes('成功') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                    {franchiseMsg}
+                  </div>
+                )}
+                <form onSubmit={handleFranchiseSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('invest.franchise.locationLabel')}</label>
+                    <input type="text" value={franchiseForm.location}
+                      onChange={e => setFranchiseForm({ ...franchiseForm, location: e.target.value })}
+                      placeholder={t('invest.franchise.locationPlaceholder')}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('invest.franchise.selectTemplate')}</label>
+                    <select value={franchiseForm.template_id}
+                      onChange={e => setFranchiseForm({ ...franchiseForm, template_id: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                      <option value="">-- {t('invest.franchise.selectTemplate')} --</option>
+                      {swapTemplates.map(tmpl => (
+                        <option key={tmpl.id} value={tmpl.id}>
+                          {tmpl.name}（{tmpl.cabinet_count}{t('adminFa.cabinetsUnit')}）
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedTemplate && (
+                    <div className="bg-blue-50 rounded-lg p-4 text-sm space-y-1">
+                      <p className="text-blue-800 font-medium">{
+                        t('invest.franchise.templateDetail')
+                          .replace('{{price}}', formatCurrency(selectedTemplate.price, i18n.language))
+                          .replace('{{rent}}', formatCurrency(selectedTemplate.monthly_rent, i18n.language))
+                          .replace('{{roi}}', selectedTemplate.annual_roi)
+                      }</p>
+                    </div>
+                  )}
+                  {selectedTemplate && (
+                    <div className={`rounded-lg p-4 text-sm ${isFranchiseEligible ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                      <p className="font-medium">{t('invest.franchise.batteryCheck')}</p>
+                      {isFranchiseEligible ? (
+                        <p>{t('invest.franchise.eligible').replace('{{total}}', myTotalBatteries)}</p>
+                      ) : (
+                        <p>{t('invest.franchise.notEligible').replace('{{required}}', requiredBatteries).replace('{{current}}', myTotalBatteries)}</p>
+                      )}
+                      <div className="flex space-x-4 mt-2 text-xs">
+                        <span>4820: {myBatteryCounts['4820']}</span>
+                        <span>6035: {myBatteryCounts['6035']}</span>
+                        <span>7250: {myBatteryCounts['7250']}</span>
+                      </div>
+                    </div>
+                  )}
+                  <button type="submit" disabled={franchiseSubmitting || !isFranchiseEligible}
+                    className={`w-full py-2.5 rounded-lg text-sm font-medium transition ${isFranchiseEligible ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                    {franchiseSubmitting ? <Loader2 className="h-4 w-4 animate-spin inline mr-1" /> : null}
+                    {t('invest.franchise.submit')}
+                  </button>
+                </form>
+              </div>
+
+              {/* Application History */}
+              <div className="bg-white rounded-xl border p-6">
+                <h3 className="font-bold text-lg mb-4">{t('invest.franchise.applicationHistory')}</h3>
+                {franchiseApplications.length === 0 ? (
+                  <p className="text-gray-400 text-sm text-center py-8">{t('invest.franchise.noApplications')}</p>
+                ) : (
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                    {franchiseApplications.map(app => {
+                      const tmpl = swapTemplates.find(t => t.id === app.template_id);
+                      return (
+                        <div key={app.id} className="border rounded-lg p-4 text-sm">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium">{tmpl?.name || app.template_id}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              app.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {app.status === 'approved' ? t('adminFa.status.approved') :
+                               app.status === 'rejected' ? t('adminFa.status.rejected') : t('adminFa.status.pending')}
+                            </span>
+                          </div>
+                          <p className="text-gray-600">{t('adminFa.location')}: {app.location}</p>
+                          <p className="text-gray-600">{t('adminFa.cabinetCount')}: {app.cabinet_count}</p>
+                          <p className="text-gray-600">4820: {app.matched_battery_4820} | 6035: {app.matched_battery_6035} | 7250: {app.matched_battery_7250}</p>
+                          {app.admin_remark && <p className="text-gray-500 mt-1">{t('adminFa.remark')}: {app.admin_remark}</p>}
+                          <p className="text-gray-400 text-xs mt-2">{app.created_at ? new Date(app.created_at).toLocaleDateString() : ''}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tab: Wallet */}
         {activeTab === 'wallet' && (
           <div>
@@ -1386,36 +1503,6 @@ const getPenaltyTierDisplay = (tier, t) => {
                         ))}
                       </tbody>
                     </table>
-                    {/* 分页控件 */}
-                    {txTotalPages > 1 && (
-                      <div className="flex items-center justify-between px-4 py-3 border-t">
-                        <span className="text-sm text-gray-500">共 {txTotal} 条</span>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => loadWalletTransactions(txPage - 1)}
-                            disabled={txPage <= 1}
-                            className="px-3 py-1 text-sm rounded border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100"
-                          >上一页</button>
-                          <span className="text-sm text-gray-600">{txPage} / {txTotalPages}</span>
-                          <button
-                            onClick={() => loadWalletTransactions(txPage + 1)}
-                            disabled={txPage >= txTotalPages}
-                            className="px-3 py-1 text-sm rounded border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100"
-                          >下一页</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {/* 诊断面板 */}
-                {txDebug && (
-                  <div className="border-t mt-3 pt-3 px-4 pb-3">
-                    <details>
-                      <summary className="text-xs text-gray-400 cursor-pointer select-none">Debug Info</summary>
-                      <pre className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded overflow-auto max-h-64">
-                        {JSON.stringify(txDebug, null, 2)}
-                      </pre>
-                    </details>
                   </div>
                 )}
               </>
@@ -1520,13 +1607,5 @@ const getPenaltyTierDisplay = (tier, t) => {
         </div>
       )}
     </div>
-  );
-}
-
-export default function Invest() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <InvestPageContent />
-    </Suspense>
   );
 }

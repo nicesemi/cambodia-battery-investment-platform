@@ -1,0 +1,97 @@
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
+import { authenticateToken } from '@/lib/auth'
+import { badRequest, ok, unauthorized, serverError } from '@/lib/response'
+import { randomUUID } from 'crypto'
+import { writeFile, mkdir } from 'fs/promises'
+import path from 'path'
+
+export const dynamic = 'force-dynamic'
+
+export async function GET(request: Request) {
+  try {
+    const user = await authenticateToken(request)
+    if (!user || (user.role !== 'admin' && user.role !== 'operator')) return unauthorized('Admin only')
+
+    const adminClient = getSupabaseAdmin()
+    const { data, error } = await adminClient
+      .from('swap_station_templates')
+      .select('*')
+      .order('cabinet_count', { ascending: true })
+
+    if (error) return serverError(error.message)
+    return ok({ templates: data || [] })
+  } catch (e: any) {
+    return serverError()
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const user = await authenticateToken(request)
+    if (!user || (user.role !== 'admin' && user.role !== 'operator')) return unauthorized('Admin only')
+
+    const formData = await request.formData()
+    const name = formData.get('name') as string
+    const cabinet_count = formData.get('cabinet_count') as string
+    const price = formData.get('price') as string
+    const monthly_rent = formData.get('monthly_rent') as string
+    const annual_roi = formData.get('annual_roi') as string
+    const gps_lat = formData.get('gps_lat') as string
+    const gps_lng = formData.get('gps_lng') as string
+
+    if (!name || !cabinet_count || !price) {
+      return badRequest('缺少必填字段: name, cabinet_count, price')
+    }
+
+    let image_url: string | null = null
+    const image = formData.get('image') as File | null
+    if (image && image.size > 0) {
+      const adminClient = getSupabaseAdmin()
+      const ext = image.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const filename = `${Date.now()}-${randomUUID()}.${ext}`
+      const buffer = Buffer.from(await image.arrayBuffer())
+
+      const { error: uploadErr } = await adminClient.storage
+        .from('public-assets')
+        .upload(`swap-stations/${filename}`, buffer, {
+          contentType: image.type,
+          upsert: false
+        })
+
+      if (uploadErr) {
+        // fallback to local upload
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'swap-stations')
+        await mkdir(uploadsDir, { recursive: true })
+        const filePath = path.join(uploadsDir, filename)
+        await writeFile(filePath, buffer)
+        image_url = `/uploads/swap-stations/${filename}`
+      } else {
+        const { data: urlData } = adminClient.storage
+          .from('public-assets')
+          .getPublicUrl(`swap-stations/${filename}`)
+        image_url = urlData.publicUrl
+      }
+    }
+
+    const adminClient = getSupabaseAdmin()
+    const { data, error } = await adminClient
+      .from('swap_station_templates')
+      .insert({
+        name: name.trim(),
+        cabinet_count: parseInt(cabinet_count),
+        price: parseFloat(price),
+        monthly_rent: monthly_rent ? parseFloat(monthly_rent) : 0,
+        annual_roi: annual_roi ? parseFloat(annual_roi) : 0,
+        image_url,
+        gps_lat: gps_lat ? parseFloat(gps_lat) : null,
+        gps_lng: gps_lng ? parseFloat(gps_lng) : null,
+      })
+      .select('*')
+      .single()
+
+    if (error) return serverError(error.message)
+    return ok({ message: '模板已创建', template: data }, 201)
+  } catch (e: any) {
+    return serverError()
+  }
+}
