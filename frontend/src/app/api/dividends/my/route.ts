@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, serverError } from '@/lib/response'
 
@@ -23,9 +23,10 @@ export async function GET(request: Request) {
     if (error) return serverError(error.message)
 
     // 过滤掉已回购的电池：检查 investor_battery_units 中是否仍持有
+    const adminClient = getSupabaseAdmin()
     const eligibleDividends: any[] = []
     for (const d of (dividends || [])) {
-      const { data: holding } = await supabase.from('investor_battery_units')
+      const { data: holding } = await adminClient.from('investor_battery_units')
         .select('id').eq('investor_id', user.id).eq('battery_asset_id', d.asset_id).limit(1)
       if (holding && holding.length > 0) {
         eligibleDividends.push(d)
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
     const currentYear = today.getFullYear()
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
 
-    const { data: holdings } = await supabase
+    const { data: holdings } = await adminClient
       .from('investor_battery_units')
       .select(`
         purchased_at,

@@ -126,26 +126,98 @@ async function matchOrders(assetId: string) {
             await supabase.from('user_assets').insert({ user_id: buy.user_id, asset_id: assetId, units: matched, average_cost: matchPrice })
           }
 
-          // Create battery_units + investor_battery_units records for the matched units
-          // so the buyer sees individual battery details in "我的资产"
+          // Assign battery_units to buyer: 优先分配已存在但未分配的电池单元，不足时新建
           try {
-            const { data: assetInfo } = await getSupabaseAdmin().from('battery_assets')
-              .select('asset_code').eq('id', assetId).single()
-            const assetCode = assetInfo?.asset_code || `BT${assetId.slice(0, 6)}`
+            const admin = getSupabaseAdmin()
             const purchasedAt = new Date().toISOString()
-            for (let i = 0; i < matched; i++) {
-              const unitCode = `${assetCode}-${Date.now().toString(36)}-${i}`
-              const { data: newUnit } = await getSupabaseAdmin().from('battery_units')
-                .insert({ unit_code: unitCode, status: 'active' }).select('id').single()
-              if (newUnit) {
-                await getSupabaseAdmin().from('investor_battery_units').insert({
+
+            // Step 1: 查找该资产下已部署但未售出的电池单元（status='sold' + investor_id IS NULL + site_name IS NOT NULL）
+            const { data: deployedOwnerless } = await admin.from('battery_units')
+              .select('id, unit_code')
+              .eq('battery_asset_id', assetId)
+              .eq('status', 'sold')
+              .is('investor_id', null)
+              .not('site_name', 'is', null)
+              .limit(matched)
+
+            let assignedIds: string[] = []
+            let remaining = matched
+
+            if (deployedOwnerless && deployedOwnerless.length > 0) {
+              const take = deployedOwnerless.slice(0, remaining)
+              const takeIds = take.map((u: any) => u.id)
+              assignedIds.push(...takeIds)
+              remaining -= takeIds.length
+
+              await admin.from('battery_units')
+                .update({ investor_id: buy.user_id })
+                .in('id', takeIds)
+
+              const ibuEntries = take.map((u: any) => ({
+                investor_id: buy.user_id,
+                battery_unit_id: u.id,
+                battery_asset_id: assetId,
+                purchase_price: matchPrice,
+                purchased_at: purchasedAt,
+              }))
+              await admin.from('investor_battery_units').insert(ibuEntries)
+            }
+
+            // Step 2: 从仓库 available 池中分配
+            if (remaining > 0) {
+              const { data: availableUnits } = await admin.from('battery_units')
+                .select('id, unit_code')
+                .eq('battery_asset_id', assetId)
+                .eq('status', 'available')
+                .order('unit_code', { ascending: true })
+                .limit(remaining)
+
+              if (availableUnits && availableUnits.length > 0) {
+                const unitIds = availableUnits.map((u: any) => u.id)
+                assignedIds.push(...unitIds)
+                remaining -= unitIds.length
+
+                await admin.from('battery_units')
+                  .update({ status: 'sold', investor_id: buy.user_id })
+                  .in('id', unitIds)
+
+                const ibuEntries = availableUnits.map((u: any) => ({
                   investor_id: buy.user_id,
+                  battery_unit_id: u.id,
                   battery_asset_id: assetId,
-                  battery_unit_id: newUnit.id,
                   purchase_price: matchPrice,
                   purchased_at: purchasedAt,
-                })
+                }))
+                await admin.from('investor_battery_units').insert(ibuEntries)
               }
+            }
+
+            // Step 3: 若仍不足，创建新的 battery_units
+            if (remaining > 0) {
+              const { data: assetInfo } = await admin.from('battery_assets')
+                .select('asset_code').eq('id', assetId).single()
+              const assetCode = assetInfo?.asset_code || `BT${assetId.slice(0, 6)}`
+
+              for (let i = 0; i < remaining; i++) {
+                const unitCode = `${assetCode}-${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 6)}`
+                const { data: newUnit } = await admin.from('battery_units')
+                  .insert({ battery_asset_id: assetId, unit_code: unitCode, status: 'sold', investor_id: buy.user_id })
+                  .select('id').single()
+                if (newUnit) {
+                  assignedIds.push(newUnit.id)
+                  await admin.from('investor_battery_units').insert({
+                    investor_id: buy.user_id,
+                    battery_unit_id: newUnit.id,
+                    battery_asset_id: assetId,
+                    purchase_price: matchPrice,
+                    purchased_at: purchasedAt,
+                  })
+                }
+              }
+            }
+
+            if (assignedIds.length === 0) {
+              console.warn(`[matchOrders] 未能为买家 ${buy.user_id} 分配任何电池单元 (asset=${assetId}, matched=${matched})`)
             }
           } catch { /* battery detail creation is best-effort; trade itself is already committed */ }
 
