@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     const annual_roi = formData.get('annual_roi') as string
     const gps_lat = formData.get('gps_lat') as string
     const gps_lng = formData.get('gps_lng') as string
+    const name_i18n = formData.get('name_i18n') as string
 
     if (!name || !cabinet_count || !price) {
       return badRequest('缺少必填字段: name, cabinet_count, price')
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
       .from('swap_station_templates')
       .insert({
         name: name.trim(),
+        name_i18n: name_i18n ? JSON.parse(name_i18n) : null,
         cabinet_count: parseInt(cabinet_count),
         price: priceVal,
         monthly_rent: monthlyRentVal,

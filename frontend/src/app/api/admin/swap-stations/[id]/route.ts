@@ -22,6 +22,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const gps_lat = formData.get('gps_lat') as string
     const gps_lng = formData.get('gps_lng') as string
     const keep_image_url = formData.get('keep_image_url') as string
+    const name_i18n = formData.get('name_i18n') as string
 
     const updates: any = {}
     if (name !== undefined && name !== null) updates.name = name.trim()
@@ -31,6 +32,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (annual_roi !== undefined && annual_roi !== null) updates.annual_roi = parseFloat(annual_roi)
     if (gps_lat !== undefined && gps_lat !== null) updates.gps_lat = gps_lat !== '' ? parseFloat(gps_lat) : null
     if (gps_lng !== undefined && gps_lng !== null) updates.gps_lng = gps_lng !== '' ? parseFloat(gps_lng) : null
+    if (name_i18n !== undefined && name_i18n !== null) updates.name_i18n = name_i18n ? JSON.parse(name_i18n) : null
 
     const image = formData.get('image') as File | null
     if (image && image.size > 0) {
