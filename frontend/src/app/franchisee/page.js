@@ -3634,5 +3634,3 @@ function InlineCabinetGrid({ site }) {
     </div>
   );
 }
-
-export default FranchiseePage;
