@@ -739,7 +739,7 @@ function BatteryNetworkSection({ amapReady }) {
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-12">
           <div className="inline-flex items-center bg-amber-100 text-amber-700 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
-            <Network className="h-4 w-4 mr-2" /> {t('home.batteryNetwork')}
+            <Network className="h-4 w-4 mr-2" /> {t('home.batteryNetwork')} <span className="ml-1 text-[10px] opacity-50">v3</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{t('home.networkTitle')}</h2>
           <p className="text-gray-500 max-w-2xl mx-auto">{t('home.networkDesc')}</p>
