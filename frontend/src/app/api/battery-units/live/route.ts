@@ -212,10 +212,11 @@ export async function GET(_request: Request) {
         .from('warehouses')
         .select('id, warehouse_code, name, address, created_at'),
 
-      // 1d. 全部运营站点（用于四分类 Tab：换电站/运营线路/移动储能柜/固定储能柜）
+      // 1d. 全部运营站点（仅 is_active=true 的有效站点，排除已关闭/维护/待建等）
       supabase
         .from('operation_sites')
-        .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n, cabinet_slots, battery_count'),
+        .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n, cabinet_slots, battery_count')
+        .eq('is_active', true),
     ])
 
     const { data: unitsRaw, error: unitsError } = assignedResult

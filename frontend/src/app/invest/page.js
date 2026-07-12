@@ -111,6 +111,8 @@ function InvestContent() {
   const [investMapReady, setInvestMapReady] = useState(false);
   const investMapRef = useRef(null);
   const investMapContainerRef = useRef(null);
+  const franchiseMapRef = useRef(null);
+  const franchiseMapContainerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -472,6 +474,48 @@ const getPenaltyTierDisplay = (tier, t) => {
       }
     };
   }, [investMapReady, activeTab, userAssets]);
+
+  // ─── 加盟换电站地图渲染（franchise tab 切换时渲染）───
+  useEffect(() => {
+    if (!investMapReady) return;
+    if (activeTab !== 'franchise') return;
+    if (!franchiseMapContainerRef.current) return;
+    if (!franchiseStores || franchiseStores.length === 0) return;
+
+    const timer = setTimeout(() => {
+      if (!franchiseMapContainerRef.current) return;
+      const map = new window.AMap.Map(franchiseMapContainerRef.current, {
+        zoom: 7,
+        center: [104.917, 12.565],
+        mapStyle: 'amap://styles/light',
+        resizeEnable: true,
+      });
+      franchiseMapRef.current = map;
+
+      franchiseStores.forEach(store => {
+        if (store.latitude == null || store.longitude == null) return;
+        const marker = new window.AMap.Marker({
+          position: [store.longitude, store.latitude],
+          content: `<div style="width:28px;height:28px;background:#3b82f6;border-radius:8px;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center" title="${store.name || ''}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>`,
+          offset: new window.AMap.Pixel(-14, -14),
+        });
+        marker.on('click', () => {
+          map.setZoomAndCenter(14, [store.longitude, store.latitude]);
+        });
+        map.add(marker);
+      });
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      if (franchiseMapRef.current) {
+        franchiseMapRef.current.destroy();
+        franchiseMapRef.current = null;
+      }
+    };
+  }, [investMapReady, activeTab, franchiseStores]);
 
   const loadDividends = async () => {
     setDividendsLoading(true);
@@ -1326,11 +1370,7 @@ const getPenaltyTierDisplay = (tier, t) => {
             <p className="text-gray-500 text-sm mb-6">{t('invest.franchise.subtitle')}</p>
 
             {/* Map */}
-            <div className="bg-white rounded-xl border overflow-hidden mb-6" style={{ height: 400 }}>
-              <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
-                {t('invest.franchise.mapHint')}
-              </div>
-            </div>
+            <div ref={franchiseMapContainerRef} className="bg-white rounded-xl border overflow-hidden mb-6" style={{ height: 400 }} />
 
             <div className="grid md:grid-cols-2 gap-6">
               {/* Application Form */}

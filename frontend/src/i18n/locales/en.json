@@ -1516,6 +1516,7 @@
   "adminSw.price": "Price (USD)",
   "adminSw.monthlyRent": "Monthly Rent (USD)",
   "adminSw.annualRoi": "Annual ROI",
+  "adminSw.autoCalculated": "Auto-calculated",
   "adminSw.image": "Image",
   "adminSw.gps": "GPS Coordinates",
   "adminSw.gpsLat": "Latitude",

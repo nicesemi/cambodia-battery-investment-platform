@@ -60,12 +60,13 @@ export async function POST(request: Request) {
         })
 
       if (uploadErr) {
-        // fallback to local upload
-        const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'swap-stations')
-        await mkdir(uploadsDir, { recursive: true })
-        const filePath = path.join(uploadsDir, filename)
+        // Vercel serverless: only /tmp is writable, fallback to /tmp
+        console.warn('Supabase storage upload failed, falling back to /tmp:', uploadErr.message)
+        const tmpDir = '/tmp/uploads/swap-stations'
+        await mkdir(tmpDir, { recursive: true })
+        const filePath = path.join(tmpDir, filename)
         await writeFile(filePath, buffer)
-        image_url = `/uploads/swap-stations/${filename}`
+        image_url = `/tmp/uploads/swap-stations/${filename}`
       } else {
         const { data: urlData } = adminClient.storage
           .from('public-assets')

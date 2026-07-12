@@ -232,7 +232,7 @@ export default function SwapStationsPage() {
                         const mr = form.monthly_rent;
                         const priceVal = parseFloat(p) || 0;
                         const rentVal = parseFloat(mr) || 0;
-                        const roi = priceVal > 0 && rentVal > 0 ? ((rentVal * 12 / priceVal) * 100).toFixed(1) : form.annual_roi;
+                        const roi = priceVal > 0 && rentVal > 0 ? ((rentVal * 12 / priceVal) * 100).toFixed(1) : '';
                         setForm({ ...form, price: p, annual_roi: roi });
                       }}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
@@ -240,14 +240,20 @@ export default function SwapStationsPage() {
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">{t('adminSw.monthlyRent')} (USD)</label>
                     <input type="number" min="0" step="0.01" value={form.monthly_rent}
-                      onChange={e => setForm({ ...form, monthly_rent: e.target.value })}
+                      onChange={e => {
+                        const mr = e.target.value;
+                        const p = form.price;
+                        const priceVal = parseFloat(p) || 0;
+                        const rentVal = parseFloat(mr) || 0;
+                        const roi = priceVal > 0 && rentVal > 0 ? ((rentVal * 12 / priceVal) * 100).toFixed(1) : '';
+                        setForm({ ...form, monthly_rent: mr, annual_roi: roi });
+                      }}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">{t('adminSw.annualRoi')} (%)</label>
-                    <input type="number" min="0" step="0.1" value={form.annual_roi}
-                      onChange={e => setForm({ ...form, annual_roi: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{t('adminSw.annualRoi')} (%) <span className="text-gray-400 font-normal">({t('adminSw.autoCalculated')})</span></label>
+                    <input type="number" min="0" step="0.1" value={form.annual_roi} disabled
+                      className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">{t('adminSw.gpsLat')}</label>

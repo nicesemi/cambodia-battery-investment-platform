@@ -1516,6 +1516,7 @@
   "adminSw.price": "售价 (USD)",
   "adminSw.monthlyRent": "月租金 (USD)",
   "adminSw.annualRoi": "年化收益率",
+  "adminSw.autoCalculated": "自动计算",
   "adminSw.image": "图片",
   "adminSw.gps": "GPS坐标",
   "adminSw.gpsLat": "纬度",
