@@ -388,7 +388,7 @@ function useBatteryLive() {
   useEffect(() => {
     // 初始化时始终发起请求获取最新数据，不使用模块缓存
     const doFetch = () => {
-      fetch(`/api/battery-units/live?_t=${Date.now()}`)
+      return fetch(`/api/battery-units/live?_t=${Date.now()}`)
         .then(res => res.json())
         .then(d => {
           const result = { sites: d.sites || [], units: d.units || [], warehouses: d.warehouses || [], unsold_total: d.unsold_total || 0 };
