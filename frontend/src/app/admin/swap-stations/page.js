@@ -176,8 +176,11 @@ export default function SwapStationsPage() {
                     <td className="p-3 text-right font-mono text-sm">{Number(tmpl.annual_roi)}%</td>
                     <td className="p-3 text-center">
                       {tmpl.image_url ? (
-                        <img src={tmpl.image_url} alt={tmpl.name} className="h-8 w-8 object-cover rounded border mx-auto" />
-                      ) : <span className="text-gray-300 text-xs">-</span>}
+                        <img src={tmpl.image_url} alt={tmpl.name}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement.querySelector('.img-fallback')?.classList.remove('hidden'); }}
+                          className="h-8 w-8 object-cover rounded border mx-auto" />
+                      ) : null}
+                      <span className={`text-gray-300 text-xs img-fallback ${tmpl.image_url ? 'hidden' : ''}`}>-</span>
                     </td>
                     <td className="p-3 text-center text-xs text-gray-400">
                       {tmpl.gps_lat != null && tmpl.gps_lng != null
@@ -277,7 +280,7 @@ export default function SwapStationsPage() {
                         if (f) { setFile(f); setPreviewUrl(URL.createObjectURL(f)); }
                       }}
                       className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition cursor-pointer" />
-                    {previewUrl && <img src={previewUrl} alt="" className="h-10 w-10 object-cover rounded border" />}
+                    {previewUrl && <img src={previewUrl} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} className="h-10 w-10 object-cover rounded border" />}
                   </div>
                 </div>
                 <div className="flex justify-end gap-3 pt-3 border-t">

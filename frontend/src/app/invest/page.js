@@ -499,8 +499,8 @@ const getPenaltyTierDisplay = (tier, t) => {
           : '';
         const marker = new window.AMap.Marker({
           position: [store.longitude, store.latitude],
-          content: `<div style="width:28px;height:28px;background:#3b82f6;border-radius:8px;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center" title="${store.name || ''}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          content: `<div style="width:28px;height:28px;background:#f97316;border-radius:8px;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center" title="${store.name || ''}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           </div>`,
           offset: new window.AMap.Pixel(-14, -14),
         });
@@ -1417,7 +1417,12 @@ const getPenaltyTierDisplay = (tier, t) => {
                     </select>
                   </div>
                   {selectedTemplate && (
-                    <div className="bg-blue-50 rounded-lg p-4 text-sm space-y-1">
+                    <div className="bg-blue-50 rounded-lg p-4 text-sm space-y-3">
+                      {selectedTemplate.image_url && (
+                        <img src={selectedTemplate.image_url} alt={selectedTemplate.name}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          className="w-full h-48 object-cover rounded-lg border border-blue-100" />
+                      )}
                       <p className="text-blue-800 font-medium">{
                         t('invest.franchise.templateDetail')
                           .replace('{{price}}', formatCurrency(selectedTemplate.price, i18n.language))
