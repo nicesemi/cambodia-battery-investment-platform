@@ -126,6 +126,29 @@ async function matchOrders(assetId: string) {
             await supabase.from('user_assets').insert({ user_id: buy.user_id, asset_id: assetId, units: matched, average_cost: matchPrice })
           }
 
+          // Create battery_units + investor_battery_units records for the matched units
+          // so the buyer sees individual battery details in "我的资产"
+          try {
+            const { data: assetInfo } = await getSupabaseAdmin().from('battery_assets')
+              .select('asset_code').eq('id', assetId).single()
+            const assetCode = assetInfo?.asset_code || `BT${assetId.slice(0, 6)}`
+            const purchasedAt = new Date().toISOString()
+            for (let i = 0; i < matched; i++) {
+              const unitCode = `${assetCode}-${Date.now().toString(36)}-${i}`
+              const { data: newUnit } = await getSupabaseAdmin().from('battery_units')
+                .insert({ unit_code: unitCode, status: 'active' }).select('id').single()
+              if (newUnit) {
+                await getSupabaseAdmin().from('investor_battery_units').insert({
+                  investor_id: buy.user_id,
+                  battery_asset_id: assetId,
+                  battery_unit_id: newUnit.id,
+                  purchase_price: matchPrice,
+                  purchased_at: purchasedAt,
+                })
+              }
+            }
+          } catch { /* battery detail creation is best-effort; trade itself is already committed */ }
+
           // Pay seller
           const sellerReceive = totalAmount - fee
           const { data: sw } = await getSupabaseAdmin().from('user_wallets').select('balance').eq('user_id', sell.user_id).single()
