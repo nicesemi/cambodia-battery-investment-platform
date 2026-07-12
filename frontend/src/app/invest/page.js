@@ -605,12 +605,13 @@ const getPenaltyTierDisplay = (tier, t) => {
     // 按资产持有量（units）统计电池数量
     const counts = { 4820: 0, 6035: 0, 7250: 0 };
     freshUserAssets.forEach(u => {
-      const code = (u.asset_code || u.code || '').toUpperCase();
+      // 优先用 battery_type（如 "7250 高速电摩换电"），其次 asset_code
+      const typeStr = (u.battery_type || u.asset_code || u.code || '').toUpperCase();
       const units = Number(u.units) || 0;
       if (units <= 0) return;
-      if (code.includes('4820')) counts['4820'] += units;
-      else if (code.includes('6035')) counts['6035'] += units;
-      else if (code.includes('7250')) counts['7250'] += units;
+      if (typeStr.includes('4820')) counts['4820'] += units;
+      else if (typeStr.includes('6035')) counts['6035'] += units;
+      else if (typeStr.includes('7250')) counts['7250'] += units;
     });
     setMyBatteryCounts(counts);
   };
