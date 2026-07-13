@@ -129,7 +129,23 @@ export default function OperationSitesPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.country.trim() || !form.city.trim() || !form.battery_count) {
+    // 从 i18n 回填主字段（表单 UI 绑定了 i18n 字段，主字段可能为空）
+    const updatedForm = { ...form };
+    if (!updatedForm.name.trim()) {
+      const i18nName = Object.values(updatedForm.name_i18n || {}).find(v => v?.trim());
+      if (i18nName) updatedForm.name = i18nName;
+    }
+    if (!updatedForm.country.trim()) {
+      const i18nCountry = Object.values(updatedForm.country_i18n || {}).find(v => v?.trim());
+      if (i18nCountry) updatedForm.country = i18nCountry;
+    }
+    if (!updatedForm.city.trim()) {
+      const i18nCity = Object.values(updatedForm.city_i18n || {}).find(v => v?.trim());
+      if (i18nCity) updatedForm.city = i18nCity;
+    }
+    // 更新 form state 以便后续 append 使用
+    setForm(updatedForm);
+    if (!updatedForm.name.trim() || !updatedForm.country.trim() || !updatedForm.city.trim() || !updatedForm.battery_count) {
       alert('请填写必填项：名称、国家、城市、电池数量');
       return;
     }
@@ -142,33 +158,33 @@ export default function OperationSitesPage() {
       const buildI18nOs = (obj) => { const r = {}; let h = false; for (const l of LANGUAGES) { if (obj[l.code]?.trim()) { r[l.code] = obj[l.code].trim(); h = true; } } return h ? r : null; };
 
       const fd = new FormData();
-      fd.append('name', form.name);
-      fd.append('name_i18n', JSON.stringify(buildI18nOs(form.name_i18n || {}) || {}));
-      fd.append('country', form.country);
-      fd.append('country_i18n', JSON.stringify(buildI18nOs(form.country_i18n || {}) || {}));
-      fd.append('city', form.city);
-      fd.append('city_i18n', JSON.stringify(buildI18nOs(form.city_i18n || {}) || {}));
-      fd.append('address', form.address);
-      fd.append('longitude', form.longitude);
-      fd.append('latitude', form.latitude);
-      fd.append('battery_count', form.battery_count);
-      fd.append('status', form.status);
-      fd.append('site_type', form.site_type);
-      if (isEditing && form.site_code) {
-        fd.append('site_code', form.site_code);
+      fd.append('name', updatedForm.name);
+      fd.append('name_i18n', JSON.stringify(buildI18nOs(updatedForm.name_i18n || {}) || {}));
+      fd.append('country', updatedForm.country);
+      fd.append('country_i18n', JSON.stringify(buildI18nOs(updatedForm.country_i18n || {}) || {}));
+      fd.append('city', updatedForm.city);
+      fd.append('city_i18n', JSON.stringify(buildI18nOs(updatedForm.city_i18n || {}) || {}));
+      fd.append('address', updatedForm.address);
+      fd.append('longitude', updatedForm.longitude);
+      fd.append('latitude', updatedForm.latitude);
+      fd.append('battery_count', updatedForm.battery_count);
+      fd.append('status', updatedForm.status);
+      fd.append('site_type', updatedForm.site_type);
+      if (isEditing && updatedForm.site_code) {
+        fd.append('site_code', updatedForm.site_code);
       }
-      fd.append('contact', form.contact);
-      fd.append('description', form.description);
-      fd.append('battery_type', form.battery_type);
-      fd.append('cabinet_slots', form.cabinet_slots);
-      if (form.template_id) {
-        fd.append('template_id', form.template_id);
+      fd.append('contact', updatedForm.contact);
+      fd.append('description', updatedForm.description);
+      fd.append('battery_type', updatedForm.battery_type);
+      fd.append('cabinet_slots', updatedForm.cabinet_slots);
+      if (updatedForm.template_id) {
+        fd.append('template_id', updatedForm.template_id);
       }
       if (file) {
         fd.append('image', file);
-      } else if (isEditing && !file && form.image_url) {
+      } else if (isEditing && !file && updatedForm.image_url) {
         // 编辑模式未换图时保留原有 image_url
-        fd.append('keep_image_url', form.image_url);
+        fd.append('keep_image_url', updatedForm.image_url);
       }
 
       const res = await fetch(url, {

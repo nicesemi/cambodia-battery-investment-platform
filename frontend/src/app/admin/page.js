@@ -559,8 +559,8 @@ export default function Admin() {
         case 'users': { const r = await adminAPI.getUsers(1, 100); setUsers(r.users || []); } break;
         case 'assets': { const r = await adminAPI.getAssets(); setAssets(r.assets || []); try { const wh = await adminAPI.getWarehouses(); setWarehouses(wh || []); } catch(e){} } break;
         case 'stores': { const r = await adminAPI.getStores(); setStores(r.stores || []); } break;
-        case 'applications': { const r = await adminAPI.getApplications(); setApplications(r.applications || []); } break;
-        case 'agent-applications': { const r = await adminAPI.getAgentApplications(); setAgentApplications(r.applications || []); } break;
+        case 'applications': { const r = await adminAPI.getApplications(); setApplications(applyReviewCache(r.applications || [], 'application')); } break;
+        case 'agent-applications': { const r = await adminAPI.getAgentApplications(); setAgentApplications(applyReviewCache(r.applications || [], 'agent-application')); } break;
         case 'managed-agents': { const r = await adminAPI.getManagedAgents(); setManagedAgents(r.agents || []); } break;
         case 'sold-batteries': { const config = sortConfigs['sold-batteries']; const sortKey = config?.key || ''; const sortDirection = config?.direction || 'asc'; const r = await adminAPI.getSoldBatteries(1, 20, sortKey, sortDirection); setSoldStats(r.stats); setSoldBatteries(r.batteries || []); setSoldOrders(r.recent_orders || []); setSoldTotal(r.total || 0); preloadDispatchData(); } break;
         case 'my-workers':
@@ -587,8 +587,8 @@ export default function Admin() {
             .finally(() => setSiteTypesLoading(false));
           break;
         case 'configs': { const r = await adminAPI.getConfigs(); setConfigs(r.configs || []); } break;
-        case 'withdrawals': { const r = await adminAPI.getWithdrawals(); setWithdrawals(r.withdrawals || []); } break;
-        case 'kyc': { const r = await adminAPI.getKycList(); setKycUsers(r.users || []); } break;
+        case 'withdrawals': { const r = await adminAPI.getWithdrawals(); setWithdrawals(applyReviewCache(r.withdrawals || [], 'withdrawal')); } break;
+        case 'kyc': { const r = await adminAPI.getKycList(); setKycUsers(applyReviewCache(r.users || [], 'kyc')); } break;
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -602,6 +602,24 @@ export default function Admin() {
       cache[`${type}:${id}`] = { status, timestamp: Date.now() };
       localStorage.setItem('admin_review_cache', JSON.stringify(cache));
     } catch {}
+  };
+
+  // 通用：从缓存覆盖读副本返回的旧状态，解决部署后重载回退问题
+  const applyReviewCache = (items, type) => {
+    try {
+      const raw = localStorage.getItem('admin_review_cache');
+      if (!raw) return items;
+      const cache = JSON.parse(raw);
+      const now = Date.now();
+      return items.map(item => {
+        const key = `${type}:${item.id}`;
+        const cached = cache[key];
+        if (cached && now - cached.timestamp < 5 * 60 * 1000 && cached.status !== 'pending') {
+          return { ...item, status: cached.status };
+        }
+        return item;
+      });
+    } catch { return items; }
   };
 
   const handleReviewApplication = async (id, status) => {
