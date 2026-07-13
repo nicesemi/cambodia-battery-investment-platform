@@ -230,8 +230,8 @@ export async function POST(request: Request) {
       const insertData: any = {
         name, country, city,
         address: address || null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : 0,
+        latitude: latitude ? parseFloat(latitude) : 0,
         battery_count: parseInt(battery_count),
         status: status || '运营中',
         site_code,
