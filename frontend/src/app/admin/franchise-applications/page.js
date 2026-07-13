@@ -53,16 +53,17 @@ export default function FranchiseApplicationsPage() {
     if (!reviewModal) return;
     setSubmitting(true);
     try {
-      await adminAPI.reviewFranchiseSwapApplication(reviewModal.id, { status, admin_remark: remark });
-      console.log('[FRONTEND] PUT success for', reviewModal.id, 'status:', status);
-      // Persist reviewed status in ref to survive stale GET responses
-      reviewedRef.current[reviewModal.id] = { status, admin_remark: remark };
-      console.log('[FRONTEND] ref updated:', Object.keys(reviewedRef.current).map(k => k.slice(0,8) + '=' + reviewedRef.current[k].status));
+      const res = await adminAPI.reviewFranchiseSwapApplication(reviewModal.id, { status, admin_remark: remark });
+      console.log('[FRONTEND] PUT success, returned status:', res.application?.status);
+      // Use PUT response directly — bypass replica lag from subsequent GET
+      const updatedApp = res.application;
+      reviewedRef.current[reviewModal.id] = { status: updatedApp.status, admin_remark: updatedApp.admin_remark };
       setApplications(prev => prev.map(app =>
-        app.id === reviewModal.id ? { ...app, status, admin_remark: remark } : app
+        app.id === reviewModal.id ? { ...app, ...updatedApp, applicant: app.applicant, template: app.template } : app
       ));
       setReviewModal(null); setRemark('');
-      loadApplications();
+      // Delay re-fetch to let Supabase read replica catch up
+      setTimeout(() => loadApplications(), 1500);
     } catch (err) { alert(err.message); }
     finally { setSubmitting(false); }
   };
