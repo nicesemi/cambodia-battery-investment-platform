@@ -86,6 +86,7 @@ export const adminAPI = {
   getApplications: () => request('/admin/applications'),
   reviewApplication: (applicationId, data) => request(`/admin/applications?id=${applicationId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   getFranchiseSwapApplications: () => request('/admin/franchise-applications'),
+  reviewFranchiseSwapApplication: (applicationId, data) => request(`/admin/franchise-applications/${applicationId}`, { method: 'PUT', body: JSON.stringify(data) }),
   getAgentApplications: (status) => {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
