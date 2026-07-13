@@ -15,23 +15,25 @@ export async function GET(request: Request) {
     diagnostics.auth = { ok: false, error: e?.message || String(e) }
   }
 
-  // 2. Check env vars
-  diagnostics.env = {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'MISSING',
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'MISSING',
-    JWT_SECRET: process.env.JWT_SECRET ? 'set' : 'MISSING',
-  }
-
-  // 3. Check Supabase admin connection
+  // 2. Check all franchise_applications with status
   try {
     const adminClient = getSupabaseAdmin()
-    const { data, error } = await adminClient.from('franchise_applications').select('id, status', { count: 'exact', head: false })
-    diagnostics.db = error 
+    const { data, error } = await adminClient
+      .from('franchise_applications')
+      .select('id, status, user_id, created_at')
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    diagnostics.applications = error
       ? { ok: false, error: error.message, code: error.code }
-      : { ok: true, count: data?.length ?? 0, sample: data?.slice(0, 3) }
+      : { ok: true, count: data?.length ?? 0, rows: data }
   } catch (e: any) {
-    diagnostics.db = { ok: false, error: e?.message || String(e) }
+    diagnostics.applications = { ok: false, error: e?.message || String(e) }
   }
+
+  // 3. Check timestamp to verify code is live
+  diagnostics.server_time = new Date().toISOString()
+  diagnostics.code_version = 'debug-v2-20260713'
 
   return ok({ diagnostics })
 }

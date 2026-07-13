@@ -34,11 +34,14 @@ export default function FranchiseApplicationsPage() {
       const apps = (data.applications || []).map(app => {
         const reviewed = reviewedRef.current[app.id];
         if (reviewed) {
+          console.log('[FRONTEND] merge ref for', app.id, 'server.status:', app.status, 'ref.status:', reviewed.status, 'match:', app.status === reviewed.status);
           if (app.status === reviewed.status) delete reviewedRef.current[app.id];
           return { ...app, ...reviewed };
         }
         return app;
       });
+      console.log('[FRONTEND] loaded', apps.length, 'apps, _debug:', data._debug);
+      console.log('[FRONTEND] status per app:', apps.map(a => ({ id: a.id.slice(0,8), status: a.status })));
       setApplications(apps);
     } catch (e) {
       setError(e.message || 'Failed to load applications');
@@ -51,8 +54,10 @@ export default function FranchiseApplicationsPage() {
     setSubmitting(true);
     try {
       await adminAPI.reviewFranchiseSwapApplication(reviewModal.id, { status, admin_remark: remark });
+      console.log('[FRONTEND] PUT success for', reviewModal.id, 'status:', status);
       // Persist reviewed status in ref to survive stale GET responses
       reviewedRef.current[reviewModal.id] = { status, admin_remark: remark };
+      console.log('[FRONTEND] ref updated:', Object.keys(reviewedRef.current).map(k => k.slice(0,8) + '=' + reviewedRef.current[k].status));
       setApplications(prev => prev.map(app =>
         app.id === reviewModal.id ? { ...app, status, admin_remark: remark } : app
       ));
