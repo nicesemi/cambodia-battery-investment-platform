@@ -41,8 +41,12 @@ export default function FranchiseApplicationsPage() {
     setSubmitting(true);
     try {
       await adminAPI.reviewFranchiseSwapApplication(reviewModal.id, { status, admin_remark: remark });
+      // Optimistically update local state before re-fetching (avoids replica lag)
+      setApplications(prev => prev.map(app =>
+        app.id === reviewModal.id ? { ...app, status, admin_remark: remark } : app
+      ));
       setReviewModal(null); setRemark('');
-      await loadApplications();
+      loadApplications();
     } catch (err) { alert(err.message); }
     finally { setSubmitting(false); }
   };
