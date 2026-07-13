@@ -20,6 +20,14 @@ export async function GET(request: Request) {
       .select('*')
       .order('created_at', { ascending: false })
 
+    console.log('[DEBUG GET] raw apps count:', apps?.length, 'error:', error)
+    if (apps && apps.length > 0) {
+      console.log('[DEBUG GET] first app id:', apps[0].id, 'status:', apps[0].status)
+      const pendingApps = apps.filter(a => a.status === 'pending')
+      const rejectedApps = apps.filter(a => a.status === 'rejected')
+      console.log('[DEBUG GET] pending:', pendingApps.length, 'rejected:', rejectedApps.length)
+    }
+
     if (error) {
       console.error('[franchise-applications] Supabase query error:', error)
       return serverError('Database query failed: ' + error.message)
@@ -53,8 +61,11 @@ export async function GET(request: Request) {
       template: templateMap.get(app.template_id) || null,
     }))
 
+    // DEBUG: status distribution
+    const statusDist: Record<string, number> = {}
+    applications.forEach(a => { statusDist[a.status] = (statusDist[a.status] || 0) + 1 })
     console.log('[franchise-applications] Found', applications.length, 'applications')
-    return ok({ applications })
+    return ok({ applications, _debug: { version: 'v3-20260713', total: applications.length, status_distribution: statusDist, sample_ids: applications.slice(0, 5).map(a => ({ id: a.id, status: a.status })) } }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
   } catch (e: any) {
     console.error('[franchise-applications] Unexpected error:', e)
     return serverError('Unexpected error: ' + (e?.message || String(e)))
