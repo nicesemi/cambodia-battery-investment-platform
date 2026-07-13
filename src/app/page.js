@@ -384,33 +384,27 @@ let _batteryLiveLoaded = false;
 let _batteryLivePromise = null;
 
 function useBatteryLive() {
-  const [data, setData] = useState(() => _batteryLiveCache || { sites: [], units: [], warehouses: [], unsold_total: 0 });
+  const [data, setData] = useState(() => ({ sites: [], units: [], warehouses: [], unsold_total: 0 }));
   useEffect(() => {
-    if (_batteryLiveLoaded) { setData(_batteryLiveCache || { sites: [], units: [], warehouses: [], unsold_total: 0 }); }
-    if (_batteryLivePromise) {
-      _batteryLivePromise.then(d => setData(d));
-      _batteryLivePromise = null;
-    } else {
-      _batteryLivePromise = fetch('/api/battery-units/live')
+    // 初始化时始终发起请求获取最新数据，不使用模块缓存
+    const doFetch = () => {
+      return fetch(`/api/battery-units/live?_t=${Date.now()}`)
         .then(res => res.json())
         .then(d => {
           const result = { sites: d.sites || [], units: d.units || [], warehouses: d.warehouses || [], unsold_total: d.unsold_total || 0 };
           _batteryLiveCache = result;
           _batteryLiveLoaded = true;
-          _batteryLivePromise = null;
           return result;
         })
         .catch(() => {
-          _batteryLiveCache = _batteryLiveCache || { sites: [], units: [], warehouses: [], unsold_total: 0 };
-          _batteryLiveLoaded = true;
-          _batteryLivePromise = null;
-          return { sites: [], units: [], warehouses: [], unsold_total: 0 };
+          return _batteryLiveCache || { sites: [], units: [], warehouses: [], unsold_total: 0 };
         });
-      _batteryLivePromise.then(d => setData(d));
-    }
-    // 每 10 秒轮询，使大巴 GPS 标记实时移动
+    };
+    _batteryLivePromise = doFetch();
+    _batteryLivePromise.then(d => setData(d));
+    // 每 10 秒轮询，使大巴 GPS 标记实时移动，同时更新模块缓存避免 Vercel CDN 缓存导致数据不刷新
     const interval = setInterval(() => {
-      fetch('/api/battery-units/live')
+      fetch(`/api/battery-units/live?_t=${Date.now()}`)
         .then(res => res.json())
         .then(d => {
           const result = { sites: d.sites || [], units: d.units || [], warehouses: d.warehouses || [], unsold_total: d.unsold_total || 0 };
@@ -526,7 +520,7 @@ function BatteryNetworkSection({ amapReady }) {
   const fixedKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '固定储能柜' || st.name === '固定储能柜')?.name || '固定储能柜', [siteTypes]);
 
   const swapSites = useMemo(() => {
-    return (batteryLive.sites || []).filter(s => s.site_type === swapKey);
+    return (batteryLive.sites || []).filter(s => s.site_type === swapKey || s.site_type === 'swap_station');
   }, [batteryLive.sites, swapKey]);
 
   const lineSites = useMemo(() => {
@@ -739,7 +733,7 @@ function BatteryNetworkSection({ amapReady }) {
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-12">
           <div className="inline-flex items-center bg-amber-100 text-amber-700 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
-            <Network className="h-4 w-4 mr-2" /> {t('home.batteryNetwork')}
+            <Network className="h-4 w-4 mr-2" /> {t('home.batteryNetwork')} <span className="ml-1 text-[10px] opacity-50">v3</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{t('home.networkTitle')}</h2>
           <p className="text-gray-500 max-w-2xl mx-auto">{t('home.networkDesc')}</p>
@@ -825,7 +819,7 @@ function BatteryNetworkSection({ amapReady }) {
                                     <span className="font-medium text-sm text-gray-900">{resolveI18n(site, 'name_i18n', site.site_name, i18n)}</span>
                                   </div>
                                   <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                                    {(batteryLive.units || []).filter(u => u.site_name === site.site_name).length}{t('home.blockUnit')}
+                                    {site.real_battery_count ?? 0}{t('home.blockUnit')}
                                   </span>
                                 </div>
                                 <p className="text-[10px] text-gray-400 mt-1">{resolveI18n(site, 'city_i18n', site.city, i18n)} · {resolveI18n(site, 'country_i18n', site.country, i18n)}</p>
@@ -1258,7 +1252,7 @@ function CabinetDiagram({ site, onBack, SensorCard, onTrackBattery }) {
   else if (rawSlots && typeof rawSlots === 'object') { slots = Object.values(rawSlots); }
   if (!Array.isArray(slots)) slots = [];
   const totalSlots = slots.length;
-  const occupiedSlots = slots.filter(s => s.status === 'occupied').length;
+  const occupiedSlots = site.real_battery_count ?? slots.filter(s => s.status === 'occupied').length;
   const emptySlots = totalSlots - occupiedSlots;
 
   const slotStatusColor = (slot) => {
@@ -1287,7 +1281,7 @@ function CabinetDiagram({ site, onBack, SensorCard, onTrackBattery }) {
       <div className="flex items-center gap-4 text-xs">
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-yellow-400" />{t('home.occupied')} {occupiedSlots}</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300" />{t('home.empty')} {emptySlots}</span>
-        <span className="text-gray-400">{t('home.batteryAssets')} {occupiedSlots}{t('home.blockUnit')} · {t('home.totalPrefix')} {totalSlots}{t('home.slot')}</span>
+        <span className="text-gray-400">{t('home.batteryAssets')} {site.real_battery_count ?? 0}{t('home.blockUnit')} · {t('home.totalPrefix')} {totalSlots}{t('home.slot')}</span>
       </div>
 
       {/* 选中槽位传感器详情 — 显示在换电柜上方 */}

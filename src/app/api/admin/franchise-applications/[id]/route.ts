@@ -38,6 +38,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (error) return serverError(error.message)
     if (!application) return notFound('Application not found')
 
+    // DEBUG: verify the update actually persisted by re-fetching
+    const { data: verifyApp } = await adminClient
+      .from('franchise_applications')
+      .select('id, status')
+      .eq('id', id)
+      .single()
+
     // Fetch template data separately
     let template = null
     if (application.template_id) {
@@ -53,7 +60,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (status === 'approved') {
       const siteData = {
         name: `${application.location} 加盟换电站`,
-        site_type: 'swap_station',
+        site_type: '换电站',
         template_id: application.template_id,
         cabinet_count: template ? template.cabinet_count : application.cabinet_count,
         battery_count: 0,
@@ -78,7 +85,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
     }
 
-    return ok({ application })
+    return ok({
+      application,
+      _debug: {
+        version: 'v3-20260713',
+        requested_status: status,
+        returned_status: application.status,
+        db_verify_status: verifyApp?.status,
+        db_verify_match: verifyApp?.status === application.status,
+      }
+    })
   } catch (e: any) {
     return serverError()
   }

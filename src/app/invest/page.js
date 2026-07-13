@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { assetAPI, orderAPI, dividendAPI } from '../../services/api';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -74,7 +74,7 @@ function resolveI18n(obj, i18nKey, fallback, i18n) {
   return i18nData[i18n.language] || i18nData['zh-CN'] || fallback;
 }
 
-export default function Invest() {
+function InvestContent() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
@@ -111,6 +111,8 @@ export default function Invest() {
   const [investMapReady, setInvestMapReady] = useState(false);
   const investMapRef = useRef(null);
   const investMapContainerRef = useRef(null);
+  const franchiseMapRef = useRef(null);
+  const franchiseMapContainerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,6 +228,7 @@ export default function Invest() {
   const [franchiseMsg, setFranchiseMsg] = useState('');
   const [myBatteryCounts, setMyBatteryCounts] = useState({ 4820: 0, 6035: 0, 7250: 0 });
   const [franchiseStores, setFranchiseStores] = useState([]);
+  const [franchiseSwapStations, setFranchiseSwapStations] = useState([]); // 我的换电站（含cabinet_slots）
 
 const getTxRemark = (tx, t, i18n) => {
   // 优先使用 DB 中的 remark_i18n（多语言），其次 remark（纯文本），否则基于 type 做 i18n
@@ -333,6 +336,7 @@ const getPenaltyTierDisplay = (tier, t) => {
   }, [user]);
 
   useEffect(() => {
+    if (activeTab === 'portfolio') loadData();
     if (activeTab === 'dividends') loadDividends();
     if (activeTab === 'wallet') loadWallet();
     if (activeTab === 'franchise') loadFranchiseData();
@@ -365,19 +369,26 @@ const getPenaltyTierDisplay = (tier, t) => {
     ];
 
     try {
-      const [assetsRes, userAssetsRes, ordersRes, bindingRes] = await Promise.all([
+      const results = await Promise.allSettled([
         assetAPI.getAssets(i18n.language),
         assetAPI.getUserAssets(),
         orderAPI.getMyOrders(1, 50),
-        orderAPI.getMyBinding().catch(() => null),
+        orderAPI.getMyBinding(),
       ]);
-      const apiAssets = assetsRes.assets || [];
+      const [assetsResult, userAssetsResult, ordersResult, bindingResult] = results;
+
+      const apiAssets = assetsResult.status === 'fulfilled' ? (assetsResult.value.assets || []) : [];
       // 如果API返回为空，使用静态fallback数据
       setAssets(apiAssets.length > 0 ? apiAssets : FALLBACK_BATTERIES);
-      setUserAssets(userAssetsRes.userAssets || []);
-      setOrders(ordersRes.orders || []);
-      if (bindingRes?.binding?.store_id) {
-        setBoundStoreId(bindingRes.binding.store_id);
+
+      const userAssetsData = userAssetsResult.status === 'fulfilled' ? (userAssetsResult.value.userAssets || []) : [];
+      setUserAssets(userAssetsData);
+
+      const ordersData = ordersResult.status === 'fulfilled' ? (ordersResult.value.orders || []) : [];
+      setOrders(ordersData);
+
+      if (bindingResult.status === 'fulfilled' && bindingResult.value?.binding?.store_id) {
+        setBoundStoreId(bindingResult.value.binding.store_id);
       }
     } catch (e) {
       console.error(e);
@@ -473,6 +484,63 @@ const getPenaltyTierDisplay = (tier, t) => {
     };
   }, [investMapReady, activeTab, userAssets]);
 
+  // ─── 加盟换电站地图渲染（franchise tab 切换时渲染）───
+  useEffect(() => {
+    if (!investMapReady) return;
+    if (activeTab !== 'franchise') return;
+    if (!franchiseMapContainerRef.current) return;
+    const stations = franchiseSwapStations.length > 0 ? franchiseSwapStations : franchiseStores;
+    if (!stations || stations.length === 0) return;
+
+    const timer = setTimeout(() => {
+      if (!franchiseMapContainerRef.current) return;
+      const map = new window.AMap.Map(franchiseMapContainerRef.current, {
+        zoom: 7,
+        center: [104.917, 12.565],
+        mapStyle: 'amap://styles/light',
+        resizeEnable: true,
+      });
+      franchiseMapRef.current = map;
+
+      stations.forEach(store => {
+        if (store.latitude == null || store.longitude == null || store.latitude === 0 || store.longitude === 0) return;
+        const imgTag = store.image_url
+          ? `<div style="width:200px;margin-bottom:6px;"><img src="${store.image_url}" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;" onerror="this.style.display='none'" /></div>`
+          : '';
+        const marker = new window.AMap.Marker({
+          position: [store.longitude, store.latitude],
+          content: `<div style="width:28px;height:28px;background:#f97316;border-radius:8px;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center" title="${store.name || ''}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </div>`,
+          offset: new window.AMap.Pixel(-14, -14),
+        });
+        const infoWindow = new window.AMap.InfoWindow({
+          content: `<div style="padding:4px;min-width:160px;">
+            ${imgTag}
+            <div style="font-weight:600;font-size:14px;margin-bottom:2px;">${store.name || ''}</div>
+            <div style="font-size:12px;color:#666;">${store.site_code || ''}</div>
+            <div style="font-size:12px;color:#666;">${store.city || ''} ${store.address || ''}</div>
+            ${store.battery_count != null ? `<div style="font-size:12px;color:#3b82f6;">${store.battery_count} 仓</div>` : ''}
+          </div>`,
+          offset: new window.AMap.Pixel(0, -36),
+        });
+        marker.on('click', () => {
+          map.setZoomAndCenter(14, [store.longitude, store.latitude]);
+          infoWindow.open(map, marker.getPosition());
+        });
+        map.add(marker);
+      });
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      if (franchiseMapRef.current) {
+        franchiseMapRef.current.destroy();
+        franchiseMapRef.current = null;
+      }
+    };
+  }, [investMapReady, activeTab, franchiseStores, franchiseSwapStations]);
+
   const loadDividends = async () => {
     setDividendsLoading(true);
     try {
@@ -511,36 +579,45 @@ const getPenaltyTierDisplay = (tier, t) => {
   };
 
   const loadFranchiseData = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const [tmplRes, appRes, storeRes] = await Promise.all([
-        fetch('/api/admin/swap-stations', { headers }),
-        fetch('/api/franchise-applications', { headers }),
-        fetch('/api/operation-sites', { headers }),
-      ]);
-      if (tmplRes.ok) {
-        const d = await tmplRes.json();
-        setSwapTemplates(d.templates || []);
-      }
-      if (appRes.ok) {
-        const d = await appRes.json();
-        setFranchiseApplications(d.applications || []);
-      }
-      if (storeRes.ok) {
-        const d = await storeRes.json();
-        setFranchiseStores((d.sites || []).filter(s => s.site_type === 'swap_station' || s.site_type?.includes('换电')));
-      }
-      // Count user's swap batteries from loaded userAssets
-      const counts = { 4820: 0, 6035: 0, 7250: 0 };
-      (userAssets || []).forEach(u => {
-        const code = (u.asset_code || u.code || '').toUpperCase();
-        if (code.includes('4820')) counts['4820']++;
-        else if (code.includes('6035')) counts['6035']++;
-        else if (code.includes('7250')) counts['7250']++;
-      });
-      setMyBatteryCounts(counts);
-    } catch (e) { console.error(e); }
+    const token = localStorage.getItem('token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    // 各 fetch 独立 catch，避免任一接口失败阻断其他数据加载
+    const safeFetch = async (url) => { try { const r = await fetch(url, { headers }); return r.ok ? r : null; } catch { return null; } };
+
+    const [tmplRes, appRes, storeRes, assetsRes, swapStationRes] = await Promise.all([
+      safeFetch('/api/admin/swap-stations'),
+      safeFetch('/api/franchise-applications'),
+      safeFetch('/api/operation-sites'),
+      safeFetch('/api/assets/my'),
+      safeFetch('/api/franchisee/swap-stations'),
+    ]);
+
+    if (tmplRes) { try { const d = await tmplRes.json(); setSwapTemplates(d.templates || []); } catch {} }
+    if (appRes) { try { const d = await appRes.json(); setFranchiseApplications(d.applications || []); } catch {} }
+    if (storeRes) { try { const d = await storeRes.json(); setFranchiseStores((d.sites || []).filter(s => s.site_type && (s.site_type === 'swap_station' || s.site_type.includes('换电') || s.site_type.includes('swap')))); } catch {} }
+    if (swapStationRes) { try { const d = await swapStationRes.json(); setFranchiseSwapStations(d.stations || []); } catch {} }
+
+    // 直接从 API 获取最新用户资产数据（避免依赖可能过时的 React state）
+    let freshUserAssets = [];
+    if (assetsRes) {
+      try {
+        const d = await assetsRes.json();
+        freshUserAssets = d.userAssets || [];
+        setUserAssets(freshUserAssets);
+      } catch {}
+    }
+    // 按资产持有量（units）统计电池数量
+    const counts = { 4820: 0, 6035: 0, 7250: 0 };
+    freshUserAssets.forEach(u => {
+      // 优先用 battery_type（如 "7250 高速电摩换电"），其次 asset_code
+      const typeStr = (u.battery_type || u.asset_code || u.code || '').toUpperCase();
+      const units = Number(u.units) || 0;
+      if (units <= 0) return;
+      if (typeStr.includes('4820')) counts['4820'] += units;
+      else if (typeStr.includes('6035')) counts['6035'] += units;
+      else if (typeStr.includes('7250')) counts['7250'] += units;
+    });
+    setMyBatteryCounts(counts);
   };
 
   const selectedTemplate = swapTemplates.find(t => t.id === franchiseForm.template_id);
@@ -1326,11 +1403,64 @@ const getPenaltyTierDisplay = (tier, t) => {
             <p className="text-gray-500 text-sm mb-6">{t('invest.franchise.subtitle')}</p>
 
             {/* Map */}
-            <div className="bg-white rounded-xl border overflow-hidden mb-6" style={{ height: 400 }}>
-              <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
-                {t('invest.franchise.mapHint')}
+            <div ref={franchiseMapContainerRef} className="bg-white rounded-xl border overflow-hidden mb-6" style={{ height: 400 }} />
+
+            {/* 我的换电站 */}
+            {franchiseSwapStations.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-orange-500" />
+                  我的换电站
+                </h3>
+                <div className="space-y-4">
+                  {franchiseSwapStations.map(station => {
+                    const slots = Array.isArray(station.cabinet_slots) ? station.cabinet_slots : [];
+                    const totalSlots = slots.length;
+                    const occupiedSlots = slots.filter(s => s.status === 'occupied').length;
+                    const emptySlots = totalSlots - occupiedSlots;
+                    
+                    return (
+                      <div key={station.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Battery className="h-4 w-4 text-green-600" />
+                          <span className="font-semibold text-gray-900">{station.name}</span>
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{station.status || '运营中'}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
+                          <span>{station.city || station.address || '—'}</span>
+                          <span>仓数: {station.cabinet_count || 1}</span>
+                          <span>电池数: {station.real_battery_count ?? station.battery_count ?? 0}</span>
+                        </div>
+                        {/* 槽位统计 */}
+                        <div className="flex items-center gap-4 text-xs mb-3">
+                          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-400" />已占用 {occupiedSlots}</span>
+                          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300" />空置 {emptySlots}</span>
+                          <span className="text-gray-400">总计 {totalSlots} 槽</span>
+                        </div>
+                        {/* 换电柜网格 */}
+                        <div className="bg-gray-100 rounded-xl p-3 border-2 border-gray-300">
+                          <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2">
+                            {slots.map((slot, idx) => (
+                              <div
+                                key={idx}
+                                className={`h-10 rounded-lg border-2 flex flex-col items-center justify-center text-xs font-medium ${
+                                  slot.status === 'empty'
+                                    ? 'bg-gray-200 text-gray-400 border-gray-300'
+                                    : 'bg-green-200 border-green-400 text-green-800'
+                                }`}
+                              >
+                                <span className="text-[10px] font-bold">{slot.slot_number}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-2 h-3 bg-gray-300 rounded-b-md" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid md:grid-cols-2 gap-6">
               {/* Application Form */}
@@ -1357,13 +1487,18 @@ const getPenaltyTierDisplay = (tier, t) => {
                       <option value="">-- {t('invest.franchise.selectTemplate')} --</option>
                       {swapTemplates.map(tmpl => (
                         <option key={tmpl.id} value={tmpl.id}>
-                          {tmpl.name}（{tmpl.cabinet_count}{t('adminFa.cabinetsUnit')}）
+                          {tmpl.name_i18n?.[i18n.language] || tmpl.name_i18n?.['zh-CN'] || tmpl.name}（{tmpl.cabinet_count}{t('adminFa.cabinetsUnit')}）
                         </option>
                       ))}
                     </select>
                   </div>
                   {selectedTemplate && (
-                    <div className="bg-blue-50 rounded-lg p-4 text-sm space-y-1">
+                    <div className="bg-blue-50 rounded-lg p-4 text-sm space-y-3">
+                      {selectedTemplate.image_url && (
+                        <img src={selectedTemplate.image_url} alt={selectedTemplate.name_i18n?.[i18n.language] || selectedTemplate.name_i18n?.['zh-CN'] || selectedTemplate.name}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          className="w-full object-contain rounded-lg border border-blue-100" />
+                      )}
                       <p className="text-blue-800 font-medium">{
                         t('invest.franchise.templateDetail')
                           .replace('{{price}}', formatCurrency(selectedTemplate.price, i18n.language))
@@ -1407,7 +1542,7 @@ const getPenaltyTierDisplay = (tier, t) => {
                       return (
                         <div key={app.id} className="border rounded-lg p-4 text-sm">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{tmpl?.name || app.template_id}</span>
+                            <span className="font-medium">{tmpl?.name_i18n?.[i18n.language] || tmpl?.name_i18n?.['zh-CN'] || tmpl?.name || app.template_id}</span>
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                               app.status === 'approved' ? 'bg-green-100 text-green-700' :
                               app.status === 'rejected' ? 'bg-red-100 text-red-700' :
@@ -1607,5 +1742,13 @@ const getPenaltyTierDisplay = (tier, t) => {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Invest() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-green-600" /></div>}>
+      <InvestContent />
+    </Suspense>
   );
 }
