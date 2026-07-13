@@ -94,6 +94,13 @@ export default function FranchiseApplicationsPage() {
       const updatedApp = res.application;
       reviewedRef.current[reviewModal.id] = { status: updatedApp.status, admin_remark: updatedApp.admin_remark };
       setReviewCache(reviewModal.id, updatedApp.status, updatedApp.admin_remark);
+      // Sync to unified admin_review_cache so admin page badge counter can read it
+      try {
+        const unifiedRaw = localStorage.getItem('admin_review_cache');
+        const unifiedCache = unifiedRaw ? JSON.parse(unifiedRaw) : {};
+        unifiedCache[`franchise-application:${reviewModal.id}`] = { status: updatedApp.status, timestamp: Date.now() };
+        localStorage.setItem('admin_review_cache', JSON.stringify(unifiedCache));
+      } catch {}
       setApplications(prev => prev.map(app =>
         app.id === reviewModal.id ? { ...app, ...updatedApp, applicant: app.applicant, template: app.template } : app
       ));
