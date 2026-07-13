@@ -48,8 +48,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ site
     if (country !== undefined) updates.country = country
     if (city !== undefined) updates.city = city
     if (address !== undefined) updates.address = address || null
-    if (longitude !== undefined) updates.longitude = parseFloat(longitude)
-    if (latitude !== undefined) updates.latitude = parseFloat(latitude)
+    if (longitude !== undefined) updates.longitude = longitude ? parseFloat(longitude) : null
+    if (latitude !== undefined) updates.latitude = latitude ? parseFloat(latitude) : null
     if (battery_count !== undefined) updates.battery_count = parseInt(battery_count)
     if (status !== undefined) updates.status = status
     if (site_type !== undefined) updates.site_type = site_type

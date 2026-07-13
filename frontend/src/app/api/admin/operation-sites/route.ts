@@ -201,8 +201,8 @@ export async function POST(request: Request) {
       try { return JSON.parse(v) } catch { return null }
     }
 
-    if (!name || !country || !city || !longitude || !latitude || !battery_count) {
-      return badRequest('缺少必填字段: name, country, city, longitude, latitude, battery_count')
+    if (!name || !country || !city || !battery_count) {
+      return badRequest('缺少必填字段: name, country, city, battery_count')
     }
 
     // 处理文件上传
@@ -230,8 +230,8 @@ export async function POST(request: Request) {
       const insertData: any = {
         name, country, city,
         address: address || null,
-        longitude: parseFloat(longitude),
-        latitude: parseFloat(latitude),
+        longitude: longitude ? parseFloat(longitude) : null,
+        latitude: latitude ? parseFloat(latitude) : null,
         battery_count: parseInt(battery_count),
         status: status || '运营中',
         site_code,
