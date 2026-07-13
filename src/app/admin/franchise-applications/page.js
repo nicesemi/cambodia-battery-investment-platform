@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../contexts/AuthContext';
+import { adminAPI } from '../../../services/api';
 import { useRouter } from 'next/navigation';
-import { Loader2, ArrowLeft, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle, XCircle, FileText, AlertTriangle } from 'lucide-react';
 
 export default function FranchiseApplicationsPage() {
   const { t } = useTranslation();
@@ -12,9 +13,11 @@ export default function FranchiseApplicationsPage() {
   const router = useRouter();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [reviewModal, setReviewModal] = useState(null);
   const [remark, setRemark] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const reviewedRef = useRef({});
 
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
@@ -24,32 +27,37 @@ export default function FranchiseApplicationsPage() {
 
   const loadApplications = async () => {
     setLoading(true);
+    setError('');
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/franchise-applications', {
-        headers: { Authorization: `Bearer ${token}` }
+      const data = await adminAPI.getFranchiseSwapApplications();
+      // Merge with optimistically reviewed items to prevent replica lag from overriding correct state
+      const apps = (data.applications || []).map(app => {
+        const reviewed = reviewedRef.current[app.id];
+        if (reviewed) {
+          if (app.status === reviewed.status) delete reviewedRef.current[app.id];
+          return { ...app, ...reviewed };
+        }
+        return app;
       });
-      if (res.ok) {
-        const data = await res.json();
-        setApplications(data.applications || []);
-      }
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+      setApplications(apps);
+    } catch (e) {
+      setError(e.message || 'Failed to load applications');
+      console.error(e);
+    } finally { setLoading(false); }
   };
 
   const handleReview = async (status) => {
     if (!reviewModal) return;
     setSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/franchise-applications/${reviewModal.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status, admin_remark: remark })
-      });
-      if (!res.ok) throw new Error((await res.json()).error || t('common.operationFailed'));
+      await adminAPI.reviewFranchiseSwapApplication(reviewModal.id, { status, admin_remark: remark });
+      // Persist reviewed status in ref to survive stale GET responses
+      reviewedRef.current[reviewModal.id] = { status, admin_remark: remark };
+      setApplications(prev => prev.map(app =>
+        app.id === reviewModal.id ? { ...app, status, admin_remark: remark } : app
+      ));
       setReviewModal(null); setRemark('');
-      await loadApplications();
+      loadApplications();
     } catch (err) { alert(err.message); }
     finally { setSubmitting(false); }
   };
@@ -70,6 +78,19 @@ export default function FranchiseApplicationsPage() {
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-amber-500" />
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button onClick={loadApplications}
+          className="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg hover:bg-gray-900 transition">
+          {t('common.retry')}
+        </button>
+      </div>
     </div>
   );
 
