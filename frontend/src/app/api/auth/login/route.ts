@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
+import { SignJWT } from 'jose'
 import { supabase } from '@/lib/supabase'
 import { badRequest, ok, unauthorized, serverError } from '@/lib/response'
 
@@ -21,7 +21,11 @@ export async function POST(request: Request) {
     const valid = await bcrypt.compare(password, user.password_hash)
     if (!valid) return unauthorized('Invalid email or password')
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'battery-investment-platform-jwt-secret-key-2024', { expiresIn: '7d' })
+    const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'battery-investment-platform-jwt-secret-key-2024')
+    const token = await new SignJWT({ userId: user.id })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('7d')
+      .sign(JWT_SECRET)
 
     return ok({ message: 'Login successful', token, user: { id: user.id, email: user.email, username: user.username, fullName: user.full_name, role: user.role, agentType: user.agent_type || null, kyc_status: user.kyc_status || null, certification_status: user.certification_status || null } })
   } catch (e: any) {
