@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, badRequest, serverError } from '@/lib/response'
 
@@ -11,11 +11,28 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from('franchisee_applications')
-      .select('*, applicant:user_id(id, email, username, full_name, phone)')
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (error) return serverError(error.message)
-    return ok({ applications: data || [] })
+
+    // Batch fetch applicants
+    const apps = data || []
+    if (apps.length > 0) {
+      const userIds = [...new Set(apps.map((a: any) => a.user_id).filter(Boolean))]
+      if (userIds.length > 0) {
+        const { data: users } = await getSupabaseAdmin()
+          .from('users')
+          .select('id, email, username, full_name, phone')
+          .in('id', userIds)
+        const userMap = new Map((users || []).map((u: any) => [u.id, u]))
+        for (const a of apps) {
+          (a as any).applicant = userMap.get(a.user_id) || null
+        }
+      }
+    }
+
+    return ok({ applications: apps })
   } catch (e: any) {
     return serverError()
   }

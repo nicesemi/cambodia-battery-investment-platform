@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, badRequest, serverError, forbidden } from '@/lib/response'
 
@@ -34,29 +34,59 @@ export async function GET(request: Request) {
 
     if (agent.agent_type === 'province_agent') {
       // 省级代理：查看本省内市级加盟商申请（通过 parent_agent_id 精确匹配）
-      const { data: cityApps } = await supabase
+      const { data: cityApps, error: cityAppsErr } = await supabase
         .from('agent_applications')
-        .select('*, applicant:user_id(id, email, username, full_name, phone)')
+        .select('*')
         .eq('agent_type', 'city_franchisee')
         .eq('parent_agent_id', agent.id)
         .order('created_at', { ascending: false })
-      agentApplications = cityApps || []
+
+      if (cityAppsErr) return serverError(cityAppsErr.message)
+
+      if (cityApps && cityApps.length > 0) {
+        const userIds = [...new Set(cityApps.map((a: any) => a.user_id).filter(Boolean))]
+        const { data: users } = userIds.length > 0
+          ? await getSupabaseAdmin().from('users').select('id, email, username, full_name, phone').in('id', userIds)
+          : { data: [] }
+        const userMap = new Map((users || []).map((u: any) => [u.id, u]))
+        agentApplications = cityApps.map((a: any) => ({ ...a, applicant: userMap.get(a.user_id) || null }))
+      }
 
       // 省级代理：查看本省内的开店申请（parent_agent_id = 该省级代理ID）
-      const { data: storeApps } = await supabase
+      const { data: storeApps, error: storeAppsErr } = await supabase
         .from('franchisee_applications')
-        .select('*, applicant:user_id(id, email, username, full_name, phone)')
+        .select('*')
         .eq('parent_agent_id', agent.id)
         .order('created_at', { ascending: false })
-      storeApplications = storeApps || []
+
+      if (storeAppsErr) return serverError(storeAppsErr.message)
+
+      if (storeApps && storeApps.length > 0) {
+        const userIds = [...new Set(storeApps.map((a: any) => a.user_id).filter(Boolean))]
+        const { data: users } = userIds.length > 0
+          ? await getSupabaseAdmin().from('users').select('id, email, username, full_name, phone').in('id', userIds)
+          : { data: [] }
+        const userMap = new Map((users || []).map((u: any) => [u.id, u]))
+        storeApplications = storeApps.map((a: any) => ({ ...a, applicant: userMap.get(a.user_id) || null }))
+      }
     } else if (agent.agent_type === 'city_franchisee') {
       // 市级加盟商：查看本市开店申请（parent_agent_id = 该市级加盟商ID）
-      const { data: storeApps } = await supabase
+      const { data: storeApps, error: storeAppsErr } = await supabase
         .from('franchisee_applications')
-        .select('*, applicant:user_id(id, email, username, full_name, phone)')
+        .select('*')
         .eq('parent_agent_id', agent.id)
         .order('created_at', { ascending: false })
-      storeApplications = storeApps || []
+
+      if (storeAppsErr) return serverError(storeAppsErr.message)
+
+      if (storeApps && storeApps.length > 0) {
+        const userIds = [...new Set(storeApps.map((a: any) => a.user_id).filter(Boolean))]
+        const { data: users } = userIds.length > 0
+          ? await getSupabaseAdmin().from('users').select('id, email, username, full_name, phone').in('id', userIds)
+          : { data: [] }
+        const userMap = new Map((users || []).map((u: any) => [u.id, u]))
+        storeApplications = storeApps.map((a: any) => ({ ...a, applicant: userMap.get(a.user_id) || null }))
+      }
     }
 
     return ok({

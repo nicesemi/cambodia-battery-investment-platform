@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, badRequest, serverError, notFound } from '@/lib/response'
 
@@ -34,11 +34,21 @@ export async function PUT(
       .from('franchisee_stores')
       .update(updateData)
       .eq('id', params.id)
-      .select('*, owner:owner_id(id, email, username, full_name)')
+      .select('*')
       .single()
 
     if (error) return serverError(error.message)
     if (!store) return notFound('门店不存在')
+
+    // Fetch owner
+    if ((store as any).owner_id) {
+      const { data: owner } = await getSupabaseAdmin()
+        .from('users')
+        .select('id, email, username, full_name')
+        .eq('id', (store as any).owner_id)
+        .single()
+      ;(store as any).owner = owner || null
+    }
 
     return ok({ store })
   } catch (e: any) {
@@ -60,11 +70,21 @@ export async function DELETE(
       .from('franchisee_stores')
       .update({ status: 'closed' })
       .eq('id', params.id)
-      .select('*, owner:owner_id(id, email, username, full_name)')
+      .select('*')
       .single()
 
     if (error) return serverError(error.message)
     if (!store) return notFound('门店不存在')
+
+    // Fetch owner
+    if ((store as any).owner_id) {
+      const { data: owner } = await getSupabaseAdmin()
+        .from('users')
+        .select('id, email, username, full_name')
+        .eq('id', (store as any).owner_id)
+        .single()
+      ;(store as any).owner = owner || null
+    }
 
     return ok({ message: '门店已停业', store })
   } catch (e: any) {
@@ -92,11 +112,21 @@ export async function PATCH(
       .from('franchisee_stores')
       .update({ status })
       .eq('id', params.id)
-      .select('*, owner:owner_id(id, email, username, full_name)')
+      .select('*')
       .single()
 
     if (error) return serverError(error.message)
     if (!store) return notFound('门店不存在')
+
+    // Fetch owner
+    if ((store as any).owner_id) {
+      const { data: owner } = await getSupabaseAdmin()
+        .from('users')
+        .select('id, email, username, full_name')
+        .eq('id', (store as any).owner_id)
+        .single()
+      ;(store as any).owner = owner || null
+    }
 
     return ok({ message: '门店状态已更新', store })
   } catch (e: any) {

@@ -11,10 +11,25 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from('franchisee_stores')
-      .select('*, owner:owner_id(id, email, username, full_name)')
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (error) return serverError(error.message)
+
+    // Batch fetch owners
+    if (data && data.length > 0) {
+      const ownerIds = [...new Set(data.map((s: any) => s.owner_id).filter(Boolean))]
+      if (ownerIds.length > 0) {
+        const { data: owners } = await getSupabaseAdmin()
+          .from('users')
+          .select('id, email, username, full_name')
+          .in('id', ownerIds)
+        const ownerMap = new Map((owners || []).map((u: any) => [u.id, u]))
+        for (const s of data) {
+          (s as any).owner = ownerMap.get(s.owner_id) || null
+        }
+      }
+    }
 
     // 统计运营电池数：investor_orders(staff_registration) → investor → battery_units(sold)
     const storeIds = (data || []).map((s: any) => s.id)

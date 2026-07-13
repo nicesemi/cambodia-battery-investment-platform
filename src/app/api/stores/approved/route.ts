@@ -17,11 +17,26 @@ export async function GET(request: Request) {
     // 查询门店基本信息
     const { data, error } = await adminClient
       .from('franchisee_stores')
-      .select('*, owner:owner_id(id, email, username, full_name)')
+      .select('*')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
 
     if (error) return serverError(error.message)
+
+    // Step: Batch fetch owners
+    if (data && data.length > 0) {
+      const ownerIds = [...new Set(data.map((s: any) => s.owner_id).filter(Boolean))]
+      if (ownerIds.length > 0) {
+        const { data: owners } = await adminClient
+          .from('users')
+          .select('id, email, username, full_name')
+          .in('id', ownerIds)
+        const ownerMap = new Map((owners || []).map((u: any) => [u.id, u]))
+        for (const s of data) {
+          (s as any).owner = ownerMap.get(s.owner_id) || null
+        }
+      }
+    }
 
     const storeIds = (data || []).map((s: any) => s.id)
 

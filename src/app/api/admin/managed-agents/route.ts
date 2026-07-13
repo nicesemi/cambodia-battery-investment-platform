@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, badRequest, serverError, notFound } from '@/lib/response'
 
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('agent_applications')
-      .select('*, applicant:user_id(id, email, username, full_name, phone)')
+      .select('*')
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
 
@@ -30,8 +30,24 @@ export async function GET(request: Request) {
 
     if (error) return serverError(error.message)
 
+    // Batch fetch applicants
+    const agents = data || []
+    if (agents.length > 0) {
+      const userIds = [...new Set(agents.map((a: any) => a.user_id).filter(Boolean))]
+      if (userIds.length > 0) {
+        const { data: users } = await getSupabaseAdmin()
+          .from('users')
+          .select('id, email, username, full_name, phone')
+          .in('id', userIds)
+        const userMap = new Map((users || []).map((u: any) => [u.id, u]))
+        for (const a of agents) {
+          (a as any).applicant = userMap.get(a.user_id) || null
+        }
+      }
+    }
+
     // 为每个代理查询下属门店数，以及区县加盟商的上级市级加盟商信息
-    const agentParentIds = (data || [])
+    const agentParentIds = agents
       .filter((a: any) => a.agent_type === 'store_owner' && a.parent_agent_id)
       .map((a: any) => a.parent_agent_id)
 
@@ -49,7 +65,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const enriched = await Promise.all((data || []).map(async (agent) => {
+    const enriched = await Promise.all(agents.map(async (agent) => {
       const { count, error: countErr } = await supabase
         .from('franchisee_stores')
         .select('*', { count: 'exact', head: true })

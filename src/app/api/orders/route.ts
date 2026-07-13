@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20')
 
     let query = supabase.from('investor_orders')
-      .select('*, asset:asset_id(id, name, name_i18n, asset_code, battery_type, location, unit_price, expected_roi), store:store_id(id, name, city)', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
 
@@ -24,6 +24,30 @@ export async function GET(request: Request) {
 
     const { data: orders, count, error } = await query
     if (error) return serverError(error.message)
+
+    // Batch fetch assets & stores
+    if (orders && orders.length > 0) {
+      const assetIds = [...new Set(orders.map((o: any) => o.asset_id).filter(Boolean))]
+      const storeIds = [...new Set(orders.map((o: any) => o.store_id).filter(Boolean))]
+      const adminClient = getSupabaseAdmin()
+
+      const [assetRes, storeRes] = await Promise.all([
+        assetIds.length > 0
+          ? adminClient.from('battery_assets').select('id, name, name_i18n, asset_code, battery_type, location, unit_price, expected_roi').in('id', assetIds)
+          : { data: [] },
+        storeIds.length > 0
+          ? adminClient.from('franchisee_stores').select('id, name, city').in('id', storeIds)
+          : { data: [] },
+      ])
+
+      const assetMap = new Map((assetRes.data || []).map((a: any) => [a.id, a]))
+      const storeMap = new Map((storeRes.data || []).map((s: any) => [s.id, s]))
+
+      for (const o of orders) {
+        (o as any).asset = assetMap.get(o.asset_id) || null
+        ;(o as any).store = storeMap.get(o.store_id) || null
+      }
+    }
 
     return ok({ orders: orders || [], total: count || 0, page, limit })
   } catch (e: any) {
@@ -50,7 +74,7 @@ export async function POST(request: Request) {
 
     // Get asset with stock info
     const { data: asset } = await adminClient.from('battery_assets')
-      .select('unit_price, available_units, stock, name, asset_code').eq('id', asset_id).single()
+      .select('unit_price, available_units, stock, name, asset_code, station_id').eq('id', asset_id).single()
 
     if (!asset) return badRequest('Asset not found')
     if (asset.available_units < units) return badRequest('Insufficient available units')
@@ -91,9 +115,12 @@ export async function POST(request: Request) {
     await adminClient.from('users').update({ total_investment: newTotal }).eq('id', user.id)
 
     // Record transaction
-    await adminClient.from('transactions').insert({
-      tx_no: `TX${Date.now()}`, user_id: user.id, type: 'trade', amount: total, status: 'completed'
+    const now = new Date().toISOString()
+    const { error: txError } = await adminClient.from('transactions').insert({
+      tx_no: `TX${Date.now()}`, user_id: user.id, type: 'trade', amount: total, status: 'completed',
+      created_at: now, completed_at: now
     })
+    if (txError) console.error('Order transaction insert error:', txError)
 
     // Assign battery_units: 优先分配已部署到站点但未售的电池（运营中无主），再回退到仓库 available
     // Step 1: 查找已部署运营但 investor_id 为空的电池单元 (status='sold' + site_name IS NOT NULL + investor_id IS NULL)
@@ -144,9 +171,13 @@ export async function POST(request: Request) {
       if (availableUnits && availableUnits.length > 0) {
         assignedUnits.push(...availableUnits)
         const unitIds = availableUnits.map((u: any) => u.id)
-        // Mark units as sold
+        // Mark units as sold with station info
+        const updatePayload: any = { status: 'sold', investor_id: user.id }
+        if (asset.station_id) {
+          updatePayload.site_id = asset.station_id
+        }
         await adminClient.from('battery_units')
-          .update({ status: 'sold', investor_id: user.id })
+          .update(updatePayload)
           .in('id', unitIds)
         // Create investor_battery_units entries
         const ibuEntries = availableUnits.map((u: any) => ({

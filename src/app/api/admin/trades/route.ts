@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, serverError } from '@/lib/response'
 
@@ -14,10 +14,30 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20')
 
     const { data: trades, count, error } = await supabase.from('trade_records')
-      .select('*, buyer:buyer_id(username), seller:seller_id(username), battery_assets!inner(name, name_i18n)', { count: 'exact' })
+      .select('*, battery_assets!inner(name, name_i18n)', { count: 'exact' })
       .order('trade_time', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
     if (error) return serverError(error.message)
+
+    // Batch fetch buyer & seller users
+    let buyerMap = new Map<string, any>()
+    let sellerMap = new Map<string, any>()
+    if (trades && trades.length > 0) {
+      const buyerIds = [...new Set(trades.map((t: any) => t.buyer_id).filter(Boolean))]
+      const sellerIds = [...new Set(trades.map((t: any) => t.seller_id).filter(Boolean))]
+      const allUserIds = [...new Set([...buyerIds, ...sellerIds])]
+      if (allUserIds.length > 0) {
+        const { data: users } = await getSupabaseAdmin()
+          .from('users')
+          .select('id, username')
+          .in('id', allUserIds)
+        const userMap = new Map((users || []).map((u: any) => [u.id, u]))
+        for (const t of trades) {
+          (t as any).buyer = userMap.get(t.buyer_id) || null
+          ;(t as any).seller = userMap.get(t.seller_id) || null
+        }
+      }
+    }
 
     const formatted = (trades || []).map((t: any) => ({
       ...t, buyer_name: t.buyer?.username, seller_name: t.seller?.username,
