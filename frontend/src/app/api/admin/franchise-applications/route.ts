@@ -20,6 +20,14 @@ export async function GET(request: Request) {
       .select('*')
       .order('created_at', { ascending: false })
 
+    console.log('[DEBUG GET] raw apps count:', apps?.length, 'error:', error)
+    if (apps && apps.length > 0) {
+      console.log('[DEBUG GET] first app id:', apps[0].id, 'status:', apps[0].status)
+      const pendingApps = apps.filter(a => a.status === 'pending')
+      const rejectedApps = apps.filter(a => a.status === 'rejected')
+      console.log('[DEBUG GET] pending:', pendingApps.length, 'rejected:', rejectedApps.length)
+    }
+
     if (error) {
       console.error('[franchise-applications] Supabase query error:', error)
       return serverError('Database query failed: ' + error.message)

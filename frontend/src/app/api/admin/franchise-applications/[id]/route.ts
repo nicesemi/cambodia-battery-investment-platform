@@ -13,6 +13,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const body = await request.json()
     const { status, admin_remark } = body
 
+    console.log('[DEBUG PUT] id:', id, 'body:', JSON.stringify(body))
+
     if (!status || !['approved', 'rejected'].includes(status)) {
       return badRequest('Status must be approved or rejected')
     }
@@ -30,6 +32,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       .eq('id', id)
       .select('*')
       .single()
+
+    console.log('[DEBUG PUT] update result - data:', JSON.stringify(application), 'error:', error)
 
     if (error) return serverError(error.message)
     if (!application) return notFound('Application not found')
