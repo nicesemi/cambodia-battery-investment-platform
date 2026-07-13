@@ -220,6 +220,8 @@ export default function Franchisee() {
   const [hasApproved, setHasApproved] = useState(false);
   const [batterySites, setBatterySites] = useState([]); // battery-live sites for cabinet display
   const [batterySitesLoaded, setBatterySitesLoaded] = useState(false);
+  const [swapStations, setSwapStations] = useState([]); // 我的换电站
+  const [swapStationsLoading, setSwapStationsLoading] = useState(false);
 
   // 申请表单
   const [showApplyForm, setShowApplyForm] = useState(false);
@@ -425,6 +427,14 @@ export default function Franchisee() {
           }
         } catch (_) {}
         setBatterySitesLoaded(true);
+        
+        // 加载我的换电站数据
+        setSwapStationsLoading(true);
+        try {
+          const swapRes = await franchiseeAPI.getMySwapStations();
+          setSwapStations(swapRes.stations || []);
+        } catch (_) {}
+        setSwapStationsLoading(false);
       }
       // 检查用户是否已审批通过的代理
       const approvedAgent = (agentRes.applications || []).find(
@@ -1535,6 +1545,72 @@ export default function Franchisee() {
                 </div>
               );
             })()}
+
+            {/* 我的换电站 */}
+            {hasApproved && !swapStationsLoading && swapStations.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-orange-500" />
+                  {t('franchisee.swapStation.myStations') || '我的换电站'}
+                </h3>
+                {swapStations.map(station => {
+                  const slots = Array.isArray(station.cabinet_slots) ? station.cabinet_slots : [];
+                  const totalSlots = slots.length;
+                  const occupiedSlots = slots.filter(s => s.status === 'occupied').length;
+                  const emptySlots = totalSlots - occupiedSlots;
+                  
+                  return (
+                    <div key={station.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Battery className="h-4 w-4 text-green-600" />
+                        <span className="font-semibold text-gray-900">{station.name}</span>
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{station.status}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
+                        <span>{station.city || station.address || '—'}</span>
+                        <span>{t('franchisee.swapStation.cabinetCount') || '仓数'}: {station.cabinet_count || 1}</span>
+                        <span>{t('franchisee.swapStation.batteryCount') || '电池数'}: {station.real_battery_count ?? station.battery_count ?? 0}</span>
+                      </div>
+                      {/* 槽位统计 */}
+                      <div className="flex items-center gap-4 text-xs mb-3">
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-400" />{t('franchisee.swapStation.occupied') || '已占用'} {occupiedSlots}</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300" />{t('franchisee.swapStation.empty') || '空置'} {emptySlots}</span>
+                        <span className="text-gray-400">{t('franchisee.swapStation.total') || '总计'} {totalSlots} {t('franchisee.swapStation.slots') || '槽'}</span>
+                      </div>
+                      {/* 换电柜网格 */}
+                      <div className="bg-gray-100 rounded-xl p-3 border-2 border-gray-300">
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                          {slots.map((slot, idx) => (
+                            <div
+                              key={idx}
+                              className={`h-12 rounded-lg border-2 flex flex-col items-center justify-center text-xs font-medium ${
+                                slot.status === 'empty'
+                                  ? 'bg-gray-200 text-gray-400 border-gray-300'
+                                  : 'bg-green-200 border-green-400 text-green-800'
+                              }`}
+                            >
+                              <span className="text-[10px] font-bold">{slot.slot_number}</span>
+                              {slot.status === 'occupied' && (
+                                <span className="text-[8px] truncate max-w-full px-0.5">{slot.battery_unit_code || '—'}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-2 h-3 bg-gray-300 rounded-b-md" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 加载中 */}
+            {hasApproved && swapStationsLoading && (
+              <div className="bg-white rounded-xl border p-6 text-center text-gray-500">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                {t('franchisee.swapStation.loading') || '加载换电站数据...'}
+              </div>
+            )}
 
             {/* 门店列表 / 门店详情 */}
             {selectedStoreId ? (
