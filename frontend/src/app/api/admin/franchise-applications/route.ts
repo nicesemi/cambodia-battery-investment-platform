@@ -16,9 +16,7 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
 
     if (error) return serverError(error.message)
-    // DEBUG: verify service_role key is loaded
-    const keyLen = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').length
-    return ok({ applications: data || [], _debug: { keyLen, dataLen: (data || []).length } })
+    return ok({ applications: data || [] })
   } catch (e: any) {
     return serverError()
   }
