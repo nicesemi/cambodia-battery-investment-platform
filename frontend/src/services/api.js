@@ -169,6 +169,7 @@ export const franchiseeAPI = {
   submitApplication: (data) => request('/franchisee/applications', { method: 'POST', body: JSON.stringify(data) }),
   staffRegisterInvestor: (data) => request('/franchisee/staff-register-investor', { method: 'POST', body: JSON.stringify(data) }),
   getAgentOptions: (region, city) => request(`/franchisee/agent-options?region=${encodeURIComponent(region)}&city=${encodeURIComponent(city)}`),
+  getMySwapStations: () => request('/franchisee/swap-stations'),
 };
 
 // 门店列表API（投资者/加盟商可访问已审批门店）
