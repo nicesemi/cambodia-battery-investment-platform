@@ -16,9 +16,9 @@ export async function GET(request: Request) {
       .eq('user_id', user.id)
     if (error) return serverError(error.message)
 
-    // Fetch battery units for this user
+    // Fetch battery units for this user (LEFT JOIN to avoid !inner filtering quirks)
     const { data: myUnits } = await adminClient.from('investor_battery_units')
-      .select('battery_asset_id, battery_unit_id, purchase_price, purchased_at, battery_units!inner(id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude)')
+      .select('battery_asset_id, battery_unit_id, purchase_price, purchased_at, battery_units(id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude)')
       .eq('investor_id', user.id)
 
     // Group units by asset_id

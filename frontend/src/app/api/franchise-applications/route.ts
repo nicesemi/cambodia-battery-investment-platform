@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { badRequest, ok, unauthorized, serverError } from '@/lib/response'
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const user = await authenticateToken(request)
     if (!user) return unauthorized()
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseAdmin()
       .from('franchise_applications')
       .select('*, template:template_id(*)')
       .eq('user_id', user.id)
@@ -41,7 +41,8 @@ export async function POST(request: Request) {
     }
 
     // Get template to fill cabinet_count
-    const { data: template } = await supabase
+    const adminClient = getSupabaseAdmin()
+    const { data: template } = await adminClient
       .from('swap_station_templates')
       .select('id, cabinet_count')
       .eq('id', template_id)
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
     if (!template) return badRequest('所选模板不存在')
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from('franchise_applications')
       .insert({
         user_id: user.id,

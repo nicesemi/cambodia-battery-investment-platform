@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     // Get asset with stock info
     const { data: asset } = await adminClient.from('battery_assets')
-      .select('unit_price, available_units, stock, name, asset_code').eq('id', asset_id).single()
+      .select('unit_price, available_units, stock, name, asset_code, station_id').eq('id', asset_id).single()
 
     if (!asset) return badRequest('Asset not found')
     if (asset.available_units < units) return badRequest('Insufficient available units')
@@ -147,9 +147,13 @@ export async function POST(request: Request) {
       if (availableUnits && availableUnits.length > 0) {
         assignedUnits.push(...availableUnits)
         const unitIds = availableUnits.map((u: any) => u.id)
-        // Mark units as sold
+        // Mark units as sold with station info
+        const updatePayload: any = { status: 'sold', investor_id: user.id }
+        if (asset.station_id) {
+          updatePayload.site_id = asset.station_id
+        }
         await adminClient.from('battery_units')
-          .update({ status: 'sold', investor_id: user.id })
+          .update(updatePayload)
           .in('id', unitIds)
         // Create investor_battery_units entries
         const ibuEntries = availableUnits.map((u: any) => ({
