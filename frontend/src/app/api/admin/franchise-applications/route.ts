@@ -13,9 +13,11 @@ export async function GET(request: Request) {
     console.log('[franchise-applications] User authenticated:', user.email, 'role:', user.role)
 
     const adminClient = getSupabaseAdmin()
-    const { data, error } = await adminClient
+
+    // Step 1: Query franchise_applications without joins (known to work)
+    const { data: apps, error } = await adminClient
       .from('franchise_applications')
-      .select('*, applicant:user_id(id, email, username, full_name, phone), template:template_id(*)')
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -23,8 +25,36 @@ export async function GET(request: Request) {
       return serverError('Database query failed: ' + error.message)
     }
 
-    console.log('[franchise-applications] Found', data?.length ?? 0, 'applications')
-    return ok({ applications: data || [] })
+    if (!apps || apps.length === 0) {
+      return ok({ applications: [] })
+    }
+
+    // Step 2: Collect unique user_ids and template_ids
+    const userIds = [...new Set(apps.map(a => a.user_id).filter(Boolean))]
+    const templateIds = [...new Set(apps.map(a => a.template_id).filter(Boolean))]
+
+    // Step 3: Batch fetch users and templates
+    const [userRes, templateRes] = await Promise.all([
+      userIds.length > 0
+        ? adminClient.from('users').select('id, email, username, full_name, phone').in('id', userIds)
+        : { data: [], error: null },
+      templateIds.length > 0
+        ? adminClient.from('swap_station_templates').select('*').in('id', templateIds)
+        : { data: [], error: null },
+    ])
+
+    const userMap = new Map((userRes.data || []).map(u => [u.id, u]))
+    const templateMap = new Map((templateRes.data || []).map(t => [t.id, t]))
+
+    // Step 4: Merge
+    const applications = apps.map(app => ({
+      ...app,
+      applicant: userMap.get(app.user_id) || null,
+      template: templateMap.get(app.template_id) || null,
+    }))
+
+    console.log('[franchise-applications] Found', applications.length, 'applications')
+    return ok({ applications })
   } catch (e: any) {
     console.error('[franchise-applications] Unexpected error:', e)
     return serverError('Unexpected error: ' + (e?.message || String(e)))

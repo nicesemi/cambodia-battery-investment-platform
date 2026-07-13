@@ -28,32 +28,46 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .select('*, template:template_id(*)')
+      .select('*')
       .single()
 
     if (error) return serverError(error.message)
     if (!application) return notFound('Application not found')
 
+    // Fetch template data separately
+    let template = null
+    if (application.template_id) {
+      const { data: tmpl } = await adminClient
+        .from('swap_station_templates')
+        .select('*')
+        .eq('id', application.template_id)
+        .single()
+      template = tmpl || null
+    }
+
     // When approved, create operation_site record
     if (status === 'approved') {
-      const tmpl = (application as any).template
+      const siteData = {
+        name: `${application.location} 加盟换电站`,
+        site_type: 'swap_station',
+        template_id: application.template_id,
+        cabinet_count: template ? template.cabinet_count : application.cabinet_count,
+        battery_count: 0,
+        longitude: template?.gps_lng || 0,
+        latitude: template?.gps_lat || 0,
+        status: '运营中',
+        is_active: true,
+        country: '柬埔寨',
+        city: application.location,
+        address: application.location,
+        franchise_application_id: id,
+      }
+
+      console.log('[franchise-review] Creating operation_site:', JSON.stringify(siteData, null, 2))
+
       const { error: siteErr } = await adminClient
         .from('operation_sites')
-        .insert({
-          name: `${application.location} 加盟换电站`,
-          site_type: 'swap_station',
-          template_id: application.template_id,
-          cabinet_count: tmpl ? tmpl.cabinet_count : application.cabinet_count,
-          battery_count: 0,
-          longitude: tmpl?.gps_lng || 0,
-          latitude: tmpl?.gps_lat || 0,
-          status: '运营中',
-          is_active: true,
-          country: '柬埔寨',
-          city: application.location,
-          address: application.location,
-          franchise_application_id: id,
-        })
+        .insert(siteData)
 
       if (siteErr) {
         console.error('Failed to create operation_site for franchise:', siteErr.message)
