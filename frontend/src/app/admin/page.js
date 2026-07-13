@@ -519,7 +519,22 @@ export default function Admin() {
       // franchise-applications: 换电站加盟审批
       if (results[4].status === 'fulfilled') {
         const fApps = results[4].value.applications || [];
-        counts['franchise-applications'] = fApps.filter(a => a.status === 'pending').length;
+        // Check localStorage review cache to correct replica-lag stale counts
+        let reviewedIds = new Set();
+        try {
+          const raw = localStorage.getItem('franchise_review_cache');
+          if (raw) {
+            const cache = JSON.parse(raw);
+            const now = Date.now();
+            Object.entries(cache).forEach(([id, v]) => {
+              if (now - v.timestamp < 5 * 60 * 1000 && v.status !== 'pending') {
+                reviewedIds.add(id);
+              }
+            });
+          }
+        } catch {}
+        const pending = fApps.filter(a => a.status === 'pending' && !reviewedIds.has(a.id));
+        counts['franchise-applications'] = pending.length;
       }
       setPendingCounts(counts);
     } catch (e) { /* silent */ }
