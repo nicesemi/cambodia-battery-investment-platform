@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../contexts/AuthContext';
 import { adminAPI } from '../../../services/api';
@@ -17,6 +17,7 @@ export default function FranchiseApplicationsPage() {
   const [reviewModal, setReviewModal] = useState(null);
   const [remark, setRemark] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const reviewedRef = useRef({});
 
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
@@ -29,7 +30,19 @@ export default function FranchiseApplicationsPage() {
     setError('');
     try {
       const data = await adminAPI.getFranchiseSwapApplications();
-      setApplications(data.applications || []);
+      // Merge with optimistically reviewed items to prevent replica lag from overriding correct state
+      const apps = (data.applications || []).map(app => {
+        const reviewed = reviewedRef.current[app.id];
+        if (reviewed) {
+          console.log('[FRONTEND] merge ref for', app.id, 'server.status:', app.status, 'ref.status:', reviewed.status, 'match:', app.status === reviewed.status);
+          if (app.status === reviewed.status) delete reviewedRef.current[app.id];
+          return { ...app, ...reviewed };
+        }
+        return app;
+      });
+      console.log('[FRONTEND] loaded', apps.length, 'apps, _debug:', data._debug);
+      console.log('[FRONTEND] status per app:', apps.map(a => ({ id: a.id.slice(0,8), status: a.status })));
+      setApplications(apps);
     } catch (e) {
       setError(e.message || 'Failed to load applications');
       console.error(e);
@@ -40,13 +53,17 @@ export default function FranchiseApplicationsPage() {
     if (!reviewModal) return;
     setSubmitting(true);
     try {
-      await adminAPI.reviewFranchiseSwapApplication(reviewModal.id, { status, admin_remark: remark });
-      // Optimistically update local state before re-fetching (avoids replica lag)
+      const res = await adminAPI.reviewFranchiseSwapApplication(reviewModal.id, { status, admin_remark: remark });
+      console.log('[FRONTEND] PUT success, returned status:', res.application?.status);
+      // Use PUT response directly — bypass replica lag from subsequent GET
+      const updatedApp = res.application;
+      reviewedRef.current[reviewModal.id] = { status: updatedApp.status, admin_remark: updatedApp.admin_remark };
       setApplications(prev => prev.map(app =>
-        app.id === reviewModal.id ? { ...app, status, admin_remark: remark } : app
+        app.id === reviewModal.id ? { ...app, ...updatedApp, applicant: app.applicant, template: app.template } : app
       ));
       setReviewModal(null); setRemark('');
-      loadApplications();
+      // Delay re-fetch to let Supabase read replica catch up
+      setTimeout(() => loadApplications(), 1500);
     } catch (err) { alert(err.message); }
     finally { setSubmitting(false); }
   };
