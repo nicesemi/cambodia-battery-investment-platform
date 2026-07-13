@@ -486,6 +486,41 @@ export default function Admin() {
     loadPendingCounts();
   }, [user, activeTab]);
 
+  // 从 unified admin_review_cache 读取已审批项，修正读副本延迟导致的 pending 计数
+  const getCachedPendingCount = (items, type) => {
+    let reviewedIds = new Set();
+    try {
+      const raw = localStorage.getItem('admin_review_cache');
+      if (raw) {
+        const cache = JSON.parse(raw);
+        const now = Date.now();
+        Object.entries(cache).forEach(([key, v]) => {
+          if (now - v.timestamp < 5 * 60 * 1000 && v.status !== 'pending' && key.startsWith(`${type}:`)) {
+            reviewedIds.add(key.split(':')[1]);
+          }
+        });
+      }
+    } catch {}
+    return items.filter(a => a.status === 'pending' && !reviewedIds.has(a.id)).length;
+  };
+
+  const getKycCachedPendingCount = (users) => {
+    let reviewedIds = new Set();
+    try {
+      const raw = localStorage.getItem('admin_review_cache');
+      if (raw) {
+        const cache = JSON.parse(raw);
+        const now = Date.now();
+        Object.entries(cache).forEach(([key, v]) => {
+          if (now - v.timestamp < 5 * 60 * 1000 && v.status !== 'pending' && key.startsWith('kyc:')) {
+            reviewedIds.add(key.split(':')[1]);
+          }
+        });
+      }
+    } catch {}
+    return users.filter(u => u.certification_status === 'pending' && !reviewedIds.has(u.id)).length;
+  };
+
   const loadPendingCounts = async () => {
     try {
       const results = await Promise.allSettled([
@@ -496,31 +531,16 @@ export default function Admin() {
         adminAPI.getFranchiseSwapApplications(),
       ]);
       const counts = {};
-      // applications: franchisee store applications (加盟店审核)
-      if (results[0].status === 'fulfilled') {
-        const apps = results[0].value.applications || [];
-        counts['applications'] = apps.filter(a => a.status === 'pending').length;
-      }
-      // agent-applications: 省级代理审批
-      if (results[1].status === 'fulfilled') {
-        const agentApps = results[1].value.applications || [];
-        counts['agent-applications'] = agentApps.filter(a => a.status === 'pending').length;
-      }
-      // withdrawals: 提现审批
-      if (results[2].status === 'fulfilled') {
-        const ws = results[2].value.withdrawals || [];
-        counts['withdrawals'] = ws.filter(w => w.status === 'pending').length;
-      }
-      // kyc: 实名审核
-      if (results[3].status === 'fulfilled') {
-        const kyc = results[3].value.users || [];
-        counts['kyc'] = kyc.filter(u => u.kyc_status === 'pending').length;
-      }
       // franchise-applications: 换电站加盟审批
       if (results[4].status === 'fulfilled') {
         const fApps = results[4].value.applications || [];
-        counts['franchise-applications'] = fApps.filter(a => a.status === 'pending').length;
+        counts['franchise-applications'] = getCachedPendingCount(fApps, 'franchise-application');
       }
+      // 用 localStorage 缓存修正所有因读副本延迟而滞后的 tab badge 计数
+      counts['applications'] = getCachedPendingCount(results[0].status === 'fulfilled' ? (results[0].value.applications || []) : [], 'application');
+      counts['agent-applications'] = getCachedPendingCount(results[1].status === 'fulfilled' ? (results[1].value.applications || []) : [], 'agent-application');
+      counts['withdrawals'] = getCachedPendingCount(results[2].status === 'fulfilled' ? (results[2].value.withdrawals || []) : [], 'withdrawal');
+      counts['kyc'] = getKycCachedPendingCount(results[3].status === 'fulfilled' ? (results[3].value.users || []) : []);
       setPendingCounts(counts);
     } catch (e) { /* silent */ }
   };
@@ -574,11 +594,25 @@ export default function Admin() {
     finally { setLoading(false); }
   };
 
+  // 通用：将审批结果写入 localStorage 缓存，防止副本延迟导致刷新后回退
+  const saveReviewToCache = (id, status, type) => {
+    try {
+      const raw = localStorage.getItem('admin_review_cache');
+      const cache = raw ? JSON.parse(raw) : {};
+      cache[`${type}:${id}`] = { status, timestamp: Date.now() };
+      localStorage.setItem('admin_review_cache', JSON.stringify(cache));
+    } catch {}
+  };
+
   const handleReviewApplication = async (id, status) => {
     try {
-      await adminAPI.reviewApplication(id, { status, reviewed_by: user?.id });
+      const res = await adminAPI.reviewApplication(id, { status, reviewed_by: user?.id });
+      // 用 API 返回值直接更新 state，绕过读副本延迟
+      if (res?.application) {
+        setApplications(prev => prev.map(a => a.id === id ? { ...a, ...res.application } : a));
+      }
+      saveReviewToCache(id, status, 'application');
       alert(`已${status === 'approved' ? '批准' : '拒绝'}申请`);
-      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 
@@ -589,28 +623,37 @@ export default function Admin() {
       return;
     }
     try {
-      await adminAPI.reviewKyc(userId, { status });
+      const res = await adminAPI.reviewKyc(userId, { status });
+      if (res?.user) {
+        setKycUsers(prev => prev.map(u => u.id === userId ? { ...u, ...res.user } : u));
+      }
+      saveReviewToCache(userId, status, 'kyc');
       alert('已通过实名认证');
-      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 
   const confirmKycReject = async () => {
     if (!rejectReason) { alert('请选择驳回原因'); return; }
     try {
-      await adminAPI.reviewKyc(rejectingKycUser, { status: 'kyc_rejected', rejection_reason: rejectReason });
+      const res = await adminAPI.reviewKyc(rejectingKycUser, { status: 'kyc_rejected', rejection_reason: rejectReason });
+      if (res?.user) {
+        setKycUsers(prev => prev.map(u => u.id === rejectingKycUser ? { ...u, ...res.user } : u));
+      }
+      saveReviewToCache(rejectingKycUser, 'kyc_rejected', 'kyc');
       alert('已驳回实名认证');
       setRejectingKycUser(null);
       setRejectReason('');
-      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 
   const handleReviewAgentApplication = async (id, status) => {
     try {
-      await adminAPI.reviewAgentApplication(id, { status, reviewed_by: user?.id });
+      const res = await adminAPI.reviewAgentApplication(id, { status, reviewed_by: user?.id });
+      if (res?.application) {
+        setAgentApplications(prev => prev.map(a => a.id === id ? { ...a, ...res.application } : a));
+      }
+      saveReviewToCache(id, status, 'agent-application');
       alert(`已${status === 'approved' ? '批准' : '拒绝'}代理申请`);
-      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 
@@ -621,9 +664,12 @@ export default function Admin() {
         const reason = prompt('驳回原因（可选）:');
         if (reason !== null) payload.reason = reason;
       }
-      await adminAPI.reviewWithdrawal(id, payload);
+      const res = await adminAPI.reviewWithdrawal(id, payload);
+      if (res?.withdrawal) {
+        setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, ...res.withdrawal } : w));
+      }
+      saveReviewToCache(id, action === 'approve' ? 'approved' : 'rejected', 'withdrawal');
       alert(`已${action === 'approve' ? '通过' : '驳回'}提现申请`);
-      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 

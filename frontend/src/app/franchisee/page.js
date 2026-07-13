@@ -1300,8 +1300,23 @@ export default function Franchisee() {
 
   const handleReview = async (type, id, status) => {
     try {
-      await agentAPI.reviewApplication(id, { type, status });
-      loadReviewData();
+      const res = await agentAPI.reviewApplication(id, { type, status });
+      // 用 API 返回值直接更新 state，绕过读副本延迟
+      if (res?.application) {
+        setReviewData(prev => {
+          const updated = { ...prev };
+          if (type === 'agent') {
+            updated.agent_applications = (prev.agent_applications || []).map(a =>
+              a.id === id ? { ...a, ...res.application } : a
+            );
+          } else {
+            updated.store_applications = (prev.store_applications || []).map(a =>
+              a.id === id ? { ...a, ...res.application } : a
+            );
+          }
+          return updated;
+        });
+      }
     } catch (err) { alert(err.message || t('franchisee.alert.approvalFailed')); }
   };
 

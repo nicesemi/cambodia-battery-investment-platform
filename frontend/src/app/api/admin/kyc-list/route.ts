@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     const { data: users, error } = await query
     if (error) return serverError(error.message)
 
-    return ok({ users: users || [] })
+    return ok({ users: users || [] }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
   } catch (e: any) {
     return serverError()
   }

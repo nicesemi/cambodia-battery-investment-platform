@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       user: userMap.get(w.user_id) || null,
     }))
 
-    return ok({ withdrawals: enriched })
+    return ok({ withdrawals: enriched }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
   } catch (e: any) {
     return serverError(e.message)
   }

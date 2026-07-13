@@ -19,9 +19,41 @@ export default function FranchiseApplicationsPage() {
   const [submitting, setSubmitting] = useState(false);
   const reviewedRef = useRef({});
 
+  // localStorage-backed review cache — survives page refresh
+  const REVIEW_CACHE_KEY = 'franchise_review_cache';
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  const getReviewCache = () => {
+    try {
+      const raw = localStorage.getItem(REVIEW_CACHE_KEY);
+      if (!raw) return {};
+      const cache = JSON.parse(raw);
+      const now = Date.now();
+      const cleaned = {};
+      Object.entries(cache).forEach(([id, v]) => {
+        if (now - v.timestamp < CACHE_TTL) cleaned[id] = v;
+      });
+      if (Object.keys(cleaned).length !== Object.keys(cache).length) {
+        localStorage.setItem(REVIEW_CACHE_KEY, JSON.stringify(cleaned));
+      }
+      return cleaned;
+    } catch { return {}; }
+  };
+
+  const setReviewCache = (id, status, admin_remark) => {
+    const cache = getReviewCache();
+    cache[id] = { status, admin_remark, timestamp: Date.now() };
+    localStorage.setItem(REVIEW_CACHE_KEY, JSON.stringify(cache));
+  };
+
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
     if (!canAccessAdmin()) { router.push('/'); return; }
+    // Restore ref from localStorage on mount (survives refresh)
+    const cached = getReviewCache();
+    Object.entries(cached).forEach(([id, v]) => {
+      reviewedRef.current[id] = { status: v.status, admin_remark: v.admin_remark };
+    });
     loadApplications();
   }, [user]);
 
@@ -34,14 +66,17 @@ export default function FranchiseApplicationsPage() {
       const apps = (data.applications || []).map(app => {
         const reviewed = reviewedRef.current[app.id];
         if (reviewed) {
-          console.log('[FRONTEND] merge ref for', app.id, 'server.status:', app.status, 'ref.status:', reviewed.status, 'match:', app.status === reviewed.status);
-          if (app.status === reviewed.status) delete reviewedRef.current[app.id];
+          if (app.status === reviewed.status) {
+            delete reviewedRef.current[app.id];
+            // Also clean from localStorage
+            const cache = getReviewCache();
+            delete cache[app.id];
+            localStorage.setItem(REVIEW_CACHE_KEY, JSON.stringify(cache));
+          }
           return { ...app, ...reviewed };
         }
         return app;
       });
-      console.log('[FRONTEND] loaded', apps.length, 'apps, _debug:', data._debug);
-      console.log('[FRONTEND] status per app:', apps.map(a => ({ id: a.id.slice(0,8), status: a.status })));
       setApplications(apps);
     } catch (e) {
       setError(e.message || 'Failed to load applications');
@@ -58,6 +93,7 @@ export default function FranchiseApplicationsPage() {
       // Use PUT response directly — bypass replica lag from subsequent GET
       const updatedApp = res.application;
       reviewedRef.current[reviewModal.id] = { status: updatedApp.status, admin_remark: updatedApp.admin_remark };
+      setReviewCache(reviewModal.id, updatedApp.status, updatedApp.admin_remark);
       setApplications(prev => prev.map(app =>
         app.id === reviewModal.id ? { ...app, ...updatedApp, applicant: app.applicant, template: app.template } : app
       ));

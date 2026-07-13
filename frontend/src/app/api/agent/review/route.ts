@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       agent_id: agent.id,
       agent_applications: agentApplications,
       store_applications: storeApplications,
-    })
+    }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
   } catch (e: any) {
     return serverError()
   }

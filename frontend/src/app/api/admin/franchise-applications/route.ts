@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     const statusDist: Record<string, number> = {}
     applications.forEach(a => { statusDist[a.status] = (statusDist[a.status] || 0) + 1 })
     console.log('[franchise-applications] Found', applications.length, 'applications')
-    return ok({ applications, _debug: { version: 'v3-20260713', total: applications.length, status_distribution: statusDist, sample_ids: applications.slice(0, 5).map(a => ({ id: a.id, status: a.status })) } })
+    return ok({ applications, _debug: { version: 'v3-20260713', total: applications.length, status_distribution: statusDist, sample_ids: applications.slice(0, 5).map(a => ({ id: a.id, status: a.status })) } }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
   } catch (e: any) {
     console.error('[franchise-applications] Unexpected error:', e)
     return serverError('Unexpected error: ' + (e?.message || String(e)))
