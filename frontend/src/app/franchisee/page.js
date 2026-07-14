@@ -40,8 +40,8 @@ const getOrderTypeDisplay = (orderType, t) => {
   const map = {
     '购买': t('franchisee.orders.typePurchase'),
     '出售': t('franchisee.orders.typeSell'),
-    '投资者绑定': t('franchisee.orders.typeInvestorBinding'),
-    '代理商绑定': t('franchisee.orders.typeAgentBinding'),
+    'investor_binding': t('franchisee.orders.typeInvestorBinding'),
+    'agent_binding': t('franchisee.orders.typeAgentBinding'),
     '线上订单': t('franchisee.orders.typeOnline'),
     '门店订单': t('franchisee.orders.typeStore'),
   };
@@ -1803,7 +1803,7 @@ export default function Franchisee() {
                   <table className="w-full text-sm"><thead className="bg-gray-50"><tr><th className="text-left p-3">{t('franchisee.orders.orderType')}</th><th className="text-left p-3">{t('franchisee.orders.asset')}</th><th className="text-left p-3">{t('franchisee.orders.store')}</th><th className="text-right p-3">{t('franchisee.orders.quantity')}</th><th className="text-right p-3">{t('franchisee.earnings.purchaseAmount')}</th><th className="text-right p-3">{t('franchisee.calculator.monthlyRentLabel')}</th><th className="text-right p-3">{t('franchisee.orders.purchaseCommission')}</th><th className="text-right p-3">{t('franchisee.orders.rentDividend')}</th><th className="text-right p-3">{t('franchisee.orders.time')}</th></tr></thead>
                     <tbody>{allStoreOrders.slice(0, 10).map(o => (
                       <tr key={o.id} className="border-t"><td className="p-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${o.order_type === '投资者绑定' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${o.order_type === 'investor_binding' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                           {getOrderTypeDisplay(o.order_type, t)}
                         </span>
                       </td><td className="p-3">{resolveI18n(o, 'asset_name_i18n', o.asset_name, i18n) || o.battery_type || '-'}</td><td className="p-3">{o.store?.name || o.store_name || '-'}</td><td className="p-3 text-right">{o.units || 1}</td><td className="p-3 text-right font-medium">{formatCurrency(o.purchase_amount || o.total_amount || o.amount || 0, i18n.language)}</td><td className="p-3 text-right text-gray-600">{formatCurrency(o._monthlyRent || 0, i18n.language)}</td><td className="p-3 text-right font-medium text-green-600">{formatCurrency(o.store_commission || 0, i18n.language)}</td><td className="p-3 text-right font-medium text-blue-600">{formatCurrency(o.revenue_share || 0, i18n.language)}</td><td className="p-3 text-right text-gray-400">{formatDate(o.created_at, i18n.language)}</td></tr>

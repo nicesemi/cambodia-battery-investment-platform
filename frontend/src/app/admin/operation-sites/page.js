@@ -21,7 +21,7 @@ const DEFAULT_FORM = {
   country: '', country_i18n: { ...EMPTY_I18N },
   city: '', city_i18n: { ...EMPTY_I18N },
   address: '', longitude: '', latitude: '',
-  battery_count: '', status: '运营中', site_type: '', contact: '', description: '',
+  battery_count: '', status: 'active', site_type: '', contact: '', description: '',
   battery_type: '', cabinet_slots: '', template_id: '', image_url: ''
 };
 
@@ -118,7 +118,7 @@ export default function OperationSitesPage() {
       address: s.address || '', longitude: s.longitude != null ? String(s.longitude) : '',
       latitude: s.latitude != null ? String(s.latitude) : '',
       battery_count: s.battery_count != null ? String(s.battery_count) : '',
-      status: s.status || '运营中', site_type: s.site_type || '',
+      status: s.status || 'active', site_type: s.site_type || '',
       site_code: s.site_code || '', contact: s.contact || '', description: s.description || '',
       battery_type: s.battery_type || '', cabinet_slots: s.cabinet_slots != null ? String(s.cabinet_slots) : '',
       template_id: s.template_id || '',
@@ -299,7 +299,7 @@ export default function OperationSitesPage() {
                     </td>
                     <td className="p-3 text-center">
                       <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                        s.status === '运营中' ? 'bg-green-100 text-green-700' :
+                        s.status === 'active' ? 'bg-green-100 text-green-700' :
                         s.status === '建设中' ? 'bg-yellow-100 text-yellow-700' :
                         'bg-red-100 text-red-700'
                       }`}>{s.status}</span>
@@ -412,7 +412,7 @@ export default function OperationSitesPage() {
                     <label className="block text-xs font-medium text-gray-600 mb-1">运营状态</label>
                     <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-                      <option value="运营中">{t('adminOs.operational')}</option>
+                      <option value="active">{t('adminOs.operational')}</option>
                       <option value="建设中">建设中</option>
                       <option value="已暂停">已暂停</option>
                     </select>
@@ -454,10 +454,10 @@ export default function OperationSitesPage() {
                       <p className="text-xs text-gray-400 mt-1.5">保存后自动生成</p>
                     )}
                   </div>
-                  {(['4820', '6035', '7250', '72100'].some(p => form.battery_type?.startsWith(p)) || form.site_type?.includes('swap') || form.site_type?.includes('换电')) && (
+                  {(['4820', '6035', '7250', '72100'].some(p => form.battery_type?.startsWith(p)) || form.site_type?.includes('swap')) && (
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">换电柜仓数</label>
-                    {swapTemplates.length > 0 && (form.site_type?.includes('swap') || form.site_type?.includes('换电')) ? (
+                    {swapTemplates.length > 0 && (form.site_type?.includes('swap')) ? (
                       <select value={form.template_id}
                         onChange={e => {
                           const tid = e.target.value;

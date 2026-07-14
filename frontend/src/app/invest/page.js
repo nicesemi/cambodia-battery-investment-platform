@@ -595,7 +595,7 @@ const getPenaltyTierDisplay = (tier, t) => {
 
     if (tmplRes) { try { const d = await tmplRes.json(); setSwapTemplates(d.templates || []); } catch {} }
     if (appRes) { try { const d = await appRes.json(); setFranchiseApplications(d.applications || []); } catch {} }
-    if (storeRes) { try { const d = await storeRes.json(); setFranchiseStores((d.sites || []).filter(s => s.site_type && (s.site_type === 'swap_station' || s.site_type.includes('换电') || s.site_type.includes('swap')))); } catch {} }
+    if (storeRes) { try { const d = await storeRes.json(); setFranchiseStores((d.sites || []).filter(s => s.site_type && (s.site_type === 'swap_station' || s.site_type.includes('swap')))); } catch {} }
     if (myStationsRes) { try { const d = await myStationsRes.json(); setFranchiseSwapStations(d.stations || []); } catch {} }
 
     // 直接从 API 获取最新用户资产数据（避免依赖可能过时的 React state）

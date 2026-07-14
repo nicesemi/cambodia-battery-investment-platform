@@ -184,7 +184,7 @@ export async function POST(request: Request) {
     const longitude = formData.get('longitude') as string
     const latitude = formData.get('latitude') as string
     const battery_count = formData.get('battery_count') as string
-    const status = formData.get('status') as string || '运营中'
+    const status = formData.get('status') as string || 'active'
     const site_type = formData.get('site_type') as string || '标准站'
     const contact = formData.get('contact') as string || null
     const description = formData.get('description') as string || null
@@ -233,7 +233,7 @@ export async function POST(request: Request) {
         longitude: longitude ? parseFloat(longitude) : 0,
         latitude: latitude ? parseFloat(latitude) : 0,
         battery_count: parseInt(battery_count),
-        status: status || '运营中',
+        status: status || 'active',
         site_code,
         site_type: site_type || null,
         contact: contact || null,

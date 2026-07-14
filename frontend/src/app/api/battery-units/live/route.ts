@@ -534,7 +534,7 @@ export async function GET(_request: Request) {
         if (!siteGroups[siteKey]) {
           // 判断是否为换电柜站点
           const cabSite = resolvedSiteId != null ? cabSiteMap[resolvedSiteId] : null
-          const isCabinetSite = cabSite || (site.site_type && String(site.site_type).includes('换电'))
+          const isCabinetSite = cabSite || (site.site_type && String(site.site_type).includes('swap_station'))
 
           const cabFromDb = cabSite?.cabinet_slots != null ? true : false
 

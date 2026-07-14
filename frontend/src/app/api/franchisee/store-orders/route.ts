@@ -327,7 +327,7 @@ export async function GET(request: Request) {
         ...o,
         store_name: storeInfo?.name || '未知门店',
         store_code: storeInfo?.store_code || '',
-        order_type: '投资者绑定',
+        order_type: 'investor_binding',
         asset_name: asset?.name || '—',
         asset_name_i18n: asset?.name_i18n,
         battery_type: asset?.battery_type || '—',
