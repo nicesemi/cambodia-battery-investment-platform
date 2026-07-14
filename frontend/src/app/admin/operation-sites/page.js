@@ -295,7 +295,7 @@ export default function OperationSitesPage() {
                       {s.site_type ? (() => { const st = siteTypes.find(t => t.name === s.site_type); return st ? (st.name_i18n?.[i18n.language] || st.name_i18n?.['zh-CN'] || st.name) : s.site_type; })() : '-'}
                     </td>
                     <td className="p-3 text-center text-gray-500 text-xs">
-                      {['4820', '6035', '7250', '72100'].some(p => s.battery_type?.startsWith(p)) && s.cabinet_slots != null ? s.cabinet_slots : '-'}
+                      {(s.cabinet_slots != null && (['4820', '6035', '7250', '72100'].some(p => s.battery_type?.startsWith(p)) || s.site_type === 'swap_station' || s.site_type === '换电站')) ? s.cabinet_slots : '-'}
                     </td>
                     <td className="p-3 text-center">
                       <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${

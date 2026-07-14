@@ -38,12 +38,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (error) return serverError(error.message)
     if (!application) return notFound('Application not found')
 
-    // DEBUG: verify the update actually persisted by re-fetching
-    const { data: verifyApp } = await adminClient
-      .from('franchise_applications')
-      .select('id, status')
-      .eq('id', id)
-      .single()
+    // Retry verification: re-fetch to confirm status persisted (up to 3 retries with 200ms delay)
+    let verifyApp: any = null
+    for (let retry = 0; retry < 3; retry++) {
+      const { data: v } = await adminClient
+        .from('franchise_applications')
+        .select('id, status')
+        .eq('id', id)
+        .single()
+      verifyApp = v
+      if (verifyApp && verifyApp.status === status) break
+      if (retry < 2) await new Promise(r => setTimeout(r, 200))
+    }
+    console.log('[DEBUG PUT] verification after retries - verifyApp.status:', verifyApp?.status, 'expected:', status)
 
     // Fetch template data separately
     let template = null
@@ -87,7 +94,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
       const siteData = {
         name: `${application.location} 加盟换电站`,
-        site_type: 'swap_station',
+        site_type: '换电站',
         template_id: application.template_id,
         cabinet_slots: cabinetSlots,
         battery_count: 0,
