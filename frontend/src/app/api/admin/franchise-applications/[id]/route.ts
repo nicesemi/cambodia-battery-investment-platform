@@ -98,9 +98,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
       const siteCode = `${prefix}${String(nextSeq).padStart(3, '0')}`
 
-      // cabinet_slots = cabinet_count * 12（每仓12槽）
+      // cabinet_slots 存储换电柜数量（仓数）
       const cabinetCount = template?.cabinet_count ?? application.cabinet_count ?? 1
-      const cabinetSlots = cabinetCount * 12
+      const cabinetSlots = cabinetCount
 
       const siteData = {
         name: `${application.location} 加盟换电站`,
