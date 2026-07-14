@@ -1,4 +1,4 @@
-import { supabase, getSupabaseAdmin } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { ok, serverError } from '@/lib/response'
 
 export const dynamic = 'force-dynamic'
@@ -212,10 +212,11 @@ export async function GET(_request: Request) {
         .from('warehouses')
         .select('id, warehouse_code, name, address, created_at'),
 
-      // 1d. 全部运营站点（用 admin 绕过 RLS 以读取加盟站点）
-      getSupabaseAdmin()
+      // 1d. 全部运营站点（仅 is_active=true 的有效站点，排除已关闭/维护/待建等）
+      supabase
         .from('operation_sites')
-        .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n, cabinet_slots, battery_count'),
+        .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n, cabinet_slots, battery_count')
+        .eq('is_active', true),
     ])
 
     const { data: unitsRaw, error: unitsError } = assignedResult
@@ -268,20 +269,22 @@ export async function GET(_request: Request) {
     // 第 3 批：并行查询 — 站点（ID + Name）/ 资产
     // ═══════════════════════════════════════════════════════
     const [sitesResult, sitesByNameResult, assetsResult] = await Promise.all([
-      // 已分配电池所在站点（按 site_id）
+      // 已分配电池所在站点（按 site_id）- 仅 is_active 有效站点
       assignedSiteIds.length > 0
-        ? getSupabaseAdmin()
+        ? supabase
             .from('operation_sites')
             .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n')
             .in('id', assignedSiteIds)
+            .eq('is_active', true)
         : Promise.resolve({ data: [], error: null }),
 
-      // 已售电池通过 site_name 匹配站点
+      // 已售电池通过 site_name 匹配站点 - 仅 is_active 有效站点
       soldSiteNames.length > 0
-        ? getSupabaseAdmin()
+        ? supabase
             .from('operation_sites')
             .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n')
             .in('name', soldSiteNames)
+            .eq('is_active', true)
         : Promise.resolve({ data: [], error: null }),
 
       // 所有关联的 battery_assets
