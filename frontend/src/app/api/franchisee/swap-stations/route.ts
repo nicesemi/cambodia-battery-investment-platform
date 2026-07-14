@@ -9,8 +9,8 @@ export async function GET(request: Request) {
     const user = await authenticateToken(request)
     if (!user) return unauthorized()
 
-    if (user.role !== 'franchisee' && user.role !== 'admin' && user.role !== 'operator') {
-      return unauthorized('Franchisee only')
+    if (user.role !== 'franchisee' && user.role !== 'admin' && user.role !== 'operator' && user.role !== 'investor') {
+      return unauthorized('Access denied')
     }
 
     const adminClient = getSupabaseAdmin()
@@ -52,10 +52,8 @@ export async function GET(request: Request) {
     // 通过 name 中的 location 匹配加盟申请
     const franchiseLocations = (franchiseApps || []).map((a: any) => a.location).filter(Boolean)
     const matchedSites = (sites || []).filter((s: any) => {
-      if (!s.name) return false
-      return franchiseLocations.some((loc: string) =>
-        s.name.includes(loc) || s.name.includes('加盟换电站')
-      )
+      if (!s.name || franchiseLocations.length === 0) return false
+      return franchiseLocations.some((loc: string) => s.name.includes(loc))
     })
 
     const stations = matchedSites
