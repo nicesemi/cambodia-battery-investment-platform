@@ -25,10 +25,10 @@ export async function GET(request: Request) {
     if (unitCodes.length > 0) {
       const { data: batteryData } = await supabase.from('battery_units')
         .select('id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude')
-        .in('unit_code', unitCodes)
+        .in('id', unitCodes)
       if (batteryData) {
         for (const bu of batteryData) {
-          batteryMap[bu.unit_code] = bu
+          batteryMap[bu.id] = bu
         }
       }
     }

@@ -143,9 +143,13 @@ export async function GET(request: Request) {
         const typeMatchKey = `${s.id}|${siteBt}`
         const dispatchedOfType = dispatchedTypeMap[typeMatchKey] || 0
         // resolve display_name from name_i18n (zh-CN first), fallback to name
-        const i18n = s.name_i18n
+        const parseJSON = (v: any) => {
+          if (typeof v === 'string') { try { return JSON.parse(v); } catch {} return v; }
+          return v;
+        };
+        const i18n = parseJSON(s.name_i18n)
         const displayName = (i18n && typeof i18n === 'object' && i18n['zh-CN']) || s.name || ''
-        const cI18n = s.city_i18n
+        const cI18n = parseJSON(s.city_i18n)
         const displayCity = (cI18n && typeof cI18n === 'object' && cI18n['zh-CN']) || s.city || ''
         return {
           id: s.id,
