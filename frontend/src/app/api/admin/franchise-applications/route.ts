@@ -14,18 +14,21 @@ export async function GET(request: Request) {
 
     const adminClient = getSupabaseAdmin()
 
-    // Step 1: Query franchise_applications without joins (known to work)
+    // Step 1: Query franchise_applications — compare select('*') vs select('id,status')
     const { data: apps, error } = await adminClient
       .from('franchise_applications')
       .select('*')
       .order('created_at', { ascending: false })
 
+    // Parallel query with explicit columns (same as debug endpoint)
+    const { data: appsExplicit } = await adminClient
+      .from('franchise_applications')
+      .select('id, status, user_id, created_at')
+      .order('created_at', { ascending: false })
+
     console.log('[DEBUG GET] raw apps count:', apps?.length, 'error:', error)
     if (apps && apps.length > 0) {
       console.log('[DEBUG GET] first app id:', apps[0].id, 'status:', apps[0].status)
-      const pendingApps = apps.filter(a => a.status === 'pending')
-      const rejectedApps = apps.filter(a => a.status === 'rejected')
-      console.log('[DEBUG GET] pending:', pendingApps.length, 'rejected:', rejectedApps.length)
     }
 
     if (error) {
@@ -108,16 +111,18 @@ export async function GET(request: Request) {
 
     // Extended debug: include raw app statuses and review_log statuses for cross-verification
     const debugRawApps = apps.map(a => ({ id: a.id, status: a.status }))
+    const debugExplicitApps = (appsExplicit || []).map(a => ({ id: a.id, status: a.status }))
     const debugReviewLogs = (reviewLogs || []).map(l => ({ application_id: l.application_id, status: l.status }))
 
     return ok({
       applications,
       _debug: {
-        version: 'v5-debug-20260714',
+        version: 'v6-debug-20260714',
         supabase_url: process.env.NEXT_PUBLIC_SUPABASE_URL || '(not set)',
         has_service_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
         total: applications.length,
-        raw_app_statuses: debugRawApps,
+        raw_app_statuses_select_star: debugRawApps,
+        raw_app_statuses_explicit: debugExplicitApps,
         review_log_statuses: debugReviewLogs,
         merged_status_distribution: statusDist,
       }
