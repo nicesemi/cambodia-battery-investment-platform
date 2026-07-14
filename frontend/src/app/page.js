@@ -521,7 +521,7 @@ function BatteryNetworkSection({ amapReady }) {
   const fixedKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '固定储能柜' || st.name === '固定储能柜')?.name || '固定储能柜', [siteTypes]);
 
   const swapSites = useMemo(() => {
-    return (batteryLive.sites || []).filter(s => s.site_type === swapKey || s.site_type === 'swap_station');
+    return (batteryLive.sites || []).filter(s => s.site_type === swapKey);
   }, [batteryLive.sites, swapKey]);
 
   const lineSites = useMemo(() => {
@@ -656,7 +656,7 @@ function BatteryNetworkSection({ amapReady }) {
               setActiveTab(0);
             }
           } else {
-            const swapSitesList = (batteryLive.sites || []).filter(s => !s.site_type || s.site_type === swapKeyInner || s.site_type === 'swap_station');
+            const swapSitesList = (batteryLive.sites || []).filter(s => s.site_type === swapKeyInner);
             const matchedSite = swapSitesList.find(s => s.site_name === bu.site_name);
             if (matchedSite) setSelectedCabinetSite(matchedSite);
             setActiveTab(0);

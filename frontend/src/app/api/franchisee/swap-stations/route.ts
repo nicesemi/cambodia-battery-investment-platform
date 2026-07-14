@@ -118,7 +118,7 @@ export async function GET(request: Request) {
       .from('operation_sites')
       .select('*')
       .eq('is_active', true)
-      .or('site_type.eq.swap_station,site_type.eq.换电站')
+      .or('site_type.eq.swap_station')
 
     if (siteErr) return serverError(siteErr.message)
 
