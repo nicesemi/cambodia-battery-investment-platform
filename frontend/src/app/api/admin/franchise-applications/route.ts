@@ -62,7 +62,7 @@ export async function GET(request: Request) {
         .from('operation_sites')
         .select('name, site_code')
         .eq('is_active', true)
-        .or('site_type.eq.swap_station,site_type.eq.换电站')
+        .or('site_type.eq.swap_station')
       if (sites) {
         for (const a of approvedApps) {
           const match = sites.find((s: any) => s.name && s.name.includes(a.location))
