@@ -515,10 +515,10 @@ function BatteryNetworkSection({ amapReady }) {
     return map;
   }, [siteTypes]);
 
-  const swapKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '换电站' || st.name === '换电站')?.name || '换电站', [siteTypes]);
-  const lineKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '运营线路' || st.name === '运营线路')?.name || '运营线路', [siteTypes]);
-  const mobileKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '移动储能柜' || st.name === '移动储能柜')?.name || '移动储能柜', [siteTypes]);
-  const fixedKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '固定储能柜' || st.name === '固定储能柜')?.name || '固定储能柜', [siteTypes]);
+  const swapKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '换电站' || st.name === 'swap_station')?.name || 'swap_station', [siteTypes]);
+  const lineKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '运营线路' || st.name === 'operation_line')?.name || 'operation_line', [siteTypes]);
+  const mobileKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '移动储能柜' || st.name === 'mobile_ess')?.name || 'mobile_ess', [siteTypes]);
+  const fixedKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '固定储能柜' || st.name === 'fixed_ess')?.name || 'fixed_ess', [siteTypes]);
 
   const swapSites = useMemo(() => {
     return (batteryLive.sites || []).filter(s => s.site_type === swapKey);
@@ -617,10 +617,10 @@ function BatteryNetworkSection({ amapReady }) {
       });
       marker.on('click', () => {
         map.setZoomAndCenter(14, [bu.longitude, bu.latitude]);
-        const lineKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '运营线路' || st.name === '运营线路')?.name || '运营线路';
-        const mobileKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '移动储能柜' || st.name === '移动储能柜')?.name || '移动储能柜';
-        const fixedKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '固定储能柜' || st.name === '固定储能柜')?.name || '固定储能柜';
-        const swapKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '换电站' || st.name === '换电站')?.name || '换电站';
+        const lineKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '运营线路' || st.name === 'operation_line')?.name || 'operation_line';
+        const mobileKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '移动储能柜' || st.name === 'mobile_ess')?.name || 'mobile_ess';
+        const fixedKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '固定储能柜' || st.name === 'fixed_ess')?.name || 'fixed_ess';
+        const swapKeyInner = siteTypes.find(st => st.name_i18n?.['zh-CN'] === '换电站' || st.name === 'swap_station')?.name || 'swap_station';
         if (bu.unit_code && (bu.unit_code.startsWith('BAT-BUS') || bu.unit_code.startsWith('BAT-TRUCK'))) {
           // Vehicle battery: find matching lineSite, set selectedLineSite + selectedVehicle
           const lineSitesFiltered = (batteryLive.sites || []).filter(s => s.site_type && s.site_type === lineKeyInner);
