@@ -4,6 +4,79 @@ import { ok, unauthorized, serverError } from '@/lib/response'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * 基于真实电池单元数据构建换电柜槽位
+ * 对齐首页 /api/battery-units/live 的 buildCabinetSlots 模式
+ *
+ * @param slotCount  - 总槽位数（来自 operation_sites.cabinet_slots）
+ * @param units      - 已分配到此站点的真实电池单元数组（带 sensor 数据）
+ * @param occupiedCount - 据库记录的已占用槽位数（operation_sites.battery_count）
+ *
+ * 槽位分配规则：
+ *   1. 前 units.length 个槽位 = 真实电池单元传感器数据
+ *   2. 接下来 (occupiedCount - units.length) 个槽位 = 占位数据（无真实 sensor）
+ *   3. 剩余 (slotCount - occupiedCount) 个槽位 = 空闲
+ */
+function buildCabinetSlots(
+  slotCount: number,
+  units: any[],
+  occupiedCount?: number,
+): Array<Record<string, unknown>> {
+  const slots: Array<Record<string, unknown>> = []
+  const realUnitCount = units.length
+  const effectiveOccupied = Math.max(realUnitCount, occupiedCount ?? realUnitCount)
+
+  for (let i = 1; i <= slotCount; i++) {
+    const unitIndex = i - 1
+
+    if (unitIndex < realUnitCount) {
+      // 真实电池单元
+      const unit = units[unitIndex]
+      const soc = unit.soc ?? null
+      slots.push({
+        slot_number: i,
+        status: 'occupied',
+        battery_unit_code: unit.unit_code || null,
+        sensor_battery_level: soc,
+        sensor_temperature: unit.temperature ?? null,
+        sensor_voltage: typeof unit.voltage === 'string' ? parseFloat(unit.voltage) || null : (unit.voltage ?? null),
+        sensor_current: null,
+        charging: unit.status === 'normal' && soc !== null && soc < 80,
+        last_swap_time: unit.last_maintenance || null,
+      })
+    } else if (unitIndex < effectiveOccupied) {
+      // 占位数据（已占用但无真实电池单元分配）
+      slots.push({
+        slot_number: i,
+        status: 'occupied',
+        battery_unit_code: null,
+        sensor_battery_level: null,
+        sensor_temperature: null,
+        sensor_voltage: null,
+        sensor_current: null,
+        charging: false,
+        last_swap_time: null,
+      })
+    } else {
+      // 空闲槽位
+      slots.push({
+        slot_number: i,
+        status: 'empty',
+      })
+    }
+  }
+  return slots
+}
+
+/** 从 operation_sites 读取 cabinet_slots 整数，fallback=6 */
+function getSlotCount(site: any): number {
+  if (site && site.cabinet_slots != null) {
+    const val = typeof site.cabinet_slots === 'number' ? site.cabinet_slots : parseInt(String(site.cabinet_slots))
+    if (!isNaN(val) && val > 0) return val
+  }
+  return 6
+}
+
 export async function GET(request: Request) {
   try {
     const user = await authenticateToken(request)
@@ -15,7 +88,7 @@ export async function GET(request: Request) {
 
     const adminClient = getSupabaseAdmin()
 
-    // 1. 获取当前用户已审批的加盟申请
+    // 1. 获取当前用户已审批的加盟申请（提取 location）
     const { data: franchiseApps, error: appErr } = await adminClient
       .from('franchise_applications')
       .select('id, location')
@@ -39,8 +112,8 @@ export async function GET(request: Request) {
       return ok({ stations: [] })
     }
 
-    // 2. 查询 operation_sites（无 franchise_application_id 列，用 name 模式匹配）
-    // name 格式：{location}加盟换电站
+    // 2. 通过 name 中的 location 匹配 operation_sites
+    const franchiseLocations = (franchiseApps || []).map((a: any) => a.location).filter(Boolean)
     const { data: sites, error: siteErr } = await adminClient
       .from('operation_sites')
       .select('*')
@@ -49,17 +122,17 @@ export async function GET(request: Request) {
 
     if (siteErr) return serverError(siteErr.message)
 
-    // 通过 name 中的 location 匹配加盟申请
-    const franchiseLocations = (franchiseApps || []).map((a: any) => a.location).filter(Boolean)
     const matchedSites = (sites || []).filter((s: any) => {
       if (!s.name || franchiseLocations.length === 0) return false
       return franchiseLocations.some((loc: string) => s.name.includes(loc))
     })
 
-    const stations = matchedSites
+    if (matchedSites.length === 0) {
+      return ok({ stations: [] })
+    }
 
-    // 3. 补充模板数据（用于生成占位槽位）
-    const templateIds = [...new Set(stations.map((s: any) => s.template_id).filter(Boolean))]
+    // 3. 批量查询模板数据
+    const templateIds = [...new Set(matchedSites.map((s: any) => s.template_id).filter(Boolean))]
     const templateMap: Record<string, any> = {}
     if (templateIds.length > 0) {
       const { data: templates } = await adminClient
@@ -71,42 +144,33 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. 丰富站点数据：解析 cabinet_slots，或根据模板生成占位槽位
-    const enriched = stations.map((site: any) => {
-      let slots = []
-      const rawSlots = site.cabinet_slots
-      if (Array.isArray(rawSlots) && rawSlots.length > 0) {
-        slots = rawSlots
-      } else if (typeof rawSlots === 'string') {
-        try { slots = JSON.parse(rawSlots) } catch { slots = [] }
-      }
+    // 4. 逐个站点查询真实电池单元并构建槽位数组
+    const enriched = await Promise.all(
+      matchedSites.map(async (site: any) => {
+        const slotCount = getSlotCount(site)
 
-      // 如果有 cabinet_slots 数据就用，否则根据 cabinet_count 和 template 生成占位槽位
-      if (!Array.isArray(slots) || slots.length === 0) {
-        const template = templateMap[site.template_id]
-        const cabinetCount = site.cabinet_count || template?.cabinet_count || 1
-        const batteryCount = site.battery_count ?? 0
-        // 每个仓默认 12 个槽位（参考 swap_station_templates 常见设计）
-        const slotsPerCabinet = template?.slots_per_cabinet || 12
-        const totalSlots = cabinetCount * slotsPerCabinet
+        // 查询分配到此站点的真实电池单元（带 sensor 数据）
+        const { data: units } = await adminClient
+          .from('battery_units')
+          .select('unit_code, soc, temperature, voltage, status, last_maintenance')
+          .eq('site_id', site.id)
+          .order('unit_code', { ascending: true })
 
-        slots = []
-        for (let i = 0; i < totalSlots; i++) {
-          slots.push({
-            slot_number: i + 1,
-            status: i < batteryCount ? 'occupied' : 'empty',
-            battery_unit_code: null,
-            charging: false,
-          })
+        const cabinetSlots = buildCabinetSlots(
+          slotCount,
+          units || [],
+          site.battery_count ?? 0,
+        )
+
+        // 只返回 operation_sites 和模板的有效字段，不暴露原始 cabinet_slots 整数
+        const { cabinet_slots: _, ...siteRest } = site
+        return {
+          ...siteRest,
+          cabinet_slots: cabinetSlots,
+          template: templateMap[site.template_id] || null,
         }
-      }
-
-      return {
-        ...site,
-        cabinet_slots: slots,
-        template: templateMap[site.template_id] || null,
-      }
-    })
+      }),
+    )
 
     return ok({ stations: enriched })
   } catch (e: any) {

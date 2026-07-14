@@ -81,11 +81,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
       const siteCode = `${prefix}${String(nextSeq).padStart(3, '0')}`
 
+      // cabinet_slots = cabinet_count * 12（每仓12槽）
+      const cabinetCount = template?.cabinet_count ?? application.cabinet_count ?? 1
+      const cabinetSlots = cabinetCount * 12
+
       const siteData = {
         name: `${application.location} 加盟换电站`,
         site_type: 'swap_station',
         template_id: application.template_id,
-        cabinet_count: template ? template.cabinet_count : application.cabinet_count,
+        cabinet_slots: cabinetSlots,
         battery_count: 0,
         longitude: template?.gps_lng || 0,
         latitude: template?.gps_lat || 0,
