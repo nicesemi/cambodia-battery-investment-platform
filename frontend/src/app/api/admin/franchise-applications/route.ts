@@ -54,11 +54,31 @@ export async function GET(request: Request) {
     const userMap = new Map((userRes.data || []).map(u => [u.id, u]))
     const templateMap = new Map((templateRes.data || []).map(t => [t.id, t]))
 
-    // Step 4: Merge
+    // Step 4: Query operation_sites to get site_code for approved applications
+    const approvedApps = apps.filter(a => a.status === 'approved')
+    let siteCodeMap: Map<string, string> = new Map()
+    if (approvedApps.length > 0) {
+      const { data: sites } = await adminClient
+        .from('operation_sites')
+        .select('name, site_code')
+        .eq('is_active', true)
+        .eq('site_type', 'swap_station')
+      if (sites) {
+        for (const a of approvedApps) {
+          const match = sites.find((s: any) => s.name && s.name.includes(a.location))
+          if (match?.site_code) {
+            siteCodeMap.set(a.id, match.site_code)
+          }
+        }
+      }
+    }
+
+    // Step 5: Merge
     const applications = apps.map(app => ({
       ...app,
       applicant: userMap.get(app.user_id) || null,
       template: templateMap.get(app.template_id) || null,
+      site_code: siteCodeMap.get(app.id) || null,
     }))
 
     // DEBUG: status distribution

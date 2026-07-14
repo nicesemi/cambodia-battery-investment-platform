@@ -58,6 +58,29 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     // When approved, create operation_site record
     if (status === 'approved') {
+      // Generate unique site_code: SW-YYYYMMDD-XXX
+      const today = new Date()
+      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
+      const prefix = `SW-${dateStr}-`
+
+      // Query existing site_codes with today's prefix to determine next sequence
+      const { data: existingCodes } = await adminClient
+        .from('operation_sites')
+        .select('site_code')
+        .like('site_code', `${prefix}%`)
+        .order('site_code', { ascending: false })
+        .limit(1)
+
+      let nextSeq = 1
+      if (existingCodes && existingCodes.length > 0) {
+        const lastCode = existingCodes[0].site_code || ''
+        const lastSeqMatch = lastCode.match(/-(\d{3})$/)
+        if (lastSeqMatch) {
+          nextSeq = parseInt(lastSeqMatch[1], 10) + 1
+        }
+      }
+      const siteCode = `${prefix}${String(nextSeq).padStart(3, '0')}`
+
       const siteData = {
         name: `${application.location} 加盟换电站`,
         site_type: 'swap_station',
@@ -71,17 +94,21 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         country: '柬埔寨',
         city: application.location,
         address: application.location,
-        franchise_application_id: id,
+        site_code: siteCode,
       }
 
-      console.log('[franchise-review] Creating operation_site:', JSON.stringify(siteData, null, 2))
+      console.log('[franchise-review] Creating operation_site with site_code:', siteCode, JSON.stringify(siteData, null, 2))
 
-      const { error: siteErr } = await adminClient
+      const { data: newSite, error: siteErr } = await adminClient
         .from('operation_sites')
         .insert(siteData)
+        .select('id, site_code')
+        .single()
 
       if (siteErr) {
         console.error('Failed to create operation_site for franchise:', siteErr.message)
+      } else if (newSite) {
+        console.log('[franchise-review] Operation site created:', newSite.id, 'site_code:', newSite.site_code)
       }
     }
 

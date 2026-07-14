@@ -172,6 +172,7 @@ export default function FranchiseApplicationsPage() {
                   <th className="text-left p-3">{t('adminFa.applicant')}</th>
                   <th className="text-left p-3">{t('adminFa.location')}</th>
                   <th className="text-center p-3">{t('adminFa.template')}</th>
+                  <th className="text-center p-3">站点编号</th>
                   <th className="text-center p-3">{t('adminFa.cabinetCount')}</th>
                   <th className="text-center p-3">{t('adminFa.battery4820')}</th>
                   <th className="text-center p-3">{t('adminFa.battery6035')}</th>
@@ -194,6 +195,9 @@ export default function FranchiseApplicationsPage() {
                     <td className="p-3 text-xs">{app.location}</td>
                     <td className="p-3 text-center text-xs">
                       {app.template?.name || '-'}
+                    </td>
+                    <td className="p-3 text-center font-mono text-xs text-blue-700">
+                      {app.site_code || '-'}
                     </td>
                     <td className="p-3 text-center font-semibold text-xs">{app.cabinet_count}</td>
                     <td className="p-3 text-center text-xs">{app.matched_battery_4820}</td>

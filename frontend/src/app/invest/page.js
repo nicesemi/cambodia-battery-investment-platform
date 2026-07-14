@@ -230,6 +230,7 @@ function InvestContent() {
   const [myBatteryCounts, setMyBatteryCounts] = useState({ 4820: 0, 6035: 0, 7250: 0 });
   const [franchiseStores, setFranchiseStores] = useState([]);
   const [franchiseSwapStations, setFranchiseSwapStations] = useState([]);
+  const [expandedStationIds, setExpandedStationIds] = useState(new Set());
 
 const getTxRemark = (tx, t, i18n) => {
   // 优先使用 DB 中的 remark_i18n（多语言），其次 remark（纯文本），否则基于 type 做 i18n
@@ -1513,16 +1514,50 @@ const getPenaltyTierDisplay = (tier, t) => {
               <div className="bg-white rounded-xl border p-6 mt-6">
                 <h3 className="font-bold text-lg mb-4">我的换电站</h3>
                 <div className="grid md:grid-cols-2 gap-4">
-                  {franchiseSwapStations.map(station => (
-                    <div key={station.id} className="border rounded-lg p-4">
-                      <p className="font-medium text-sm mb-2">{station.name || station.location}</p>
-                      <CabinetDiagram site={station} SensorCard={null} compact={true} />
-                      <div className="mt-2 text-xs text-gray-500">
-                        <span>槽位数: {station.cabinet_slots || station.slots || 0}</span>
-                        <span className="ml-4"> {station.battery_count !== undefined ? `${station.battery_count} 块电池` : ''}</span>
+                  {franchiseSwapStations.map(station => {
+                    const isExpanded = expandedStationIds.has(station.id);
+                    const toggleExpand = () => {
+                      setExpandedStationIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(station.id)) next.delete(station.id);
+                        else next.add(station.id);
+                        return next;
+                      });
+                    };
+                    return (
+                      <div key={station.id} className="border rounded-lg overflow-hidden">
+                        <button
+                          onClick={toggleExpand}
+                          className="w-full text-left p-4 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                        >
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              {station.site_code && (
+                                <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                  {station.site_code}
+                                </span>
+                              )}
+                              <p className="font-medium text-sm truncate">{station.name || station.location}</p>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {station.city || station.location || ''}
+                              {station.city ? ' · ' : ''}
+                              仓数: {station.template?.cabinet_count || station.cabinet_count || 0}
+                              {station.battery_count !== undefined ? ` · ${station.battery_count} 块电池` : ''}
+                            </p>
+                          </div>
+                          <span className="text-gray-400 text-xs ml-2 shrink-0">
+                            {isExpanded ? '收起 ▲' : '展开 ▼'}
+                          </span>
+                        </button>
+                        {isExpanded && (
+                          <div className="border-t px-4 pb-4">
+                            <CabinetDiagram site={station} SensorCard={null} compact={true} />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
