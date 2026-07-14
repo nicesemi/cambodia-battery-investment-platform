@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { ok, serverError } from '@/lib/response'
 
 export const dynamic = 'force-dynamic'
@@ -212,8 +212,8 @@ export async function GET(_request: Request) {
         .from('warehouses')
         .select('id, warehouse_code, name, address, created_at'),
 
-      // 1d. 全部运营站点（用于四分类 Tab：换电站/运营线路/移动储能柜/固定储能柜）
-      supabase
+      // 1d. 全部运营站点（用 admin 绕过 RLS 以读取加盟站点）
+      getSupabaseAdmin()
         .from('operation_sites')
         .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n, cabinet_slots, battery_count'),
     ])
@@ -268,17 +268,17 @@ export async function GET(_request: Request) {
     // 第 3 批：并行查询 — 站点（ID + Name）/ 资产
     // ═══════════════════════════════════════════════════════
     const [sitesResult, sitesByNameResult, assetsResult] = await Promise.all([
-      // 已分配电池所在站点（按 site_id）
+      // 已分配电池所在站点（按 site_id）- 用 admin 绕过 RLS
       assignedSiteIds.length > 0
-        ? supabase
+        ? getSupabaseAdmin()
             .from('operation_sites')
             .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n')
             .in('id', assignedSiteIds)
         : Promise.resolve({ data: [], error: null }),
 
-      // 已售电池通过 site_name 匹配站点
+      // 已售电池通过 site_name 匹配站点 - 用 admin 绕过 RLS
       soldSiteNames.length > 0
-        ? supabase
+        ? getSupabaseAdmin()
             .from('operation_sites')
             .select('id, name, name_i18n, site_code, site_type, latitude, longitude, city, country, country_i18n, city_i18n')
             .in('name', soldSiteNames)
