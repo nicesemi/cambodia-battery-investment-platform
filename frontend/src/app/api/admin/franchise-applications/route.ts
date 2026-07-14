@@ -44,14 +44,18 @@ export async function GET(request: Request) {
       .select('*')
       .in('application_id', appIds)
 
+    console.log('[review_log] fetched:', reviewLogs?.length, 'entries')
+
     const reviewMap = new Map((reviewLogs || []).map(l => [l.application_id, l]))
     const mergedApps = apps.map(app => {
       const log = reviewMap.get(app.id)
       if (log) {
+        console.log('[review_log] override', app.id, 'from', app.status, 'to', log.status)
         return { ...app, status: log.status, admin_remark: log.admin_remark }
       }
       return app
     })
+    console.log('[review_log] merge done, mergedApps pending count:', mergedApps.filter(a => a.status === 'pending').length)
 
     // Step 2: Collect unique user_ids and template_ids
     const userIds = [...new Set(mergedApps.map(a => a.user_id).filter(Boolean))]
