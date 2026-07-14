@@ -105,7 +105,21 @@ export async function GET(request: Request) {
     const statusDist: Record<string, number> = {}
     applications.forEach(a => { statusDist[a.status] = (statusDist[a.status] || 0) + 1 })
     console.log('[franchise-applications] Found', applications.length, 'applications')
-    return ok({ applications, _debug: { version: 'v3-20260713', total: applications.length, status_distribution: statusDist, sample_ids: applications.slice(0, 5).map(a => ({ id: a.id, status: a.status })) } }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
+
+    // Extended debug: include raw app statuses and review_log statuses for cross-verification
+    const debugRawApps = apps.map(a => ({ id: a.id, status: a.status }))
+    const debugReviewLogs = (reviewLogs || []).map(l => ({ application_id: l.application_id, status: l.status }))
+
+    return ok({
+      applications,
+      _debug: {
+        version: 'v4-debug-20260714',
+        total: applications.length,
+        raw_app_statuses: debugRawApps,
+        review_log_statuses: debugReviewLogs,
+        merged_status_distribution: statusDist,
+      }
+    }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
   } catch (e: any) {
     console.error('[franchise-applications] Unexpected error:', e)
     return serverError('Unexpected error: ' + (e?.message || String(e)))
