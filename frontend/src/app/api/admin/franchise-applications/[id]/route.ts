@@ -94,7 +94,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
       const siteData = {
         name: `${application.location} 加盟换电站`,
-        site_type: '换电站',
+        site_type: 'swap_station',
         template_id: application.template_id,
         cabinet_slots: cabinetSlots,
         battery_count: 0,
