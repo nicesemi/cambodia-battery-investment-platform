@@ -52,6 +52,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
     console.log('[DEBUG PUT] verification after retries - verifyApp.status:', verifyApp?.status, 'expected:', status)
 
+    // Write to review_log as authoritative source — bypasses read replica lag
+    await adminClient
+      .from('review_log')
+      .upsert({
+        application_id: id,
+        status,
+        admin_remark: admin_remark || '',
+        reviewed_at: new Date().toISOString(),
+      }, { onConflict: 'application_id' })
+
     // Fetch template data separately
     let template = null
     if (application.template_id) {

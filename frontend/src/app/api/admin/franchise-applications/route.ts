@@ -37,9 +37,25 @@ export async function GET(request: Request) {
       return ok({ applications: [] })
     }
 
+    // Step 1.5: Merge review_log as authoritative source — bypasses read replica lag
+    const appIds = apps.map(a => a.id)
+    const { data: reviewLogs } = await adminClient
+      .from('review_log')
+      .select('*')
+      .in('application_id', appIds)
+
+    const reviewMap = new Map((reviewLogs || []).map(l => [l.application_id, l]))
+    const mergedApps = apps.map(app => {
+      const log = reviewMap.get(app.id)
+      if (log) {
+        return { ...app, status: log.status, admin_remark: log.admin_remark }
+      }
+      return app
+    })
+
     // Step 2: Collect unique user_ids and template_ids
-    const userIds = [...new Set(apps.map(a => a.user_id).filter(Boolean))]
-    const templateIds = [...new Set(apps.map(a => a.template_id).filter(Boolean))]
+    const userIds = [...new Set(mergedApps.map(a => a.user_id).filter(Boolean))]
+    const templateIds = [...new Set(mergedApps.map(a => a.template_id).filter(Boolean))]
 
     // Step 3: Batch fetch users and templates
     const [userRes, templateRes] = await Promise.all([
@@ -55,7 +71,7 @@ export async function GET(request: Request) {
     const templateMap = new Map((templateRes.data || []).map(t => [t.id, t]))
 
     // Step 4: Query operation_sites to get site_code for approved applications
-    const approvedApps = apps.filter(a => a.status === 'approved')
+    const approvedApps = mergedApps.filter(a => a.status === 'approved')
     let siteCodeMap: Map<string, string> = new Map()
     if (approvedApps.length > 0) {
       const { data: sites } = await adminClient
@@ -74,7 +90,7 @@ export async function GET(request: Request) {
     }
 
     // Step 5: Merge
-    const applications = apps.map(app => ({
+    const applications = mergedApps.map(app => ({
       ...app,
       applicant: userMap.get(app.user_id) || null,
       template: templateMap.get(app.template_id) || null,
