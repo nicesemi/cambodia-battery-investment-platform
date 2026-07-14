@@ -113,7 +113,9 @@ export async function GET(request: Request) {
     return ok({
       applications,
       _debug: {
-        version: 'v4-debug-20260714',
+        version: 'v5-debug-20260714',
+        supabase_url: process.env.NEXT_PUBLIC_SUPABASE_URL || '(not set)',
+        has_service_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
         total: applications.length,
         raw_app_statuses: debugRawApps,
         review_log_statuses: debugReviewLogs,
