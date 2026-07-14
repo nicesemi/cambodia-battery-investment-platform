@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSupabaseAdmin } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, serverError } from '@/lib/response'
 
@@ -23,11 +23,12 @@ export async function GET(request: Request) {
     const unitIds = (myUnits || []).map(ibu => ibu.battery_unit_id).filter(Boolean)
     let batteryMap: Record<string, any> = {}
     if (unitIds.length > 0) {
+      const adminClient = getSupabaseAdmin()
       const [batteryRes, codeRes] = await Promise.all([
-        supabase.from('battery_units')
+        adminClient.from('battery_units')
           .select('id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude')
           .in('id', unitIds),
-        supabase.from('battery_units')
+        adminClient.from('battery_units')
           .select('id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude')
           .in('unit_code', unitIds)
       ])
