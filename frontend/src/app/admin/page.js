@@ -11,14 +11,14 @@ import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 
 const API_BASE = '/api';
 
-const LANGUAGES = [
+export const LANGUAGES = [
   { code: 'zh-CN', label: '简体中文' },
   { code: 'zh-TW', label: '繁體中文' },
   { code: 'en', label: 'English' },
   { code: 'bn', label: 'বাংলা' },
   { code: 'km', label: 'ខ្មែរ' },
 ];
-const EMPTY_I18N = { 'zh-CN': '', 'zh-TW': '', 'en': '', 'bn': '', 'km': '' };
+export const EMPTY_I18N = { 'zh-CN': '', 'zh-TW': '', 'en': '', 'bn': '', 'km': '' };
 
 function computeBatteryHealth(soc, temp, cycles) {
   function sensorHealth(val, g, y, o, gt) {
@@ -62,7 +62,6 @@ export default function Admin() {
   const [batteryTypes, setBatteryTypes] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [kycUsers, setKycUsers] = useState([]);
-  const [pendingCounts, setPendingCounts] = useState({});
   const [rejectingKycUser, setRejectingKycUser] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [loading, setLoading] = useState(true);
@@ -451,7 +450,7 @@ export default function Admin() {
     setBatchSubmitting(true);
     try {
       const selectedSite = batchDispatchSites.find(s => s.id == batchDispatchSiteId);
-      const siteName = selectedSite ? (selectedSite.name || selectedSite.site_code || '') : '';
+      const siteName = selectedSite ? (selectedSite.display_name || selectedSite.name || selectedSite.site_code || '') : '';
       const r = await adminAPI.dispatchBatteries({
         battery_ids: selectedBatteryIds,
         worker_id: batchDispatchWorkerId,
@@ -483,67 +482,7 @@ export default function Admin() {
     if (!canAccessAdmin()) { router.push('/'); return; }
     loadData();
     loadBatteryTypes();
-    loadPendingCounts();
   }, [user, activeTab]);
-
-  // 从 unified admin_review_cache 读取已审批项，修正读副本延迟导致的 pending 计数
-  const getCachedPendingCount = (items, type) => {
-    let reviewedIds = new Set();
-    try {
-      const raw = localStorage.getItem('admin_review_cache');
-      if (raw) {
-        const cache = JSON.parse(raw);
-        const now = Date.now();
-        Object.entries(cache).forEach(([key, v]) => {
-          if (now - v.timestamp < 5 * 60 * 1000 && v.status !== 'pending' && key.startsWith(`${type}:`)) {
-            reviewedIds.add(key.split(':')[1]);
-          }
-        });
-      }
-    } catch {}
-    return items.filter(a => a.status === 'pending' && !reviewedIds.has(a.id)).length;
-  };
-
-  const getKycCachedPendingCount = (users) => {
-    let reviewedIds = new Set();
-    try {
-      const raw = localStorage.getItem('admin_review_cache');
-      if (raw) {
-        const cache = JSON.parse(raw);
-        const now = Date.now();
-        Object.entries(cache).forEach(([key, v]) => {
-          if (now - v.timestamp < 5 * 60 * 1000 && v.status !== 'pending' && key.startsWith('kyc:')) {
-            reviewedIds.add(key.split(':')[1]);
-          }
-        });
-      }
-    } catch {}
-    return users.filter(u => u.certification_status === 'pending' && !reviewedIds.has(u.id)).length;
-  };
-
-  const loadPendingCounts = async () => {
-    try {
-      const results = await Promise.allSettled([
-        adminAPI.getApplications(),
-        adminAPI.getAgentApplications(),
-        adminAPI.getWithdrawals(),
-        adminAPI.getKycList(),
-        adminAPI.getFranchiseSwapApplications(),
-      ]);
-      const counts = {};
-      // franchise-applications: 换电站加盟审批
-      if (results[4].status === 'fulfilled') {
-        const fApps = results[4].value.applications || [];
-        counts['franchise-applications'] = getCachedPendingCount(fApps, 'franchise-application');
-      }
-      // 用 localStorage 缓存修正所有因读副本延迟而滞后的 tab badge 计数
-      counts['applications'] = getCachedPendingCount(results[0].status === 'fulfilled' ? (results[0].value.applications || []) : [], 'application');
-      counts['agent-applications'] = getCachedPendingCount(results[1].status === 'fulfilled' ? (results[1].value.applications || []) : [], 'agent-application');
-      counts['withdrawals'] = getCachedPendingCount(results[2].status === 'fulfilled' ? (results[2].value.withdrawals || []) : [], 'withdrawal');
-      counts['kyc'] = getKycCachedPendingCount(results[3].status === 'fulfilled' ? (results[3].value.users || []) : []);
-      setPendingCounts(counts);
-    } catch (e) { /* silent */ }
-  };
 
   const loadBatteryTypes = async () => {
     try {
@@ -559,8 +498,8 @@ export default function Admin() {
         case 'users': { const r = await adminAPI.getUsers(1, 100); setUsers(r.users || []); } break;
         case 'assets': { const r = await adminAPI.getAssets(); setAssets(r.assets || []); try { const wh = await adminAPI.getWarehouses(); setWarehouses(wh || []); } catch(e){} } break;
         case 'stores': { const r = await adminAPI.getStores(); setStores(r.stores || []); } break;
-        case 'applications': { const r = await adminAPI.getApplications(); setApplications(applyReviewCache(r.applications || [], 'application')); } break;
-        case 'agent-applications': { const r = await adminAPI.getAgentApplications(); setAgentApplications(applyReviewCache(r.applications || [], 'agent-application')); } break;
+        case 'applications': { const r = await adminAPI.getApplications(); setApplications(r.applications || []); } break;
+        case 'agent-applications': { const r = await adminAPI.getAgentApplications(); setAgentApplications(r.applications || []); } break;
         case 'managed-agents': { const r = await adminAPI.getManagedAgents(); setManagedAgents(r.agents || []); } break;
         case 'sold-batteries': { const config = sortConfigs['sold-batteries']; const sortKey = config?.key || ''; const sortDirection = config?.direction || 'asc'; const r = await adminAPI.getSoldBatteries(1, 20, sortKey, sortDirection); setSoldStats(r.stats); setSoldBatteries(r.batteries || []); setSoldOrders(r.recent_orders || []); setSoldTotal(r.total || 0); preloadDispatchData(); } break;
         case 'my-workers':
@@ -587,50 +526,18 @@ export default function Admin() {
             .finally(() => setSiteTypesLoading(false));
           break;
         case 'configs': { const r = await adminAPI.getConfigs(); setConfigs(r.configs || []); } break;
-        case 'withdrawals': { const r = await adminAPI.getWithdrawals(); setWithdrawals(applyReviewCache(r.withdrawals || [], 'withdrawal')); } break;
-        case 'kyc': { const r = await adminAPI.getKycList(); setKycUsers(applyReviewCache(r.users || [], 'kyc')); } break;
+        case 'withdrawals': { const r = await adminAPI.getWithdrawals(); setWithdrawals(r.withdrawals || []); } break;
+        case 'kyc': { const r = await adminAPI.getKycList(); setKycUsers(r.users || []); } break;
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
-  // 通用：将审批结果写入 localStorage 缓存，防止副本延迟导致刷新后回退
-  const saveReviewToCache = (id, status, type) => {
-    try {
-      const raw = localStorage.getItem('admin_review_cache');
-      const cache = raw ? JSON.parse(raw) : {};
-      cache[`${type}:${id}`] = { status, timestamp: Date.now() };
-      localStorage.setItem('admin_review_cache', JSON.stringify(cache));
-    } catch {}
-  };
-
-  // 通用：从缓存覆盖读副本返回的旧状态，解决部署后重载回退问题
-  const applyReviewCache = (items, type) => {
-    try {
-      const raw = localStorage.getItem('admin_review_cache');
-      if (!raw) return items;
-      const cache = JSON.parse(raw);
-      const now = Date.now();
-      return items.map(item => {
-        const key = `${type}:${item.id}`;
-        const cached = cache[key];
-        if (cached && now - cached.timestamp < 5 * 60 * 1000 && cached.status !== 'pending') {
-          return { ...item, status: cached.status };
-        }
-        return item;
-      });
-    } catch { return items; }
-  };
-
   const handleReviewApplication = async (id, status) => {
     try {
-      const res = await adminAPI.reviewApplication(id, { status, reviewed_by: user?.id });
-      // 用 API 返回值直接更新 state，绕过读副本延迟
-      if (res?.application) {
-        setApplications(prev => prev.map(a => a.id === id ? { ...a, ...res.application } : a));
-      }
-      saveReviewToCache(id, status, 'application');
+      await adminAPI.reviewApplication(id, { status, reviewed_by: user?.id });
       alert(`已${status === 'approved' ? '批准' : '拒绝'}申请`);
+      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 
@@ -641,37 +548,28 @@ export default function Admin() {
       return;
     }
     try {
-      const res = await adminAPI.reviewKyc(userId, { status });
-      if (res?.user) {
-        setKycUsers(prev => prev.map(u => u.id === userId ? { ...u, ...res.user } : u));
-      }
-      saveReviewToCache(userId, status, 'kyc');
+      await adminAPI.reviewKyc(userId, { status });
       alert('已通过实名认证');
+      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 
   const confirmKycReject = async () => {
     if (!rejectReason) { alert('请选择驳回原因'); return; }
     try {
-      const res = await adminAPI.reviewKyc(rejectingKycUser, { status: 'kyc_rejected', rejection_reason: rejectReason });
-      if (res?.user) {
-        setKycUsers(prev => prev.map(u => u.id === rejectingKycUser ? { ...u, ...res.user } : u));
-      }
-      saveReviewToCache(rejectingKycUser, 'kyc_rejected', 'kyc');
+      await adminAPI.reviewKyc(rejectingKycUser, { status: 'kyc_rejected', rejection_reason: rejectReason });
       alert('已驳回实名认证');
       setRejectingKycUser(null);
       setRejectReason('');
+      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 
   const handleReviewAgentApplication = async (id, status) => {
     try {
-      const res = await adminAPI.reviewAgentApplication(id, { status, reviewed_by: user?.id });
-      if (res?.application) {
-        setAgentApplications(prev => prev.map(a => a.id === id ? { ...a, ...res.application } : a));
-      }
-      saveReviewToCache(id, status, 'agent-application');
+      await adminAPI.reviewAgentApplication(id, { status, reviewed_by: user?.id });
       alert(`已${status === 'approved' ? '批准' : '拒绝'}代理申请`);
+      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 
@@ -682,12 +580,9 @@ export default function Admin() {
         const reason = prompt('驳回原因（可选）:');
         if (reason !== null) payload.reason = reason;
       }
-      const res = await adminAPI.reviewWithdrawal(id, payload);
-      if (res?.withdrawal) {
-        setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, ...res.withdrawal } : w));
-      }
-      saveReviewToCache(id, action === 'approve' ? 'approved' : 'rejected', 'withdrawal');
+      await adminAPI.reviewWithdrawal(id, payload);
       alert(`已${action === 'approve' ? '通过' : '驳回'}提现申请`);
+      loadData();
     } catch (e) { alert(e.message || '操作失败'); }
   };
 
@@ -1009,10 +904,10 @@ export default function Admin() {
     { key: 'battery-types', label: '电池类型', icon: Zap, link: '/admin/battery-types' },
     { key: 'sold-batteries', label: '已售电池', icon: Cpu },
     { key: 'operation-sites', label: '运营站点', icon: MapPin, link: '/admin/operation-sites' },
-    { key: 'franchise-applications', label: '换电站加盟审批', icon: FileText, link: '/admin/franchise-applications' },
+    { key: 'franchise-applications', label: '加盟审批', icon: FileText, link: '/admin/franchise-applications' },
     { key: 'swap-stations', label: '换电站模板', icon: BatteryCharging, link: '/admin/swap-stations' },
     { key: 'stores', label: '门店管理', icon: Store },
-    { key: 'applications', label: '加盟店审核', icon: ClipboardList },
+    { key: 'applications', label: '加盟审核', icon: ClipboardList },
     { key: 'agent-applications', label: '省级代理审批', icon: Users },
     { key: 'managed-agents', label: '我的代理', icon: BadgeCheck },
     { key: 'my-workers', label: '我的资产', icon: Users },
@@ -1034,21 +929,13 @@ export default function Admin() {
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex space-x-1 overflow-x-auto">
-            {tabs.map(t => {
-              const badgeCount = pendingCounts[t.key];
-              return (
+            {tabs.map(t => (
               <button key={t.key} onClick={() => { if (t.link) { router.push(t.link); return; } setActiveTab(t.key); setLoading(true); }}
-                className={`flex items-center space-x-2 px-4 py-3 border-b-2 whitespace-nowrap text-xs 2xl:text-sm font-medium transition relative ${
+                className={`flex items-center space-x-2 px-4 py-3 border-b-2 whitespace-nowrap text-xs 2xl:text-sm font-medium transition ${
                   activeTab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                 <t.icon className="h-4 w-4" /><span>{t.label}</span>
-                {badgeCount > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
-                    {badgeCount}
-                  </span>
-                )}
               </button>
-              );
-            })}
+            ))}
           </div>
         </div>
       </div>
@@ -2699,7 +2586,7 @@ export default function Admin() {
                     const remaining = s.remaining ?? s.battery_count ?? 0;
                     const dispatched = s.dispatched ?? 0;
                     return (
-                      <option key={s.id} value={s.id}>{s.name || s.site_code} ({s.city || ''}) - 运营 {dispatched} 台{remaining > 0 ? `，可派 ${remaining}` : ''}</option>
+                      <option key={s.id} value={s.id}>{s.display_name || s.name || s.site_code} ({s.city || ''}) - 运营 {dispatched} 台{remaining > 0 ? `，可派 ${remaining}` : ''}</option>
                     );
                   })}
                 </select>
@@ -2725,7 +2612,7 @@ export default function Admin() {
                   onClick={async () => {
                     const batteryUnitId = dispatchBattery.unit_id || dispatchBattery.battery_unit_id || dispatchBattery.id;
                     const selectedSite = dispatchSites.find(s => s.id == dispatchSiteId);
-                    const siteName = selectedSite ? (selectedSite.site_name || selectedSite.name || selectedSite.site_code || '') : '';
+                    const siteName = selectedSite ? (selectedSite.display_name || selectedSite.name || selectedSite.site_code || '') : '';
                     setDispatchSingleSubmitting(true);
                     try {
                       const r = await adminAPI.dispatchBatteries({ battery_ids: [batteryUnitId], worker_id: dispatchWorkerId, site_id: dispatchSiteId });
@@ -2785,7 +2672,7 @@ export default function Admin() {
                     const remaining = s.remaining ?? s.battery_count ?? 0;
                     const dispatched = s.dispatched ?? 0;
                     return (
-                      <option key={s.id} value={s.id}>{s.name || s.site_code} ({s.city || ''}) - 运营 {dispatched} 台{remaining > 0 ? `，可派 ${remaining}` : ''}</option>
+                      <option key={s.id} value={s.id}>{s.display_name || s.name || s.site_code} ({s.city || ''}) - 运营 {dispatched} 台{remaining > 0 ? `，可派 ${remaining}` : ''}</option>
                     );
                   })}
                 </select>
