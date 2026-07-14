@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     // ALL columns must be explicit — select('*') hits stale read replicas on Supabase free tier
     const { data: apps, error } = await adminClient
       .from('franchise_applications')
-      .select('id, user_id, template_id, status, location, admin_remark, company_name, contact_name, contact_phone, contact_email, business_license, id_card, bank_account, investment_amount, cabinet_count, battery_count, created_at, updated_at')
+      .select('id, user_id, template_id, status, location, admin_remark, cabinet_count, matched_battery_4820, matched_battery_6035, matched_battery_7250, created_at, updated_at')
       .order('created_at', { ascending: false })
 
     if (error) {
