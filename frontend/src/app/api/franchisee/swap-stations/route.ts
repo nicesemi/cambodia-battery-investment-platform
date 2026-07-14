@@ -16,16 +16,14 @@ export async function GET(request: Request) {
     const adminClient = getSupabaseAdmin()
 
     // 1. 获取当前用户已审批的加盟申请
-    // 先查 franchise_applications（admin 审批使用的表）
     const { data: franchiseApps, error: appErr } = await adminClient
       .from('franchise_applications')
-      .select('id')
+      .select('id, location')
       .eq('user_id', user.id)
       .eq('status', 'approved')
 
     if (appErr) return serverError(appErr.message)
 
-    // 同时查 franchisee_applications（加盟商提交使用的表）
     const { data: franchiseeApps } = await adminClient
       .from('franchisee_applications')
       .select('id')
@@ -41,17 +39,26 @@ export async function GET(request: Request) {
       return ok({ stations: [] })
     }
 
-    // 2. 查询关联的 operation_sites
+    // 2. 查询 operation_sites（无 franchise_application_id 列，用 name 模式匹配）
+    // name 格式：{location}加盟换电站
     const { data: sites, error: siteErr } = await adminClient
       .from('operation_sites')
       .select('*')
-      .in('franchise_application_id', allAppIds)
-      .eq('site_type', 'swap_station')
       .eq('is_active', true)
+      .or('site_type.eq.swap_station,site_type.eq.换电站')
 
     if (siteErr) return serverError(siteErr.message)
 
-    const stations = sites || []
+    // 通过 name 中的 location 匹配加盟申请
+    const franchiseLocations = (franchiseApps || []).map((a: any) => a.location).filter(Boolean)
+    const matchedSites = (sites || []).filter((s: any) => {
+      if (!s.name) return false
+      return franchiseLocations.some((loc: string) =>
+        s.name.includes(loc) || s.name.includes('加盟换电站')
+      )
+    })
+
+    const stations = matchedSites
 
     // 3. 补充模板数据（用于生成占位槽位）
     const templateIds = [...new Set(stations.map((s: any) => s.template_id).filter(Boolean))]
