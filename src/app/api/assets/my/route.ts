@@ -19,16 +19,26 @@ export async function GET(request: Request) {
       .select('battery_asset_id, battery_unit_id, purchase_price, purchased_at')
       .eq('investor_id', user.id)
 
-    // Collect unit_codes and query battery_units directly
-    const unitCodes = (myUnits || []).map(ibu => ibu.battery_unit_id).filter(Boolean)
+    // Collect battery_unit_id values (may be UUID or unit_code string)
+    const unitIds = (myUnits || []).map(ibu => ibu.battery_unit_id).filter(Boolean)
     let batteryMap: Record<string, any> = {}
-    if (unitCodes.length > 0) {
-      const { data: batteryData } = await supabase.from('battery_units')
-        .select('id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude')
-        .in('id', unitCodes)
-      if (batteryData) {
-        for (const bu of batteryData) {
+    if (unitIds.length > 0) {
+      const [batteryRes, codeRes] = await Promise.all([
+        supabase.from('battery_units')
+          .select('id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude')
+          .in('id', unitIds),
+        supabase.from('battery_units')
+          .select('id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude')
+          .in('unit_code', unitIds)
+      ])
+      const allData = [...(batteryRes.data || []), ...(codeRes.data || [])]
+      const seen = new Set<string>()
+      for (const bu of allData) {
+        // Deduplicate by id
+        if (!seen.has(bu.id)) {
+          seen.add(bu.id)
           batteryMap[bu.id] = bu
+          batteryMap[bu.unit_code] = bu
         }
       }
     }
