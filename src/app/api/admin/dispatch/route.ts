@@ -64,17 +64,20 @@ export async function POST(request: Request) {
     if (site_id) {
       const { data: site, error: siteError } = await adminClient
         .from('operation_sites')
-        .select('name, site_code')
+        .select('name, name_i18n, site_code')
         .eq('id', site_id)
         .single()
 
       if (!siteError && site) {
-        siteName = site.name || ''
+        // resolve display name from name_i18n (zh-CN first), fallback to name
+        const i18n = (site as any).name_i18n
+        const displayName = (i18n && typeof i18n === 'object' && i18n['zh-CN']) || site.name || ''
+        siteName = displayName
         // 将站点名称和 site_id 写入已售电池记录
         // 同时更新 site_id 确保 downstream（live GPS、投资者购买等）能直接关联
         const { error: updateError } = await adminClient
           .from('battery_units')
-          .update({ site_name: site.name, site_id: site_id })
+          .update({ site_name: displayName, site_id: site_id })
           .in('id', battery_ids)
         if (updateError) {
           console.error('[Dispatch] Failed to update battery site_name:', updateError.message)

@@ -450,7 +450,7 @@ export default function Admin() {
     setBatchSubmitting(true);
     try {
       const selectedSite = batchDispatchSites.find(s => s.id == batchDispatchSiteId);
-      const siteName = selectedSite ? (selectedSite.name || selectedSite.site_code || '') : '';
+      const siteName = selectedSite ? (selectedSite.display_name || selectedSite.name || selectedSite.site_code || '') : '';
       const r = await adminAPI.dispatchBatteries({
         battery_ids: selectedBatteryIds,
         worker_id: batchDispatchWorkerId,
@@ -2586,7 +2586,7 @@ export default function Admin() {
                     const remaining = s.remaining ?? s.battery_count ?? 0;
                     const dispatched = s.dispatched ?? 0;
                     return (
-                      <option key={s.id} value={s.id}>{s.name || s.site_code} ({s.city || ''}) - 运营 {dispatched} 台{remaining > 0 ? `，可派 ${remaining}` : ''}</option>
+                      <option key={s.id} value={s.id}>{s.display_name || s.name || s.site_code} ({s.city || ''}) - 运营 {dispatched} 台{remaining > 0 ? `，可派 ${remaining}` : ''}</option>
                     );
                   })}
                 </select>
@@ -2612,7 +2612,7 @@ export default function Admin() {
                   onClick={async () => {
                     const batteryUnitId = dispatchBattery.unit_id || dispatchBattery.battery_unit_id || dispatchBattery.id;
                     const selectedSite = dispatchSites.find(s => s.id == dispatchSiteId);
-                    const siteName = selectedSite ? (selectedSite.site_name || selectedSite.name || selectedSite.site_code || '') : '';
+                    const siteName = selectedSite ? (selectedSite.display_name || selectedSite.name || selectedSite.site_code || '') : '';
                     setDispatchSingleSubmitting(true);
                     try {
                       const r = await adminAPI.dispatchBatteries({ battery_ids: [batteryUnitId], worker_id: dispatchWorkerId, site_id: dispatchSiteId });
@@ -2672,7 +2672,7 @@ export default function Admin() {
                     const remaining = s.remaining ?? s.battery_count ?? 0;
                     const dispatched = s.dispatched ?? 0;
                     return (
-                      <option key={s.id} value={s.id}>{s.name || s.site_code} ({s.city || ''}) - 运营 {dispatched} 台{remaining > 0 ? `，可派 ${remaining}` : ''}</option>
+                      <option key={s.id} value={s.id}>{s.display_name || s.name || s.site_code} ({s.city || ''}) - 运营 {dispatched} 台{remaining > 0 ? `，可派 ${remaining}` : ''}</option>
                     );
                   })}
                 </select>

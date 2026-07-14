@@ -116,34 +116,40 @@ export async function GET(request: Request) {
       ] = await Promise.all([
         adminClient
           .from('operation_sites')
-          .select('id, name, site_code, battery_type, city, battery_count')
+          .select('id, name, name_i18n, site_code, battery_type, city, battery_count')
           .order('created_at', { ascending: false }),
         adminClient
           .from('battery_units')
-          .select('site_name, battery_assets!inner(battery_type)')
+          .select('site_id, site_name, battery_assets!inner(battery_type)')
           .not('site_name', 'is', null),
       ])
 
       if (sitesErr) return serverError(sitesErr.message)
       if (dispErr) return serverError(dispErr.message)
 
-      // 按 site_name → 该站点已派工的各类型电池数量
-      // key: "site_name|battery_type" → count
+      // 按 site_id → 该站点已派工的各类型电池数量
+      // key: "site_id|battery_type" → count
       const dispatchedTypeMap: Record<string, number> = {}
       for (const row of (dispatchedRows || [])) {
-        const sn = row.site_name as string
+        const sid = row.site_id as number
         const bt = (row.battery_assets as any)?.battery_type || ''
-        const key = `${sn}|${bt}`
+        if (!sid) continue
+        const key = `${sid}|${bt}`
         dispatchedTypeMap[key] = (dispatchedTypeMap[key] || 0) + 1
       }
 
       const result = (sites || []).map((s: any) => {
         const siteBt = s.battery_type || ''
-        const typeMatchKey = `${s.name}|${siteBt}`
+        const typeMatchKey = `${s.id}|${siteBt}`
         const dispatchedOfType = dispatchedTypeMap[typeMatchKey] || 0
+        // resolve display_name from name_i18n (zh-CN first), fallback to name
+        const i18n = s.name_i18n
+        const displayName = (i18n && typeof i18n === 'object' && i18n['zh-CN']) || s.name || ''
         return {
           id: s.id,
           name: s.name,
+          name_i18n: s.name_i18n,
+          display_name: displayName,
           site_code: s.site_code,
           battery_type: s.battery_type,
           city: s.city,
