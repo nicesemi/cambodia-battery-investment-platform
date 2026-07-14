@@ -8,6 +8,7 @@ import { isLoggedIn } from '@/lib/api';
 import { storesAPI, batteryTypesAPI } from '@/services/api';
 import { formatDate, formatTime } from '@/lib/date-format';
 import i18n from '@/i18n';
+import CabinetDiagram from '@/components/CabinetDiagram';
 
 // ─── 门店坐标硬编码 ──────────────────────────────────
 const STORE_COORDS = {
@@ -520,7 +521,7 @@ function BatteryNetworkSection({ amapReady }) {
   const fixedKey = useMemo(() => siteTypes.find(st => st.name_i18n?.['zh-CN'] === '固定储能柜' || st.name === '固定储能柜')?.name || '固定储能柜', [siteTypes]);
 
   const swapSites = useMemo(() => {
-    return (batteryLive.sites || []).filter(s => s.site_type === swapKey);
+    return (batteryLive.sites || []).filter(s => s.site_type === swapKey || s.site_type === 'swap_station');
   }, [batteryLive.sites, swapKey]);
 
   const lineSites = useMemo(() => {
@@ -655,7 +656,7 @@ function BatteryNetworkSection({ amapReady }) {
               setActiveTab(0);
             }
           } else {
-            const swapSitesList = (batteryLive.sites || []).filter(s => !s.site_type || s.site_type === swapKeyInner);
+            const swapSitesList = (batteryLive.sites || []).filter(s => !s.site_type || s.site_type === swapKeyInner || s.site_type === 'swap_station');
             const matchedSite = swapSitesList.find(s => s.site_name === bu.site_name);
             if (matchedSite) setSelectedCabinetSite(matchedSite);
             setActiveTab(0);
@@ -1238,118 +1239,6 @@ function BatteryNetworkSection({ amapReady }) {
         )}
       </div>
     </section>
-  );
-}
-
-// ─── 子组件：换电柜示意图 ────────────────────
-function CabinetDiagram({ site, onBack, SensorCard, onTrackBattery }) {
-  const { t, i18n } = useTranslation();
-  const [selectedSlot, setSelectedSlot] = useState(null);
-  const rawSlots = site.cabinet_slots || site.cabinetSlots || [];
-  let slots = [];
-  if (Array.isArray(rawSlots)) { slots = rawSlots; }
-  else if (typeof rawSlots === 'string') { try { slots = JSON.parse(rawSlots); } catch { slots = []; } }
-  else if (rawSlots && typeof rawSlots === 'object') { slots = Object.values(rawSlots); }
-  if (!Array.isArray(slots)) slots = [];
-  const totalSlots = slots.length;
-  const occupiedSlots = site.real_battery_count ?? slots.filter(s => s.status === 'occupied').length;
-  const emptySlots = totalSlots - occupiedSlots;
-
-  const slotStatusColor = (slot) => {
-    if (slot.status === 'empty') return 'bg-gray-200 text-gray-400 border-gray-300';
-    const h = computeBatteryHealth(slot.sensor_battery_level, slot.sensor_temperature, null);
-    if (h.status === 'normal') return 'bg-green-200 border-green-400 text-green-800';
-    if (h.status === 'warning') return 'bg-yellow-200 border-yellow-400 text-yellow-800';
-    return 'bg-red-200 border-red-400 text-red-800';
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* 返回按钮 */}
-      <button onClick={() => { onBack(); setSelectedSlot(null); }} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
-        <ChevronRight className="h-4 w-4 rotate-180" /> {t('home.backToCabinetList')}
-      </button>
-
-      {/* 站点信息 */}
-      <div className="flex items-center gap-2">
-        <Zap className="h-4 w-4 text-orange-500" />
-        <span className="font-semibold text-gray-900">{resolveI18n(site, 'name_i18n', site.site_name, i18n)}</span>
-        <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{site.site_code}</span>
-      </div>
-
-      {/* 槽位统计 */}
-      <div className="flex items-center gap-4 text-xs">
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-yellow-400" />{t('home.occupied')} {occupiedSlots}</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300" />{t('home.empty')} {emptySlots}</span>
-        <span className="text-gray-400">{t('home.batteryAssets')} {site.real_battery_count ?? 0}{t('home.blockUnit')} · {t('home.totalPrefix')} {totalSlots}{t('home.slot')}</span>
-      </div>
-
-      {/* 选中槽位传感器详情 — 显示在换电柜上方 */}
-      {selectedSlot && selectedSlot.status === 'empty' && (
-        <div className="border border-gray-200 rounded-xl p-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500">
-              {t('home.slotNumber')} {selectedSlot.slot_number}
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-              {t('home.empty')}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <SensorCard title={t('home.slotNumber')} value={selectedSlot.slot_number} color="text-gray-600" />
-            <SensorCard title={t('home.status_label')} value={t('home.empty')} color="text-gray-600" />
-          </div>
-        </div>
-      )}
-
-      {selectedSlot && selectedSlot.status === 'occupied' && (
-        <div className="border border-gray-200 rounded-xl p-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500">
-              {t('home.slot')} {selectedSlot.slot_number} · {selectedSlot.battery_unit_code || '—'}
-            </span>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-              selectedSlot.charging ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-            }`}>
-              {selectedSlot.charging ? t('home.charging') : t('home.standby')}
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <SensorCard title="SOC" value={selectedSlot.sensor_battery_level} unit="%" color="text-blue-600" />
-            <SensorCard title={t('home.temperature')} value={selectedSlot.sensor_temperature} unit="°C" color="text-orange-600" />
-            <SensorCard title={t('home.voltage')} value={selectedSlot.sensor_voltage} unit="V" color="text-purple-600" />
-            <SensorCard title={t('home.current')} value={selectedSlot.sensor_current} unit="A" color="text-teal-600" />
-            <SensorCard title={t('home.lastSwap')} value={selectedSlot.last_swap_time ? formatTime(selectedSlot.last_swap_time, i18n.language) : '—'} color="text-gray-600" />
-            <SensorCard title={t('home.status_label')} value={t('home.occupiedStatus')} color="text-gray-600" />
-          </div>
-        </div>
-      )}
-
-      {/* 换电柜网格 */}
-      <div className="bg-gray-100 rounded-xl p-3 border-2 border-gray-300">
-        <div className="grid grid-cols-4 gap-2">
-          {slots.map((slot, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setSelectedSlot(slot);
-                if (slot.status === 'occupied') onTrackBattery?.(slot);
-              }}
-              className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center transition-all text-xs font-medium cursor-pointer hover:scale-105 hover:shadow-md ${
-                slotStatusColor(slot)
-              }`}
-            >
-              <span className="text-[10px] font-bold">{slot.slot_number}</span>
-              {slot.status === 'occupied' && (
-                <span className="text-[8px] truncate max-w-full px-0.5">{slot.battery_unit_code || '—'}</span>
-              )}
-            </button>
-          ))}
-        </div>
-        {/* 柜体底部 */}
-        <div className="mt-2 h-3 bg-gray-300 rounded-b-md" />
-      </div>
-    </div>
   );
 }
 

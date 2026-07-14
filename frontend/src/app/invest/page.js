@@ -8,6 +8,7 @@ import { MapPin, TrendingUp, Battery, ShoppingCart, DollarSign, Calendar, BarCha
 import { formatCurrency, localeCurrency, fetchRates } from '../../lib/currency';
 import { formatDate } from '../../lib/date-format';
 import { useTranslation } from 'react-i18next';
+import CabinetDiagram from '@/components/CabinetDiagram';
 
 const BATTERY_PRODUCTS = [
   { id: '4820', name: '通用低速两轮换电', scene: '家用电动二轮车', voltage: '51.2V', capacity: '20Ah', energy: '1.024kWh', weight: '10kg', price: 1180, monthlyRent: 80, category: 'swap' },
@@ -228,6 +229,7 @@ function InvestContent() {
   const [franchiseMsg, setFranchiseMsg] = useState('');
   const [myBatteryCounts, setMyBatteryCounts] = useState({ 4820: 0, 6035: 0, 7250: 0 });
   const [franchiseStores, setFranchiseStores] = useState([]);
+  const [franchiseSwapStations, setFranchiseSwapStations] = useState([]);
 
 const getTxRemark = (tx, t, i18n) => {
   // 优先使用 DB 中的 remark_i18n（多语言），其次 remark（纯文本），否则基于 type 做 i18n
@@ -582,16 +584,18 @@ const getPenaltyTierDisplay = (tier, t) => {
     // 各 fetch 独立 catch，避免任一接口失败阻断其他数据加载
     const safeFetch = async (url) => { try { const r = await fetch(url, { headers }); return r.ok ? r : null; } catch { return null; } };
 
-    const [tmplRes, appRes, storeRes, assetsRes] = await Promise.all([
+    const [tmplRes, appRes, storeRes, assetsRes, myStationsRes] = await Promise.all([
       safeFetch('/api/admin/swap-stations'),
       safeFetch('/api/franchise-applications'),
       safeFetch('/api/operation-sites'),
       safeFetch('/api/assets/my'),
+      safeFetch('/api/franchisee/swap-stations'),
     ]);
 
     if (tmplRes) { try { const d = await tmplRes.json(); setSwapTemplates(d.templates || []); } catch {} }
     if (appRes) { try { const d = await appRes.json(); setFranchiseApplications(d.applications || []); } catch {} }
     if (storeRes) { try { const d = await storeRes.json(); setFranchiseStores((d.sites || []).filter(s => s.site_type && (s.site_type === 'swap_station' || s.site_type.includes('换电') || s.site_type.includes('swap')))); } catch {} }
+    if (myStationsRes) { try { const d = await myStationsRes.json(); setFranchiseSwapStations(d.swap_stations || []); } catch {} }
 
     // 直接从 API 获取最新用户资产数据（避免依赖可能过时的 React state）
     let freshUserAssets = [];
@@ -1503,6 +1507,25 @@ const getPenaltyTierDisplay = (tier, t) => {
                 )}
               </div>
             </div>
+
+            {/* My Swap Stations */}
+            {franchiseSwapStations.length > 0 && (
+              <div className="bg-white rounded-xl border p-6 mt-6">
+                <h3 className="font-bold text-lg mb-4">我的换电站</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {franchiseSwapStations.map(station => (
+                    <div key={station.id} className="border rounded-lg p-4">
+                      <p className="font-medium text-sm mb-2">{station.name || station.location}</p>
+                      <CabinetDiagram site={station} SensorCard={null} compact={true} />
+                      <div className="mt-2 text-xs text-gray-500">
+                        <span>槽位数: {station.cabinet_slots || station.slots || 0}</span>
+                        <span className="ml-4"> {station.battery_count !== undefined ? `${station.battery_count} 块电池` : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
