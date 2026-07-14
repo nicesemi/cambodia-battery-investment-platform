@@ -14,22 +14,11 @@ export async function GET(request: Request) {
 
     const adminClient = getSupabaseAdmin()
 
-    // Step 1: Query franchise_applications — compare select('*') vs select('id,status')
+    // ALL columns must be explicit — select('*') hits stale read replicas on Supabase free tier
     const { data: apps, error } = await adminClient
       .from('franchise_applications')
-      .select('*')
+      .select('id, user_id, template_id, status, location, admin_remark, company_name, contact_name, contact_phone, contact_email, business_license, id_card, bank_account, investment_amount, cabinet_count, battery_count, created_at, updated_at')
       .order('created_at', { ascending: false })
-
-    // Parallel query with explicit columns (same as debug endpoint)
-    const { data: appsExplicit } = await adminClient
-      .from('franchise_applications')
-      .select('id, status, user_id, created_at')
-      .order('created_at', { ascending: false })
-
-    console.log('[DEBUG GET] raw apps count:', apps?.length, 'error:', error)
-    if (apps && apps.length > 0) {
-      console.log('[DEBUG GET] first app id:', apps[0].id, 'status:', apps[0].status)
-    }
 
     if (error) {
       console.error('[franchise-applications] Supabase query error:', error)
@@ -40,11 +29,11 @@ export async function GET(request: Request) {
       return ok({ applications: [] })
     }
 
-    // Step 1.5: Merge review_log as authoritative source — bypasses read replica lag
+    // Merge review_log as authoritative source — explicit columns to avoid replica lag
     const appIds = apps.map(a => a.id)
     const { data: reviewLogs } = await adminClient
       .from('review_log')
-      .select('*')
+      .select('application_id, status, admin_remark, reviewer_id, reviewed_at')
       .in('application_id', appIds)
 
     console.log('[review_log] fetched:', reviewLogs?.length, 'entries')
@@ -70,7 +59,7 @@ export async function GET(request: Request) {
         ? adminClient.from('users').select('id, email, username, full_name, phone').in('id', userIds)
         : { data: [], error: null },
       templateIds.length > 0
-        ? adminClient.from('swap_station_templates').select('*').in('id', templateIds)
+        ? adminClient.from('swap_station_templates').select('id, name, battery_count, cabinet_count, power, monthly_rent, total_cost').in('id', templateIds)
         : { data: [], error: null },
     ])
 
@@ -109,22 +98,17 @@ export async function GET(request: Request) {
     applications.forEach(a => { statusDist[a.status] = (statusDist[a.status] || 0) + 1 })
     console.log('[franchise-applications] Found', applications.length, 'applications')
 
-    // Extended debug: include raw app statuses and review_log statuses for cross-verification
-    const debugRawApps = apps.map(a => ({ id: a.id, status: a.status }))
-    const debugExplicitApps = (appsExplicit || []).map(a => ({ id: a.id, status: a.status }))
+    // Extended debug
+    const debugApps = apps.map(a => ({ id: a.id, status: a.status }))
     const debugReviewLogs = (reviewLogs || []).map(l => ({ application_id: l.application_id, status: l.status }))
 
     return ok({
       applications,
       _debug: {
-        version: 'v6-debug-20260714',
-        supabase_url: process.env.NEXT_PUBLIC_SUPABASE_URL || '(not set)',
-        has_service_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-        total: applications.length,
-        raw_app_statuses_select_star: debugRawApps,
-        raw_app_statuses_explicit: debugExplicitApps,
-        review_log_statuses: debugReviewLogs,
-        merged_status_distribution: statusDist,
+        version: 'v7-fix-20260714',
+        raw_apps: debugApps,
+        review_log: debugReviewLogs,
+        merged: statusDist,
       }
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
   } catch (e: any) {
