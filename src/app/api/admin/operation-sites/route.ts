@@ -116,7 +116,7 @@ export async function GET(request: Request) {
       ] = await Promise.all([
         adminClient
           .from('operation_sites')
-          .select('id, name, name_i18n, site_code, battery_type, city, battery_count')
+          .select('id, name, name_i18n, site_code, battery_type, city, city_i18n, battery_count')
           .order('created_at', { ascending: false }),
         adminClient
           .from('battery_units')
@@ -145,6 +145,8 @@ export async function GET(request: Request) {
         // resolve display_name from name_i18n (zh-CN first), fallback to name
         const i18n = s.name_i18n
         const displayName = (i18n && typeof i18n === 'object' && i18n['zh-CN']) || s.name || ''
+        const cI18n = s.city_i18n
+        const displayCity = (cI18n && typeof cI18n === 'object' && cI18n['zh-CN']) || s.city || ''
         return {
           id: s.id,
           name: s.name,
@@ -153,6 +155,8 @@ export async function GET(request: Request) {
           site_code: s.site_code,
           battery_type: s.battery_type,
           city: s.city,
+          city_i18n: s.city_i18n,
+          display_city: displayCity,
           battery_count: s.battery_count,
           dispatched: dispatchedOfType,
           remaining: Math.max(0, (s.battery_count || 0) - dispatchedOfType),

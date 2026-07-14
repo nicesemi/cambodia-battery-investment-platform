@@ -16,8 +16,22 @@ export async function GET(request: Request) {
 
     // Fetch battery units for this user
     const { data: myUnits } = await supabase.from('investor_battery_units')
-      .select('battery_asset_id, battery_unit_id, purchase_price, purchased_at, battery_units!inner(id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude)')
+      .select('battery_asset_id, battery_unit_id, purchase_price, purchased_at')
       .eq('investor_id', user.id)
+
+    // Collect unit_codes and query battery_units directly
+    const unitCodes = (myUnits || []).map(ibu => ibu.battery_unit_id).filter(Boolean)
+    let batteryMap: Record<string, any> = {}
+    if (unitCodes.length > 0) {
+      const { data: batteryData } = await supabase.from('battery_units')
+        .select('id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude')
+        .in('unit_code', unitCodes)
+      if (batteryData) {
+        for (const bu of batteryData) {
+          batteryMap[bu.unit_code] = bu
+        }
+      }
+    }
 
     // Group units by asset_id
     const unitsByAsset: Record<string, any[]> = {}
@@ -25,7 +39,7 @@ export async function GET(request: Request) {
       for (const ibu of myUnits) {
         const aid = ibu.battery_asset_id
         if (!unitsByAsset[aid]) unitsByAsset[aid] = []
-        const bu = (ibu.battery_units as any)?.[0] || ibu.battery_units
+        const bu = batteryMap[ibu.battery_unit_id]
         unitsByAsset[aid].push({
           holding_id: ibu.battery_unit_id,
           unit_code: bu?.unit_code,
@@ -47,7 +61,7 @@ export async function GET(request: Request) {
 
     // Fetch operation_sites name_i18n for battery_units
     const siteIds = [...new Set(
-      (myUnits || []).map(ibu => (ibu.battery_units as any)?.[0]?.site_id || ibu.battery_units?.site_id).filter(Boolean)
+      Object.values(batteryMap).map((bu: any) => bu.site_id).filter(Boolean)
     )]
     let siteI18nMap: Record<string, any> = {}
     if (siteIds.length > 0) {
