@@ -1,4 +1,4 @@
-import { supabase, getSupabaseAdmin } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { authenticateToken } from '@/lib/auth'
 import { ok, unauthorized, serverError } from '@/lib/response'
 
@@ -15,8 +15,7 @@ export async function GET(request: Request) {
     if (error) return serverError(error.message)
 
     // Fetch battery units for this user
-    const adminClient = getSupabaseAdmin()
-    const { data: myUnits } = await adminClient.from('investor_battery_units')
+    const { data: myUnits } = await supabase.from('investor_battery_units')
       .select('battery_asset_id, battery_unit_id, purchase_price, purchased_at, battery_units!inner(id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude)')
       .eq('investor_id', user.id)
 
@@ -52,7 +51,7 @@ export async function GET(request: Request) {
     )]
     let siteI18nMap: Record<string, any> = {}
     if (siteIds.length > 0) {
-      const { data: sitesI18n } = await adminClient.from('operation_sites')
+      const { data: sitesI18n } = await supabase.from('operation_sites')
         .select('id, name_i18n')
         .in('id', siteIds)
       if (sitesI18n) {
