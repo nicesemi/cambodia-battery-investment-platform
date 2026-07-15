@@ -16,10 +16,24 @@ export async function GET(request: Request) {
       .eq('user_id', user.id)
     if (error) return serverError(error.message)
 
-    // Fetch battery units for this user (LEFT JOIN to avoid !inner filtering quirks)
+    // 第一步：获取 investor_battery_units 列表
     const { data: myUnits } = await adminClient.from('investor_battery_units')
-      .select('battery_asset_id, battery_unit_id, purchase_price, purchased_at, battery_units(id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude)')
+      .select('battery_asset_id, battery_unit_id, purchase_price, purchased_at')
       .eq('investor_id', user.id)
+
+    // 第二步：单独查 battery_units 获取站点信息（避免 supabase-js 嵌套 select JOIN 的不确定行为）
+    const unitIds = (myUnits || []).map(ibu => ibu.battery_unit_id).filter(Boolean)
+    let batteryMap: Record<string, any> = {}
+    if (unitIds.length > 0) {
+      const { data: units } = await adminClient.from('battery_units')
+        .select('id, unit_code, site_id, site_name, status, sensor_battery_level, sensor_temperature, sensor_cycle_count, sensor_last_online, sensor_health_status, sensor_longitude, sensor_latitude')
+        .in('id', unitIds)
+      if (units) {
+        for (const bu of units) {
+          batteryMap[bu.id] = bu
+        }
+      }
+    }
 
     // Group units by asset_id
     const unitsByAsset: Record<string, any[]> = {}
@@ -27,7 +41,7 @@ export async function GET(request: Request) {
       for (const ibu of myUnits) {
         const aid = ibu.battery_asset_id
         if (!unitsByAsset[aid]) unitsByAsset[aid] = []
-        const bu = (ibu.battery_units as any)?.[0] || ibu.battery_units
+        const bu = batteryMap[ibu.battery_unit_id]
         unitsByAsset[aid].push({
           holding_id: ibu.battery_unit_id,
           unit_code: bu?.unit_code,
@@ -49,7 +63,7 @@ export async function GET(request: Request) {
 
     // Fetch operation_sites name_i18n for battery_units
     const siteIds = [...new Set(
-      (myUnits || []).map(ibu => (ibu.battery_units as any)?.[0]?.site_id || (ibu.battery_units as any)?.site_id).filter(Boolean)
+      Object.values(batteryMap).map((bu: any) => bu.site_id).filter(Boolean)
     )]
     let siteI18nMap: Record<string, any> = {}
     let locationI18nMap: Record<string, any> = {}
