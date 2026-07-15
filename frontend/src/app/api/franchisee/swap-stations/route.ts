@@ -88,44 +88,74 @@ export async function GET(request: Request) {
 
     const adminClient = getSupabaseAdmin()
 
-    // 1. 获取当前用户已审批的加盟申请（提取 location）
-    const { data: franchiseApps, error: appErr } = await adminClient
-      .from('franchise_applications')
-      .select('id, location')
-      .eq('user_id', user.id)
-      .eq('status', 'approved')
+    let matchedSites: any[] = []
 
-    if (appErr) return serverError(appErr.message)
+    if (user.role === 'investor') {
+      // Investor: 通过 investor_battery_units → battery_units.site_id → operation_sites 找换电站
+      const { data: ibuRows } = await adminClient
+        .from('investor_battery_units')
+        .select('battery_unit_id')
+        .eq('investor_id', user.id)
 
-    const { data: franchiseeApps } = await adminClient
-      .from('franchisee_applications')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('status', 'approved')
+      if (!ibuRows || ibuRows.length === 0) return ok({ stations: [] })
 
-    const allAppIds = [
-      ...(franchiseApps || []).map((a: any) => a.id),
-      ...(franchiseeApps || []).map((a: any) => a.id),
-    ]
+      const buIds = ibuRows.map((r: any) => r.battery_unit_id)
 
-    if (allAppIds.length === 0) {
-      return ok({ stations: [] })
+      const { data: bus } = await adminClient
+        .from('battery_units')
+        .select('site_id')
+        .in('id', buIds)
+        .not('site_id', 'is', null)
+
+      if (!bus || bus.length === 0) return ok({ stations: [] })
+
+      const siteIds = [...new Set(bus.map((b: any) => b.site_id))]
+
+      const { data: sites } = await adminClient
+        .from('operation_sites')
+        .select('*')
+        .in('id', siteIds)
+        .eq('is_active', true)
+        .or('site_type.eq.swap_station')
+
+      matchedSites = sites || []
+    } else {
+      // Franchisee/admin/operator: 通过 franchise_applications.location 匹配 operation_sites.name
+      const { data: franchiseApps, error: appErr } = await adminClient
+        .from('franchise_applications')
+        .select('id, location')
+        .eq('user_id', user.id)
+        .eq('status', 'approved')
+
+      if (appErr) return serverError(appErr.message)
+
+      const { data: franchiseeApps } = await adminClient
+        .from('franchisee_applications')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'approved')
+
+      const allAppIds = [
+        ...(franchiseApps || []).map((a: any) => a.id),
+        ...(franchiseeApps || []).map((a: any) => a.id),
+      ]
+
+      if (allAppIds.length === 0) return ok({ stations: [] })
+
+      const franchiseLocations = (franchiseApps || []).map((a: any) => a.location).filter(Boolean)
+      const { data: sites, error: siteErr } = await adminClient
+        .from('operation_sites')
+        .select('*')
+        .eq('is_active', true)
+        .or('site_type.eq.swap_station')
+
+      if (siteErr) return serverError(siteErr.message)
+
+      matchedSites = (sites || []).filter((s: any) => {
+        if (!s.name || franchiseLocations.length === 0) return false
+        return franchiseLocations.some((loc: string) => s.name.includes(loc))
+      })
     }
-
-    // 2. 通过 name 中的 location 匹配 operation_sites
-    const franchiseLocations = (franchiseApps || []).map((a: any) => a.location).filter(Boolean)
-    const { data: sites, error: siteErr } = await adminClient
-      .from('operation_sites')
-      .select('*')
-      .eq('is_active', true)
-      .or('site_type.eq.swap_station')
-
-    if (siteErr) return serverError(siteErr.message)
-
-    const matchedSites = (sites || []).filter((s: any) => {
-      if (!s.name || franchiseLocations.length === 0) return false
-      return franchiseLocations.some((loc: string) => s.name.includes(loc))
-    })
 
     if (matchedSites.length === 0) {
       return ok({ stations: [] })
