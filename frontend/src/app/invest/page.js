@@ -491,7 +491,7 @@ const getPenaltyTierDisplay = (tier, t) => {
     if (!investMapReady) return;
     if (activeTab !== 'franchise') return;
     if (!franchiseMapContainerRef.current) return;
-    if (!franchiseStores || franchiseStores.length === 0) return;
+    if (!franchiseSwapStations || franchiseSwapStations.length === 0) return;
 
     const timer = setTimeout(() => {
       if (!franchiseMapContainerRef.current) return;
@@ -503,7 +503,7 @@ const getPenaltyTierDisplay = (tier, t) => {
       });
       franchiseMapRef.current = map;
 
-      franchiseStores.forEach(store => {
+      franchiseSwapStations.forEach(store => {
         if (store.latitude == null || store.longitude == null) return;
         const imgTag = store.image_url
           ? `<div style="width:200px;margin-bottom:6px;"><img src="${store.image_url}" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;" onerror="this.style.display='none'" /></div>`
@@ -540,7 +540,7 @@ const getPenaltyTierDisplay = (tier, t) => {
         franchiseMapRef.current = null;
       }
     };
-  }, [investMapReady, activeTab, franchiseStores]);
+  }, [investMapReady, activeTab, franchiseSwapStations]);
 
   const loadDividends = async () => {
     setDividendsLoading(true);
