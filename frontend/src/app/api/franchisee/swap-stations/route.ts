@@ -263,6 +263,7 @@ export async function GET(request: Request) {
         ...siteRest,
         cabinet_slots: cabinetSlots,
         template: templateMap[site.template_id] || null,
+        real_battery_count: units.length,
       }
     })
 
