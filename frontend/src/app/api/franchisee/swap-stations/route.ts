@@ -153,7 +153,7 @@ export async function GET(request: Request) {
 
       matchedSites = (sites || []).filter((s: any) => {
         if (!s.name || franchiseLocations.length === 0) return false
-        return franchiseLocations.some((loc: string) => s.name.includes(loc))
+        return franchiseLocations.some((loc: string) => s.name === `${loc} 加盟换电站`)
       })
     }
 
@@ -180,15 +180,28 @@ export async function GET(request: Request) {
         const slotCount = getSlotCount(site)
 
         // 查询分配到此站点的真实电池单元（带 sensor 数据）
-        const { data: units } = await adminClient
-          .from('battery_units')
-          .select('unit_code, soc, temperature, voltage, status, last_maintenance')
-          .eq('site_id', site.id)
-          .order('unit_code', { ascending: true })
+        // 两条路径：site_id 精确匹配 + site_name 回退（派工后 site_id 可能未回写）
+        const [unitsByIdRes, unitsByNameRes] = await Promise.all([
+          adminClient
+            .from('battery_units')
+            .select('unit_code, soc, temperature, voltage, status, last_maintenance')
+            .eq('site_id', site.id)
+            .order('unit_code', { ascending: true }),
+          site.name
+            ? adminClient
+                .from('battery_units')
+                .select('unit_code, soc, temperature, voltage, status, last_maintenance')
+                .is('site_id', null)
+                .eq('site_name', site.name)
+                .order('unit_code', { ascending: true })
+            : Promise.resolve({ data: [] }),
+        ])
+
+        const units = [...(unitsByIdRes.data || []), ...(unitsByNameRes.data || [])]
 
         const cabinetSlots = buildCabinetSlots(
           slotCount,
-          units || [],
+          units,
           0,
         )
 
