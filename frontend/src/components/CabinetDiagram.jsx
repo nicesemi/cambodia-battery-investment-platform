@@ -43,7 +43,7 @@ export default function CabinetDiagram({ site, onBack, SensorCard, onTrackBatter
   else if (rawSlots && typeof rawSlots === 'object') { slots = Object.values(rawSlots); }
   if (!Array.isArray(slots)) slots = [];
   const totalSlots = slots.length;
-  const occupiedSlots = site.real_battery_count ?? slots.filter(s => s.status === 'occupied').length;
+  const occupiedSlots = slots.filter(s => s.battery_unit_code != null).length;
   const emptySlots = totalSlots - occupiedSlots;
 
   const slotStatusColor = (slot) => {

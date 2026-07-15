@@ -159,7 +159,7 @@ export async function GET(request: Request) {
         const cabinetSlots = buildCabinetSlots(
           slotCount,
           units || [],
-          site.battery_count ?? 0,
+          0,
         )
 
         // 只返回 operation_sites 和模板的有效字段，不暴露原始 cabinet_slots 整数

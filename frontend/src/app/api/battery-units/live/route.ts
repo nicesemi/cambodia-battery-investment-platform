@@ -551,7 +551,7 @@ export async function GET(_request: Request) {
             country: site.country || '',
             country_i18n: site.country_i18n || null,
             battery_count: 0,
-            real_battery_count: (resolvedSiteId != null ? cabSiteMap[resolvedSiteId]?.battery_count : null) ?? 0,
+            real_battery_count: 0,
             units: [] as any[],
             cabinet_slots: undefined,
             _isCabinetSite: isCabinetSite,
@@ -568,9 +568,10 @@ export async function GET(_request: Request) {
     // ═══════════════════════════════════════════════════════
     Object.keys(siteGroups).forEach((key) => {
       const site = siteGroups[key]
+      site.real_battery_count = site.units.length
       if (site._isCabinetSite) {
         const slotCount = getSlotCount(site.site_id)
-        site.cabinet_slots = buildCabinetSlots(slotCount, site.units, site.real_battery_count)
+        site.cabinet_slots = buildCabinetSlots(slotCount, site.units)
       }
       delete site._isCabinetSite
       delete site._cabinetFromDb
@@ -601,7 +602,7 @@ export async function GET(_request: Request) {
             battery_count: 0,
             real_battery_count: cs.battery_count ?? 0,
             units: [],
-            cabinet_slots: buildCabinetSlots(slotCount, [], cs.battery_count ?? 0),
+            cabinet_slots: buildCabinetSlots(slotCount, [], 0),
           }
         }
       })
