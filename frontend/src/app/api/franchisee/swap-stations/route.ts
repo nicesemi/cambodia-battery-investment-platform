@@ -6,16 +6,7 @@ export const dynamic = 'force-dynamic'
 
 /**
  * 基于真实电池单元数据构建换电柜槽位
- * 对齐首页 /api/battery-units/live 的 buildCabinetSlots 模式
- *
- * @param slotCount  - 总槽位数（来自 operation_sites.cabinet_slots）
- * @param units      - 已分配到此站点的真实电池单元数组（带 sensor 数据）
- * @param occupiedCount - 据库记录的已占用槽位数（operation_sites.battery_count）
- *
- * 槽位分配规则：
- *   1. 前 units.length 个槽位 = 真实电池单元传感器数据
- *   2. 接下来 (occupiedCount - units.length) 个槽位 = 占位数据（无真实 sensor）
- *   3. 剩余 (slotCount - occupiedCount) 个槽位 = 空闲
+ * 完全对齐首页 /api/battery-units/live 的 buildCabinetSlots 模式
  */
 function buildCabinetSlots(
   slotCount: number,
@@ -30,7 +21,6 @@ function buildCabinetSlots(
     const unitIndex = i - 1
 
     if (unitIndex < realUnitCount) {
-      // 真实电池单元
       const unit = units[unitIndex]
       const soc = unit.soc ?? null
       slots.push({
@@ -45,7 +35,6 @@ function buildCabinetSlots(
         last_swap_time: unit.last_maintenance || null,
       })
     } else if (unitIndex < effectiveOccupied) {
-      // 占位数据（已占用但无真实电池单元分配）
       slots.push({
         slot_number: i,
         status: 'occupied',
@@ -58,7 +47,6 @@ function buildCabinetSlots(
         last_swap_time: null,
       })
     } else {
-      // 空闲槽位
       slots.push({
         slot_number: i,
         status: 'empty',
@@ -68,7 +56,6 @@ function buildCabinetSlots(
   return slots
 }
 
-/** 从 operation_sites 读取 cabinet_slots 整数，fallback=6 */
 function getSlotCount(site: any): number {
   if (site && site.cabinet_slots != null) {
     const val = typeof site.cabinet_slots === 'number' ? site.cabinet_slots : parseInt(String(site.cabinet_slots))
@@ -88,7 +75,9 @@ export async function GET(request: Request) {
 
     const adminClient = getSupabaseAdmin()
 
-    // ── 第一步：先查用户是否有加盟申请（无论 user.role 是什么）──
+    // ═══════════════════════════════════════════════════════
+    // 第一步：匹配用户的站点（加盟申请 / 投资人电池）
+    // ═══════════════════════════════════════════════════════
     const { data: franchiseApps, error: appErr } = await adminClient
       .from('franchise_applications')
       .select('id, location')
@@ -111,7 +100,6 @@ export async function GET(request: Request) {
     let matchedSites: any[] = []
 
     if (allAppIds.length > 0) {
-      // ── 有加盟申请：通过 location 匹配 operation_sites.name（精确匹配自己的站）──
       const franchiseLocations = (franchiseApps || []).map((a: any) => a.location).filter(Boolean)
       const { data: sites, error: siteErr } = await adminClient
         .from('operation_sites')
@@ -123,13 +111,11 @@ export async function GET(request: Request) {
 
       matchedSites = (sites || []).filter((s: any) => {
         if (!s.name || franchiseLocations.length === 0) return false
-        // 兼容两种命名格式：${loc}加盟换电站（无空格）和 ${loc} 加盟换电站（有空格）
         return franchiseLocations.some((loc: string) =>
           s.name === `${loc}加盟换电站` || s.name === `${loc} 加盟换电站`,
         )
       })
     } else if (user.role === 'investor') {
-      // ── 无加盟申请的纯投资人：通过 investor_battery_units → battery_units.site_id 找所有部署了电池的站 ──
       const { data: ibuRows } = await adminClient
         .from('investor_battery_units')
         .select('battery_unit_id')
@@ -138,7 +124,6 @@ export async function GET(request: Request) {
       if (!ibuRows || ibuRows.length === 0) return ok({ stations: [] })
 
       const buIds = ibuRows.map((r: any) => r.battery_unit_id)
-
       const { data: bus } = await adminClient
         .from('battery_units')
         .select('site_id')
@@ -148,7 +133,6 @@ export async function GET(request: Request) {
       if (!bus || bus.length === 0) return ok({ stations: [] })
 
       const siteIds = [...new Set(bus.map((b: any) => b.site_id))]
-
       const { data: sites } = await adminClient
         .from('operation_sites')
         .select('*')
@@ -163,7 +147,80 @@ export async function GET(request: Request) {
       return ok({ stations: [] })
     }
 
-    // 3. 批量查询模板数据
+    // ═══════════════════════════════════════════════════════
+    // 第二步：完全对齐首页 /api/battery-units/live 的电池查询
+    //         不再逐站 eq，而是全量 not null + sold-by-name 两组查询
+    // ═══════════════════════════════════════════════════════
+    const matchedSiteIdSet = new Set(matchedSites.map((s: any) => Number(s.id)))
+
+    // 构建 site_name → site_id 映射（用于 sold-by-name 单元解析）
+    const siteNameToId: Record<string, number> = {}
+    for (const s of matchedSites) {
+      if (s.name) siteNameToId[s.name] = Number(s.id)
+    }
+
+    const [assignedRes, soldByNameRes] = await Promise.all([
+      // 查询 1：已分配到站点的电池（site_id 不为空）— 跟首页一模一样
+      adminClient
+        .from('battery_units')
+        .select(`
+          unit_code,
+          status,
+          sensor_battery_level,
+          sensor_temperature,
+          sensor_cycle_count,
+          site_id,
+          site_name,
+          updated_at
+        `)
+        .not('site_id', 'is', null)
+        .order('unit_code', { ascending: true }),
+
+      // 查询 2：已售电池中 site_id 为空但 site_name 有值的（派工后 site_id 未回写）
+      // 仅查询与 matchedSites 相关的 site_name，避免全表扫描无关站点
+      adminClient
+        .from('battery_units')
+        .select(`
+          unit_code,
+          status,
+          sensor_battery_level,
+          sensor_temperature,
+          sensor_cycle_count,
+          site_id,
+          site_name,
+          updated_at
+        `)
+        .eq('status', 'sold')
+        .is('site_id', null)
+        .in('site_name', Object.keys(siteNameToId))
+        .order('unit_code', { ascending: true }),
+    ])
+
+    // 按 site_id 分组电池单元（对齐首页逻辑：site_id 存为字符串需转 Number）
+    const unitsBySiteId: Record<number, any[]> = {}
+    for (const key of matchedSiteIdSet) {
+      unitsBySiteId[key] = []
+    }
+
+    // 处理查询 1 结果
+    for (const u of (assignedRes.data || [])) {
+      const sid = u.site_id != null ? Number(u.site_id) : null
+      if (sid != null && matchedSiteIdSet.has(sid)) {
+        unitsBySiteId[sid].push(u)
+      }
+    }
+
+    // 处理查询 2 结果（通过 site_name 解析 site_id）
+    for (const u of (soldByNameRes.data || [])) {
+      const sid = siteNameToId[u.site_name]
+      if (sid != null && matchedSiteIdSet.has(sid)) {
+        unitsBySiteId[sid].push(u)
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 第三步：模板数据 + 按站点构建 cabinet_slots
+    // ═══════════════════════════════════════════════════════
     const templateIds = [...new Set(matchedSites.map((s: any) => s.template_id).filter(Boolean))]
     const templateMap: Record<string, any> = {}
     if (templateIds.length > 0) {
@@ -176,77 +233,38 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. 逐个站点查询电池单元 + 构建槽位
-    //    使用数据库实际列名 sensor_battery_level / updated_at，不依赖别名
-    const enriched = await Promise.all(
-      matchedSites.map(async (site: any) => {
-        const slotCount = getSlotCount(site)
+    const enriched = matchedSites.map((site: any) => {
+      const slotCount = getSlotCount(site)
+      const rawUnits = unitsBySiteId[Number(site.id)] || []
 
-        // 三条路径：site_id 精确 + site_name 回退（两种空格格式）
-        const siteNameAlt = site.name && site.name.includes('加盟换电站')
-          ? (site.name.includes(' 加盟换电站')
-              ? site.name.replace(' 加盟换电站', '加盟换电站')
-              : site.name.replace('加盟换电站', ' 加盟换电站'))
-          : null
+      // 去重（按 unit_code）
+      const seen = new Set<string>()
+      const deduped = rawUnits.filter((u: any) => {
+        const key = u.unit_code
+        if (!key || seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
 
-        const [unitsByIdRes, unitsByNameRes, unitsByNameAltRes] = await Promise.all([
-          adminClient
-            .from('battery_units')
-            .select('unit_code, sensor_battery_level, sensor_temperature, voltage, status, updated_at')
-            .eq('site_id', site.id)
-            .order('unit_code', { ascending: true }),
-          site.name
-            ? adminClient
-                .from('battery_units')
-                .select('unit_code, sensor_battery_level, sensor_temperature, voltage, status, updated_at')
-                .is('site_id', null)
-                .eq('site_name', site.name)
-                .order('unit_code', { ascending: true })
-            : Promise.resolve({ data: [], error: null }),
-          siteNameAlt
-            ? adminClient
-                .from('battery_units')
-                .select('unit_code, sensor_battery_level, sensor_temperature, voltage, status, updated_at')
-                .is('site_id', null)
-                .eq('site_name', siteNameAlt)
-                .order('unit_code', { ascending: true })
-            : Promise.resolve({ data: [], error: null }),
-        ])
+      // 字段映射：数据库列名 → buildCabinetSlots 入参约定
+      const units = deduped.map((u: any) => ({
+        unit_code: u.unit_code,
+        soc: u.sensor_battery_level ?? null,
+        temperature: u.sensor_temperature ?? null,
+        voltage: null, // battery_units 表无 voltage 列，首页也不传
+        status: u.status,
+        last_maintenance: u.updated_at ?? null,
+      }))
 
-        // 合并 + 去重（同一 unit 可能被 site_id 和 site_name 两条路径都命中）
-        const rawUnits = [
-          ...(unitsByIdRes.data || []),
-          ...(unitsByNameRes.data || []),
-          ...(unitsByNameAltRes.data || []),
-        ]
-        const seen = new Set<string>()
-        const dedupedUnits = rawUnits.filter((u: any) => {
-          const key = u.unit_code
-          if (!key || seen.has(key)) return false
-          seen.add(key)
-          return true
-        })
+      const cabinetSlots = buildCabinetSlots(slotCount, units, 0)
+      const { cabinet_slots: _, ...siteRest } = site
 
-        // 映射字段名，对齐 buildCabinetSlots 的入参约定
-        const units = dedupedUnits.map((u: any) => ({
-          unit_code: u.unit_code,
-          soc: u.sensor_battery_level ?? null,
-          temperature: u.sensor_temperature ?? null,
-          voltage: u.voltage ?? null,
-          status: u.status,
-          last_maintenance: u.updated_at ?? null,
-        }))
-
-        const cabinetSlots = buildCabinetSlots(slotCount, units, 0)
-
-        const { cabinet_slots: _, ...siteRest } = site
-        return {
-          ...siteRest,
-          cabinet_slots: cabinetSlots,
-          template: templateMap[site.template_id] || null,
-        }
-      }),
-    )
+      return {
+        ...siteRest,
+        cabinet_slots: cabinetSlots,
+        template: templateMap[site.template_id] || null,
+      }
+    })
 
     return ok({ stations: enriched })
   } catch (e: any) {
