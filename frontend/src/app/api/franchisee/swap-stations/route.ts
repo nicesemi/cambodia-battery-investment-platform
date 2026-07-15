@@ -176,64 +176,127 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. 逐个站点查询真实电池单元并构建槽位数组
-    const enriched = await Promise.all(
-      matchedSites.map(async (site: any) => {
-        const slotCount = getSlotCount(site)
+    // ── 4. 批量查询所有匹配站点的真实电池单元 ──
+    //    对齐首页 /api/battery-units/live 的批量查询模式，避免逐站查询
+    //    带来的 site.id 类型不匹配 / site_name 格式分歧问题。
+    const matchedSiteIds = matchedSites.map((s: any) => s.id)
 
-        // 查询分配到此站点的真实电池单元（带 sensor 数据）
-        // 三条路径：site_id 精确 + site_name 回退（两种空格格式）
-        const siteNameAlt = site.name && site.name.includes('加盟换电站')
-          ? (site.name.includes(' 加盟换电站')
-              ? site.name.replace(' 加盟换电站', '加盟换电站')
-              : site.name.replace('加盟换电站', ' 加盟换电站'))
-          : null
+    // 收集所有可能的 site_name 变体（原始 + 空格变体），用于 IN 批量查询
+    const siteNameVariants: string[] = []
+    matchedSites.forEach((s: any) => {
+      if (!s.name) return
+      siteNameVariants.push(s.name)
+      if (s.name.includes('加盟换电站')) {
+        const alt = s.name.includes(' 加盟换电站')
+          ? s.name.replace(' 加盟换电站', '加盟换电站')
+          : s.name.replace('加盟换电站', ' 加盟换电站')
+        siteNameVariants.push(alt)
+      }
+    })
+    const uniqueSiteNames = [...new Set(siteNameVariants)]
 
-        const [unitsByIdRes, unitsByNameRes, unitsByNameAltRes] = await Promise.all([
-          adminClient
+    // 两路并行（对齐首页的 assigned + sold-by-name 模式）：
+    //   路径 A — site_id 精配
+    //   路径 B — site_name 回退（site_id 为空但 site_name 匹配）
+    const [unitsByIdRes, unitsByNameRes] = await Promise.all([
+      adminClient
+        .from('battery_units')
+        .select('unit_code, sensor_battery_level, sensor_temperature, voltage, status, updated_at, site_id, site_name')
+        .in('site_id', matchedSiteIds)
+        .order('unit_code', { ascending: true }),
+      uniqueSiteNames.length > 0
+        ? adminClient
             .from('battery_units')
-            .select('unit_code, soc, temperature, voltage, status, last_maintenance')
-            .eq('site_id', site.id)
-            .order('unit_code', { ascending: true }),
-          site.name
-            ? adminClient
-                .from('battery_units')
-                .select('unit_code, soc, temperature, voltage, status, last_maintenance')
-                .is('site_id', null)
-                .eq('site_name', site.name)
-                .order('unit_code', { ascending: true })
-            : Promise.resolve({ data: [] }),
-          siteNameAlt
-            ? adminClient
-                .from('battery_units')
-                .select('unit_code, soc, temperature, voltage, status, last_maintenance')
-                .is('site_id', null)
-                .eq('site_name', siteNameAlt)
-                .order('unit_code', { ascending: true })
-            : Promise.resolve({ data: [] }),
-        ])
+            .select('unit_code, sensor_battery_level, sensor_temperature, voltage, status, updated_at, site_id, site_name')
+            .is('site_id', null)
+            .in('site_name', uniqueSiteNames)
+            .order('unit_code', { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+    ])
 
-        const units = [
-          ...(unitsByIdRes.data || []),
-          ...(unitsByNameRes.data || []),
-          ...(unitsByNameAltRes.data || []),
-        ]
+    if (unitsByIdRes.error) return serverError(unitsByIdRes.error.message)
+    if (unitsByNameRes.error) return serverError(unitsByNameRes.error.message)
 
-        const cabinetSlots = buildCabinetSlots(
-          slotCount,
-          units,
-          0,
-        )
+    const allUnits = [
+      ...(unitsByIdRes.data || []),
+      ...(unitsByNameRes.data || []),
+    ]
 
-        // 只返回 operation_sites 和模板的有效字段，不暴露原始 cabinet_slots 整数
-        const { cabinet_slots: _, ...siteRest } = site
-        return {
-          ...siteRest,
-          cabinet_slots: cabinetSlots,
-          template: templateMap[site.template_id] || null,
+    // 构建 site_id → units 和 site_name → units 的本地索引
+    const unitsBySiteId: Record<string, any[]> = {}
+    const unitsBySiteName: Record<string, any[]> = {}
+
+    allUnits.forEach((u: any) => {
+      const idKey = u.site_id != null ? String(u.site_id) : null
+      if (idKey) {
+        ;(unitsBySiteId[idKey] ??= []).push(u)
+      }
+      if (u.site_name) {
+        // 同时索引 site_name 本身及空格变体
+        const names = [u.site_name]
+        if (u.site_name.includes('加盟换电站')) {
+          const alt = u.site_name.includes(' 加盟换电站')
+            ? u.site_name.replace(' 加盟换电站', '加盟换电站')
+            : u.site_name.replace('加盟换电站', ' 加盟换电站')
+          names.push(alt)
         }
-      }),
-    )
+        names.forEach((n) => {
+          ;(unitsBySiteName[n] ??= []).push(u)
+        })
+      }
+    })
+
+    // 去重：同一 unit 可能同时被 site_id 和 site_name 索引命中
+    const dedup = (arr: any[]) => {
+      const seen = new Set<string>()
+      return arr.filter((u: any) => {
+        const key = u.unit_code
+        if (!key || seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+    }
+
+    // ── 5. 为每个匹配站点组装最终数据 ──
+    const enriched = matchedSites.map((site: any) => {
+      const slotCount = getSlotCount(site)
+
+      // 拼接：site_id 精确 + site_name 原始 + site_name 空格变体
+      const rawUnits = dedup([
+        ...(unitsBySiteId[String(site.id)] || []),
+        ...(site.name ? (unitsBySiteName[site.name] || []) : []),
+      ])
+
+      // 如果 site.name 含"加盟换电站"，额外拉入空格变体对应的 units
+      if (site.name && site.name.includes('加盟换电站')) {
+        const alt = site.name.includes(' 加盟换电站')
+          ? site.name.replace(' 加盟换电站', '加盟换电站')
+          : site.name.replace('加盟换电站', ' 加盟换电站')
+        rawUnits.push(...(unitsBySiteName[alt] || []))
+      }
+
+      // 二次去重（经过拼接后）
+      const units = dedup(rawUnits)
+
+      // 映射字段名，对齐 buildCabinetSlots 的入参约定
+      const mappedUnits = units.map((u: any) => ({
+        unit_code: u.unit_code,
+        soc: u.sensor_battery_level ?? null,
+        temperature: u.sensor_temperature ?? null,
+        voltage: u.voltage ?? null,
+        status: u.status,
+        last_maintenance: u.updated_at ?? null,
+      }))
+
+      const cabinetSlots = buildCabinetSlots(slotCount, mappedUnits, 0)
+
+      const { cabinet_slots: _, ...siteRest } = site
+      return {
+        ...siteRest,
+        cabinet_slots: cabinetSlots,
+        template: templateMap[site.template_id] || null,
+      }
+    })
 
     return ok({ stations: enriched })
   } catch (e: any) {
